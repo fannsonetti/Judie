@@ -34,7 +34,7 @@ echo "==> System packages (WebKitGTK / GTK)"
 if command -v apt-get >/dev/null; then
   sudo apt-get update
   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-    build-essential curl wget file libxdo-dev \
+    build-essential curl wget file libxdo-dev xdg-utils \
     libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
     librsvg2-dev patchelf libssl-dev
 fi
