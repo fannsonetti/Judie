@@ -7,7 +7,7 @@ interface Props {
 
 const SOURCE_LABEL: Record<string, string> = {
   user: "Manual",
-  assistant: "Nova",
+  assistant: "Judie",
   routine: "Routine",
   timer: "Timer",
   automation: "Auto",
@@ -29,7 +29,7 @@ export function ActivityWidget({ size }: Props) {
       <div className="act-list grow">
         {shown.length === 0 && (
           <>
-            <div className="act-row"><span>Now</span><strong>Waiting for Nova</strong><em>System</em></div>
+            <div className="act-row"><span>Now</span><strong>Waiting for Judie</strong><em>System</em></div>
             <div className="act-row"><span>—</span><strong>Lights and media will land here</strong><em>Hint</em></div>
           </>
         )}

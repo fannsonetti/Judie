@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Judie
+Comment=Judie room control
+Exec=judie
+Icon=judie
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true

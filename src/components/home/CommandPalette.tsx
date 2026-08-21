@@ -39,7 +39,7 @@ export function CommandPalette() {
     const items: Hit[] = [
       {
         id: "ask",
-        title: q.trim() ? `Ask Nova: ${q.trim()}` : "Type a command…",
+        title: q.trim() ? `Ask Judie: ${q.trim()}` : "Type a command…",
         hint: "Enter",
         run: () => {
           if (!q.trim()) return;
@@ -110,6 +110,15 @@ export function CommandPalette() {
           useAssistantStore.getState().setSettingsOpen(true);
         },
       },
+      {
+        id: "widget-creator",
+        title: "Open Widget Creator",
+        hint: "Widget",
+        run: () => {
+          setOpen(false);
+          useLayoutStore.getState().setCreatorOpen(true);
+        },
+      },
     ];
     if (!n) return items.slice(0, 12);
     return items.filter(
@@ -154,7 +163,7 @@ export function CommandPalette() {
           <input
             ref={inputRef}
             className="palette-input"
-            placeholder="Hey Nova — lights off, dim, mute, 12 times 7…"
+            placeholder="Hey Judie — lights off, dim, mute, 12 times 7…"
             value={q}
             onChange={(e) => {
               setQ(e.target.value);

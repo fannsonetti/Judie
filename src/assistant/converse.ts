@@ -14,8 +14,8 @@ export function converse(
     case "identity":
       return pick([
         identityLine(),
-        "Nova. I run this room.",
-        "Room assistant. Nova.",
+        "Judie. I run this room.",
+        "Room assistant. Judie.",
       ]);
     case "creator":
       return pick([
@@ -87,7 +87,7 @@ function personReply(entity: string, text: string) {
 }
 
 function isSelf(e: string) {
-  return e === "nova" || e === "you" || e === "nova assistant";
+  return e === "judie" || e === "you" || e === "judie assistant";
 }
 
 function preferenceReply(text: string) {

@@ -28,7 +28,7 @@ export function TimersWidget({ size }: Props) {
       {!ordered.length && (
         <div className="timer-empty grow">
           <div className="wx-metric sm">0:00</div>
-          <div className="wx-muted">No timers running. Ask Nova for five minutes.</div>
+          <div className="wx-muted">No timers running. Ask Judie for five minutes.</div>
         </div>
       )}
       {ordered[0] && (

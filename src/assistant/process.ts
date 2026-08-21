@@ -379,7 +379,7 @@ function followUp(
 }
 
 function heuristic(text: string, e: Entities, snap: RoomSnapshot, ctx: ConversationContext): ClauseResult | null {
-  if (isQuestion(text) && /\b(you|your|nova|siri|alexa)\b/.test(text) && !/\blights?\b/.test(text)) {
+  if (isQuestion(text) && /\b(you|your|judie|siri|alexa)\b/.test(text) && !/\blights?\b/.test(text)) {
     return null;
   }
   if (isQuestion(text) && /\blights?\b/.test(text)) {
@@ -709,7 +709,7 @@ function runIntent(
       return ok(intent, confidence, e, pick(["Yep.", "Mhm.", "Anytime.", "Sure."]), []);
     case "social.who": {
       const person = namedPerson(text) || (e.person as string | undefined);
-      if (person && !/^(you|nova|nova assistant)$/.test(person)) {
+      if (person && !/^(you|judie|judie assistant)$/.test(person)) {
         return ok("talk.person", confidence, e, converse("person", text, ctx, person), []);
       }
       if (/\b(made|created|built|coded|owns|designed)\b/.test(text)) {
@@ -782,8 +782,8 @@ export function processUtterance(
   const started = performance.now?.() ?? Date.now();
   const prepared = normalizeUtterance(raw, true);
   const normalized = normalizeUtterance(raw);
-  if (isWakeOnly(raw) || normalized === "nova" || normalized === "hey nova") {
-    return finalize([hello()], normalized || "hey nova", [normalized || "hey nova"], started);
+  if (isWakeOnly(raw) || normalized === "judie" || normalized === "hey judie") {
+    return finalize([hello()], normalized || "hey judie", [normalized || "hey judie"], started);
   }
   if (!normalized) {
     return {

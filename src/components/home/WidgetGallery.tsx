@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   WidgetType,
@@ -7,9 +7,14 @@ import {
   WIDGET_SUPPORTED_SIZES,
 } from "../../types/widgets";
 import { useLayoutStore } from "../../store/layoutStore";
+import { useCustomWidgetStore } from "../../store/customWidgetStore";
+import { parseWidgetFile } from "../../slopbox/export";
+import { filledSizes } from "../../slopbox/schema";
+import { useSlopStore } from "../../slopbox/store";
+import { overlayTransition, usePerformanceStore } from "../../lib/performance";
 
-const DESCRIPTIONS: Record<WidgetType, string> = {
-  activity: "See a live feed of what Nova and your automations have been doing.",
+const DESCRIPTIONS: Record<Exclude<WidgetType, "custom">, string> = {
+  activity: "See a live feed of what Judie and your automations have been doing.",
   calendar: "Keep track of your upcoming events and schedule at a glance.",
   climate: "Monitor indoor temperature, humidity, and comfort levels in real time.",
   lights: "Control your room lighting with quick toggles, brightness, and colour temperature.",
@@ -33,29 +38,80 @@ const SIZE_ASPECT: Record<WidgetSize, { w: number; h: number }> = {
   "2x2": { w: 140, h: 140 },
 };
 
+type Sel = { kind: "builtin"; type: Exclude<WidgetType, "custom"> } | { kind: "custom"; id: string };
+
 export function WidgetGallery() {
   const open = useLayoutStore((s) => s.galleryOpen);
   const setGalleryOpen = useLayoutStore((s) => s.setGalleryOpen);
+  const setCreatorOpen = useLayoutStore((s) => s.setCreatorOpen);
   const addWidget = useLayoutStore((s) => s.addWidget);
+  const customWidgets = useCustomWidgetStore((s) => s.widgets);
+  const importOne = useCustomWidgetStore((s) => s.importOne);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const reduced = usePerformanceStore((s) => s.reduced);
 
   const types = useMemo(
     () =>
-      (Object.keys(WIDGET_LABELS) as WidgetType[]).sort((a, b) =>
-        WIDGET_LABELS[a].localeCompare(WIDGET_LABELS[b])
-      ),
+      (Object.keys(WIDGET_LABELS) as WidgetType[])
+        .filter((t): t is Exclude<WidgetType, "custom"> => t !== "custom")
+        .sort((a, b) => WIDGET_LABELS[a].localeCompare(WIDGET_LABELS[b])),
     []
   );
 
-  const [selected, setSelected] = useState<WidgetType>(types[0]);
+  const [selected, setSelected] = useState<Sel>({ kind: "builtin", type: types[0] });
   const [hoveredSize, setHoveredSize] = useState<WidgetSize | null>(null);
   const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
 
-  const visible = types.filter((t) =>
-    WIDGET_LABELS[t].toLowerCase().includes(query.trim().toLowerCase())
-  );
-  const current = visible.includes(selected) ? selected : visible[0] ?? types[0];
-  const sizes = WIDGET_SUPPORTED_SIZES[current];
+  const visible = types.filter((t) => WIDGET_LABELS[t].toLowerCase().includes(q));
+  const visibleCustom = customWidgets.filter((w) => w.name.toLowerCase().includes(q));
+
+  const current: Sel =
+    selected.kind === "builtin" && visible.includes(selected.type)
+      ? selected
+      : selected.kind === "custom" && visibleCustom.some((w) => w.id === selected.id)
+        ? selected
+        : visible[0]
+          ? { kind: "builtin", type: visible[0] }
+          : visibleCustom[0]
+            ? { kind: "custom", id: visibleCustom[0].id }
+            : { kind: "builtin", type: types[0] };
+
+  const custom = current.kind === "custom" ? customWidgets.find((w) => w.id === current.id) : null;
+  const sizes =
+    current.kind === "custom"
+      ? custom
+        ? filledSizes(custom)
+        : []
+      : WIDGET_SUPPORTED_SIZES[current.type];
   const activeSize = hoveredSize && sizes.includes(hoveredSize) ? hoveredSize : null;
+  const name = current.kind === "custom" ? (custom?.name ?? "Custom") : WIDGET_LABELS[current.type];
+  const desc =
+    current.kind === "custom"
+      ? "Custom widget from Widget Creator. Select a size to add it to the home screen."
+      : DESCRIPTIONS[current.type];
+
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const def = parseWidgetFile(await file.text());
+      const id = importOne(def);
+      setSelected({ kind: "custom", id });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Could not import that file.");
+    }
+  };
+
+  const openCreator = (editId?: string) => {
+    if (editId) {
+      const def = customWidgets.find((w) => w.id === editId);
+      if (def) {
+        useSlopStore.getState().importOne(def);
+        useSlopStore.getState().select(def.id);
+      }
+    }
+    setCreatorOpen(true);
+  };
 
   return (
     <AnimatePresence>
@@ -69,13 +125,22 @@ export function WidgetGallery() {
         >
           <motion.div
             className="wg-panel"
-            initial={{ opacity: 0, y: 28, scale: 0.97 }}
+            initial={{ opacity: 0, y: reduced ? 8 : 28, scale: reduced ? 1 : 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 400, damping: 34 }}
+            exit={{ opacity: 0, y: reduced ? 4 : 16, scale: reduced ? 1 : 0.97 }}
+            transition={overlayTransition(reduced)}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Sidebar */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json,.judie-widget.json,.nova-widget.json"
+              hidden
+              onChange={(e) => {
+                void importFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
             <div className="wg-sidebar">
               <h2 className="wg-title">Add Widget</h2>
               <div className="wg-search-box">
@@ -88,23 +153,59 @@ export function WidgetGallery() {
                 />
               </div>
               <div className="wg-list">
-                {visible.map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    className={`wg-list-item ${type === current ? "active" : ""}`}
-                    onClick={() => {
-                      setSelected(type);
-                      setHoveredSize(null);
-                    }}
-                  >
-                    <span className="wg-list-name">{WIDGET_LABELS[type]}</span>
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  className="wg-list-item"
+                  onClick={() => openCreator()}
+                >
+                  <span className="wg-list-name">Open Widget Creator…</span>
+                </button>
+                <button
+                  type="button"
+                  className="wg-list-item"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  <span className="wg-list-name">Import widget file…</span>
+                </button>
+                {visibleCustom.length > 0 && (
+                  <>
+                    <div className="wg-list-heading">Custom</div>
+                    {visibleCustom.map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        className={`wg-list-item ${current.kind === "custom" && current.id === w.id ? "active" : ""}`}
+                        onClick={() => {
+                          setSelected({ kind: "custom", id: w.id });
+                          setHoveredSize(null);
+                        }}
+                      >
+                        <span className="wg-list-name">{w.name}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {visible.length > 0 && (
+                  <>
+                    <div className="wg-list-heading">Built-in</div>
+                    {visible.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        className={`wg-list-item ${current.kind === "builtin" && type === current.type ? "active" : ""}`}
+                        onClick={() => {
+                          setSelected({ kind: "builtin", type });
+                          setHoveredSize(null);
+                        }}
+                      >
+                        <span className="wg-list-name">{WIDGET_LABELS[type]}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Detail pane */}
             <div className="wg-detail">
               <button
                 type="button"
@@ -115,8 +216,8 @@ export function WidgetGallery() {
               </button>
 
               <div className="wg-detail-top">
-                <h3 className="wg-detail-name">{WIDGET_LABELS[current]}</h3>
-                <p className="wg-detail-desc">{DESCRIPTIONS[current]}</p>
+                <h3 className="wg-detail-name">{name}</h3>
+                <p className="wg-detail-desc">{desc}</p>
               </div>
 
               <div className="wg-divider" />
@@ -124,31 +225,51 @@ export function WidgetGallery() {
               <p className="wg-size-label">Choose a Size</p>
 
               <div className="wg-sizes">
-                {sizes.map((s) => {
-                  const dim = SIZE_ASPECT[s];
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      className={`wg-size-card ${activeSize === s ? "active" : ""}`}
-                      onMouseEnter={() => setHoveredSize(s)}
-                      onMouseLeave={() => setHoveredSize(null)}
-                      onClick={() => {
-                        addWidget(current, s);
-                        setGalleryOpen(false);
-                      }}
-                    >
-                      <div
-                        className="wg-size-preview"
-                        style={{ width: dim.w, height: dim.h }}
-                      />
-                      <span className="wg-size-name">{SIZE_LABEL[s]}</span>
-                    </button>
-                  );
-                })}
+                {sizes.length === 0 ? (
+                  <p className="wg-hint">
+                    This widget has no completed sizes. Open Widget Creator and lay out at least one size.
+                  </p>
+                ) : (
+                  sizes.map((s) => {
+                    const dim = SIZE_ASPECT[s];
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        className={`wg-size-card ${activeSize === s ? "active" : ""}`}
+                        onMouseEnter={() => setHoveredSize(s)}
+                        onMouseLeave={() => setHoveredSize(null)}
+                        onClick={() => {
+                          if (current.kind === "custom") addWidget("custom", s, undefined, current.id);
+                          else addWidget(current.type, s);
+                          setGalleryOpen(false);
+                        }}
+                      >
+                        <div
+                          className="wg-size-preview"
+                          style={{ width: dim.w, height: dim.h }}
+                        />
+                        <span className="wg-size-name">{SIZE_LABEL[s]}</span>
+                      </button>
+                    );
+                  })
+                )}
               </div>
 
-              <p className="wg-hint">Select a size to add this widget.</p>
+              {current.kind === "custom" ? (
+                <>
+                  <p className="wg-hint">Descriptors stay in the definition, not on the tile.</p>
+                  <button
+                    type="button"
+                    className="wg-hint-btn"
+                    onClick={() => openCreator(current.id)}
+                  >
+                    Edit in Widget Creator
+                  </button>
+                </>
+              ) : (
+                <p className="wg-hint">Select a size to add this widget.</p>
+              )}
             </div>
           </motion.div>
         </motion.div>

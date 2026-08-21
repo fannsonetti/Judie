@@ -37,7 +37,7 @@ const CONTRACTIONS: Record<string, string> = {
   "y'all": "you all",
 };
 
-const WAKE_ONLY = /^(hey |hi |hello |yo |ok |okay )?(nova)$/i;
+const WAKE_ONLY = /^(hey |hi |hello |yo |ok |okay )?(judie)$/i;
 
 export function isWakeOnly(raw: string): boolean {
   const t = raw
@@ -52,7 +52,7 @@ export function isWakeOnly(raw: string): boolean {
 
 export function normalizeUtterance(raw: string, keepCommas = false): string {
   let t = raw.toLowerCase().replace(/[“”]/g, '"').replace(/[’]/g, "'");
-  t = t.replace(/^(hey |hi |hello |yo |ok |okay |ayo )?nova[,:]?\s+/i, "");
+  t = t.replace(/^(hey |hi |hello |yo |ok |okay |ayo )?judie[,:]?\s+/i, "");
   t = stripFluff(t);
   for (const [k, v] of Object.entries(CONTRACTIONS)) {
     t = t.replace(new RegExp(`\\b${k}\\b`, "g"), v);

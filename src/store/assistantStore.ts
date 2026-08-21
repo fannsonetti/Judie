@@ -103,7 +103,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
       stopSpeech();
       set({ status: "idle", lastResponse: "Okay." });
       void appendConversationLog({ role: "you", text: trimmed, source, intent: "assistant.stop" });
-      void appendConversationLog({ role: "nova", text: "Okay.", source, intent: "assistant.stop" });
+      void appendConversationLog({ role: "judie", text: "Okay.", source, intent: "assistant.stop" });
       return null;
     }
 
@@ -119,7 +119,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
       useRoomStore.getState().applyActions(result.actions, source);
     }
 
-    const title = result.response || "Nova";
+    const title = result.response || "Judie";
     useActivityStore.getState().push({
       source,
       title,
@@ -144,7 +144,7 @@ export const useAssistantStore = create<AssistantState>((set, get) => ({
     });
     if (result.response) {
       void appendConversationLog({
-        role: "nova",
+        role: "judie",
         text: result.response,
         source,
         intent: result.intent,

@@ -5,10 +5,10 @@ import { useRoomStore } from "../store/roomStore";
 import { useSettingsStore } from "../store/settingsStore";
 import { useAssistantStore } from "../store/assistantStore";
 import { useActivityStore } from "../store/activityStore";
-import { useNovaHotkeys } from "../hooks/useNovaHotkeys";
+import { useJudieHotkeys } from "../hooks/useJudieHotkeys";
 
-export function NovaRuntime() {
-  useNovaHotkeys();
+export function JudieRuntime() {
+  useJudieHotkeys();
   const tickProgress = useRoomStore((s) => s.tickProgress);
   const notified = useRef(new Set<string>());
 

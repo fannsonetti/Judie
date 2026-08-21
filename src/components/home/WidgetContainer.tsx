@@ -16,6 +16,8 @@ import { QuickControlsWidget } from "../widgets/QuickControlsWidget";
 import { ServerWidget } from "../widgets/ServerWidget";
 import { ActivityWidget } from "../widgets/ActivityWidget";
 import { TimersWidget } from "../widgets/TimersWidget";
+import { SlopWidget } from "../widgets/SlopWidget";
+import { overlayTransition, usePerformanceStore } from "../../lib/performance";
 
 const EXPANDABLE = new Set<string>(["weather", "lights", "media", "purifier", "calendar"]);
 
@@ -36,6 +38,7 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
   const resizeWidget = useLayoutStore((s) => s.resizeWidget);
   const setDragging = useLayoutStore((s) => s.setDragging);
   const reorder = useLayoutStore((s) => s.reorder);
+  const reduced = usePerformanceStore((s) => s.reduced);
 
   const longPressTimer = useRef<number | null>(null);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
@@ -153,9 +156,9 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
   return (
     <motion.div
       className="widget-slot"
-      layout={!isDragging}
+      layout={!isDragging && !reduced}
       data-widget-id={widget.id}
-      transition={{ type: "spring", stiffness: 420, damping: 34 }}
+      transition={overlayTransition(reduced)}
       style={{
         left,
         top,
@@ -171,7 +174,7 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
       }}
     >
       <motion.div
-        layoutId={`widget-${widget.id}`}
+        layoutId={reduced ? undefined : `widget-${widget.id}`}
         className={`widget-shell ${editMode ? "edit-jiggle" : ""} ${isDragging ? "dragging" : ""}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -246,6 +249,8 @@ function WidgetBody({ widget }: { widget: PlacedWidget }): ReactNode {
       return <ActivityWidget size={widget.size} />;
     case "timers":
       return <TimersWidget size={widget.size} />;
+    case "custom":
+      return <SlopWidget customId={widget.customId} size={widget.size} />;
     default:
       return null;
   }

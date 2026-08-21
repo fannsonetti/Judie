@@ -1,0 +1,28 @@
+{
+  "bundle": {
+    "targets": ["deb", "appimage"],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1"
+        ]
+      }
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Judie",
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "fullscreen": false,
+        "maximized": true,
+        "minWidth": 800,
+        "minHeight": 480
+      }
+    ]
+  }
+}

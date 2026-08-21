@@ -34,10 +34,10 @@ const COMPARISON_CUE =
   /\b(better|worse|smarter|dumber)\b.+\b(than|or)\b|\bcompared to\b|\bversus\b|\bvs\b|\bdifference between\b|\byou or (siri|alexa|google|chatgpt)\b|\b(siri|alexa|google) or you\b/;
 
 const CREATOR_CUE =
-  /\bwho (made|created|built|coded|programmed|owns|designed|developed|wrote) (you|nova|this)\b|\bwho is your (maker|creator|author|owner|developer|boss)\b|\bwho works on (you|nova)\b|\bwhere (do you|are you) (from|running|hosted|installed)\b/;
+  /\bwho (made|created|built|coded|programmed|owns|designed|developed|wrote) (you|judie|this)\b|\bwho is your (maker|creator|author|owner|developer|boss)\b|\bwho works on (you|judie)\b|\bwhere (do you|are you) (from|running|hosted|installed)\b/;
 
 const IDENTITY_CUE =
-  /\bwho are you\b|\bwhat are you\b|\bwhat is your name\b|\bwhat(?: is|'s)? nova\b|\bwho is nova\b/;
+  /\bwho are you\b|\bwhat are you\b|\bwhat is your name\b|\bwhat(?: is|'s)? judie\b|\bwho is judie\b/;
 
 const WELLBEING_CUE =
   /\bhow are you\b|\bhow(?: are|'re) you doing\b|\byou good\b|\bhow is it going\b|\bhow you doing\b/;
@@ -182,7 +182,7 @@ export function scoreConversation(t: string): ScoredRoute["conversation"] {
 
 function isSelfEntity(entity: string) {
   const e = entity.trim().toLowerCase();
-  return e === "nova" || e === "you" || e === "nova assistant" || e === "the assistant";
+  return e === "judie" || e === "you" || e === "judie assistant" || e === "the assistant";
 }
 
 function isOpenChat(t: string) {

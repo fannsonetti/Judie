@@ -1,0 +1,839 @@
+.slop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: var(--bg);
+}
+
+.slop-app {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 260px 1fr 280px;
+  background:
+    radial-gradient(900px 500px at 20% -10%, rgba(45, 123, 255, 0.08), transparent 50%),
+    var(--bg);
+  color: var(--text);
+}
+
+.slop-sidebar,
+.slop-inspector {
+  background: rgba(18, 20, 26, 0.92);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.slop-inspector {
+  border-right: none;
+  border-left: 1px solid var(--border);
+  padding: 18px 16px 24px;
+  overflow: auto;
+}
+
+.slop-inspector h2 {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.slop-sidebar-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px 16px 12px;
+}
+
+.slop-brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.slop-brand-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.slop-new {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.slop-done {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.slop-new-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.slop-new-menu {
+  position: absolute;
+  right: 0;
+  top: 38px;
+  width: 180px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 6px;
+  z-index: 8;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+}
+
+.slop-new-menu button {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.slop-new-menu button:hover { background: rgba(255,255,255,0.06); }
+.slop-new-menu strong { font-size: 13px; }
+.slop-new-menu span { font-size: 11px; color: var(--text-dim); }
+
+.slop-widget-list {
+  flex: 1;
+  overflow: auto;
+  padding: 6px 10px 16px;
+}
+
+.slop-widget-item {
+  display: flex;
+  gap: 4px;
+  border-radius: 12px;
+  margin-bottom: 4px;
+}
+
+.slop-widget-item.active {
+  background: rgba(45, 123, 255, 0.14);
+}
+
+.slop-widget-main {
+  flex: 1;
+  text-align: left;
+  padding: 12px 10px;
+  min-width: 0;
+  min-height: 52px;
+}
+
+.slop-widget-main strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slop-widget-main span {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.slop-widget-actions {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 4px;
+}
+
+.slop-widget-actions button {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-size: 18px;
+}
+
+.slop-widget-actions button:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+
+.slop-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.slop-top {
+  min-height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.slop-size-tabs,
+.slop-size-toggles {
+  display: flex;
+  gap: 8px;
+}
+
+.slop-size-tabs button,
+.slop-size-toggles button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.slop-size-tabs button.on,
+.slop-size-toggles button.on {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+}
+
+.slop-size-tabs button.empty {
+  opacity: 0.5;
+}
+
+.slop-size-tabs button.empty.on {
+  opacity: 1;
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.slop-grid-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.slop-grid-toggle input {
+  width: 20px;
+  height: 20px;
+}
+
+.slop-zoom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+}
+
+.slop-zoom-label,
+.slop-zoom-value {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.slop-zoom-slider {
+  width: min(140px, 18vw);
+  accent-color: var(--accent);
+}
+
+.slop-zoom-btn {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.slop-zoom-btn:disabled,
+.slop-zoom-slider:disabled {
+  opacity: 0.45;
+}
+
+.slop-saved {
+  font-size: 12px;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.slop-saved.on { opacity: 1; color: var(--success); }
+
+.slop-top-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.slop-top-actions button,
+.slop-inspector .slop-size-toggles button,
+.slop-inspector .slop-svg-choose,
+.slop-inspector .slop-svg-clear,
+.slop-inspector .slop-icon-grid button {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.slop-top-actions button.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+
+.slop-top-actions button.danger {
+  color: #ffb4b4;
+  border-color: rgba(255, 92, 92, 0.35);
+}
+
+.slop-top-actions button:disabled { opacity: 0.4; }
+
+.slop-palette {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.slop-palette button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 76px;
+  min-height: 72px;
+  padding: 10px 8px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.slop-palette button:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+}
+
+.slop-glyph-letter { font-weight: 700; font-size: 13px; color: var(--text); }
+.slop-glyph-letter.lg { font-size: 15px; letter-spacing: -0.04em; }
+.slop-glyph-bar {
+  width: 28px;
+  height: 5px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), rgba(45,123,255,0.2));
+  margin-top: 6px;
+}
+.slop-glyph-btn {
+  width: 28px;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--accent);
+}
+.slop-glyph-chip {
+  width: 22px;
+  height: 10px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.16);
+}
+.slop-glyph-line {
+  width: 28px;
+  height: 2px;
+  background: rgba(255,255,255,0.28);
+  margin-top: 8px;
+}
+.slop-glyph-box {
+  width: 18px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(255,255,255,0.28);
+}
+
+.slop-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: auto;
+  padding: 24px;
+  -webkit-overflow-scrolling: touch;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(45, 123, 255, 0.07), transparent 55%),
+    radial-gradient(900px 500px at 90% 10%, rgba(255, 255, 255, 0.03), transparent 50%),
+    var(--bg);
+}
+
+.slop-stage.preview {
+  align-items: center;
+  justify-content: center;
+}
+
+.slop-stage-empty {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.slop-stage-label {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.slop-artboard-scale {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.slop-artboard {
+  position: absolute;
+  top: 0;
+  left: 0;
+  flex: none;
+}
+
+.slop-artboard .widget-face,
+.slop-artboard-face {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.slop-hook-note {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 8px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.slop-sidebar-foot {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.slop-import-btn {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.slop-artboard-face {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.slop-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 24px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.slop-hit {
+  position: absolute;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: move;
+  z-index: 2;
+  touch-action: none;
+}
+
+.slop-hit:hover { border-color: rgba(45, 123, 255, 0.45); }
+.slop-hit.selected { border-color: transparent; }
+
+.slop-selection {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 0 1px rgba(45,123,255,0.2);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.slop-handle {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: #fff;
+  border: 2px solid var(--accent);
+  pointer-events: auto;
+  z-index: 4;
+  touch-action: none;
+}
+
+.slop-handle.nw { left: -10px; top: -10px; cursor: nwse-resize; }
+.slop-handle.ne { right: -10px; top: -10px; cursor: nesw-resize; }
+.slop-handle.sw { left: -10px; bottom: -10px; cursor: nesw-resize; }
+.slop-handle.se { right: -10px; bottom: -10px; cursor: nwse-resize; }
+
+.slop-guide {
+  position: absolute;
+  background: #FF9F0A;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.85;
+}
+
+.slop-guide.x { top: 0; bottom: 0; width: 1px; }
+.slop-guide.y { left: 0; right: 0; height: 1px; }
+
+.slop-block {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.slop-block-title {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.slop-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.slop-field input[type="text"],
+.slop-field input[type="number"],
+.slop-field input:not([type]),
+.slop-inspector input[type="number"],
+.slop-inspector input:not([type="range"]):not([type="color"]):not([type="checkbox"]) {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0 12px;
+  color: var(--text);
+  font-size: 15px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.slop-field input[type="range"] {
+  width: 100%;
+  min-height: 36px;
+  accent-color: var(--accent);
+}
+
+.slop-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.slop-swatches button {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  max-width: 36px;
+  max-height: 36px;
+  padding: 0;
+  flex: 0 0 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background-clip: padding-box;
+  aspect-ratio: 1;
+}
+
+.slop-swatches button.on { outline: 2px solid #fff; outline-offset: 1px; }
+.slop-swatches input[type="color"] {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 50%;
+  background: none;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.slop-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.slop-icon-grid button {
+  min-height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.slop-icon-grid button.on {
+  background: var(--accent-soft);
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.slop-xywh {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.slop-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+
+.slop-host,
+.slop-face {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.slop-bar {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.slop-bar-fill { height: 100%; }
+
+.slop-missing {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 16px;
+  text-align: center;
+}
+
+.slop-pixel-grid {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.slop-pixel-grid line {
+  stroke: rgba(255, 255, 255, 0.055);
+  stroke-width: 1;
+}
+
+.slop-pixel-grid line.major {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+
+.slop-ctx {
+  position: fixed;
+  z-index: 80;
+  min-width: 196px;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+}
+
+.slop-ctx button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+}
+
+.slop-ctx button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.slop-ctx button:disabled {
+  color: var(--text-dim);
+}
+
+.slop-ctx button.danger {
+  color: var(--danger);
+}
+
+.slop-ctx-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 6px;
+}
+
+.slop-preview-scale {
+  position: relative;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.slop-preview-nova {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.slop-preview-page {
+  position: relative;
+  box-sizing: border-box;
+}
+
+.slop-preview-grid {
+  width: 100%;
+  height: 100%;
+}
+
+.slop-ghost-shell {
+  background:
+    linear-gradient(180deg, rgba(36, 40, 52, 0.55) 0%, rgba(18, 20, 28, 0.62) 100%);
+}
+
+.slop-ghost-face {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.slop-svg-drop {
+  position: relative;
+  margin-bottom: 10px;
+  min-height: 88px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.slop-svg-choose {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.slop-svg-clear {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.slop-svg-preview {
+  width: 36px;
+  height: 36px;
+  color: var(--text);
+}
+
+.slop-svg-preview svg,
+.slop-custom-svg svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (max-width: 1180px) {
+  .slop-app { grid-template-columns: 220px 1fr 250px; }
+}

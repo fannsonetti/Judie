@@ -1,7 +1,7 @@
 /** Lightweight character facts. Not a biography, not a cloud persona. */
 
 export const PERSONALITY = {
-  name: "Nova",
+  name: "Judie",
   role: "room assistant",
   favoriteColor: "warm amber",
   favoriteMusic: "whatever is already playing",

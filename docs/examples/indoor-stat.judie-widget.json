@@ -1,0 +1,123 @@
+{
+  "format": "judie-widget",
+  "version": 1,
+  "widget": {
+    "id": "indoor-stat",
+    "name": "Indoor",
+    "background": null,
+    "layouts": {
+      "1x1": [
+        {
+          "id": "label",
+          "kind": "text",
+          "x": 8,
+          "y": 8,
+          "w": 84,
+          "h": 10,
+          "text": "INDOOR",
+          "fontSize": 13,
+          "fontWeight": 600,
+          "color": "#8b909d",
+          "align": "left",
+          "valign": "top",
+          "descriptor": "climate.label"
+        },
+        {
+          "id": "temp",
+          "kind": "metric",
+          "x": 8,
+          "y": 28,
+          "w": 84,
+          "h": 36,
+          "text": "21°",
+          "fontSize": 44,
+          "fontWeight": 650,
+          "letterSpacing": -1.2,
+          "color": "#f4f5f7",
+          "align": "left",
+          "valign": "top",
+          "descriptor": "climate.indoorTemp",
+          "hook": "Indoor temperature, including the degree suffix."
+        },
+        {
+          "id": "comfort",
+          "kind": "text",
+          "x": 8,
+          "y": 72,
+          "w": 84,
+          "h": 14,
+          "text": "Comfortable",
+          "fontSize": 13,
+          "fontWeight": 500,
+          "color": "#8b909d",
+          "align": "left",
+          "valign": "top",
+          "descriptor": "climate.comfort"
+        }
+      ],
+      "1x2": [
+        {
+          "id": "label",
+          "kind": "text",
+          "x": 5,
+          "y": 10,
+          "w": 40,
+          "h": 12,
+          "text": "INDOOR",
+          "fontSize": 13,
+          "fontWeight": 600,
+          "color": "#8b909d",
+          "align": "left",
+          "valign": "top",
+          "descriptor": "climate.label"
+        },
+        {
+          "id": "temp",
+          "kind": "metric",
+          "x": 5,
+          "y": 32,
+          "w": 40,
+          "h": 36,
+          "text": "21°",
+          "fontSize": 44,
+          "fontWeight": 650,
+          "letterSpacing": -1.2,
+          "color": "#f4f5f7",
+          "align": "left",
+          "valign": "top",
+          "descriptor": "climate.indoorTemp",
+          "hook": "Indoor temperature, including the degree suffix."
+        },
+        {
+          "id": "humidity",
+          "kind": "bar",
+          "x": 48,
+          "y": 44,
+          "w": 46,
+          "h": 8,
+          "value": 42,
+          "accent": "#2d7bff",
+          "fill": "rgba(255,255,255,0.08)",
+          "radius": 99,
+          "descriptor": "climate.humidity",
+          "hook": "Humidity 0–100 for the fill bar."
+        },
+        {
+          "id": "humidity-label",
+          "kind": "text",
+          "x": 48,
+          "y": 58,
+          "w": 46,
+          "h": 12,
+          "text": "Humidity 42%",
+          "fontSize": 12,
+          "fontWeight": 500,
+          "color": "#8b909d",
+          "align": "left",
+          "valign": "top",
+          "descriptor": "climate.humidityLabel"
+        }
+      ]
+    }
+  }
+}

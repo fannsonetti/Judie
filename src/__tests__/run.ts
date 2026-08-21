@@ -7,6 +7,10 @@ import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
 import { WidgetInstance } from "../types/widgets";
 import { DEFAULT_LIGHTS, DEFAULT_QUEUE, DEFAULT_EVENTS, HOURLY_FORECAST } from "../lib/mockData";
+import { clampPct, snapPct, snapBoxToGrid, EDITOR_GRID_PX, CANONICAL, moveNode, defaultNode, nodesFor, filledSizes, hitBox, withLayout } from "../slopbox/schema";
+import { makeFromTemplate } from "../slopbox/templates";
+import { exportHookCode, parseWidgetFile, serializeWidget } from "../slopbox/export";
+import { sanitizeSvg } from "../slopbox/svg";
 
 function snap(): RoomSnapshot {
   return {
@@ -221,7 +225,7 @@ test("tts normalization", () => {
   assert(/morning/i.test(clock), clock);
   const night = normalizeForSpeech("Rain around 22:00.");
   assert(/night/i.test(night), night);
-  const keepAm = normalizeForSpeech("I am Nova.");
+  const keepAm = normalizeForSpeech("I am Judie.");
   assert(/\bam\b/i.test(keepAm), keepAm);
 });
 
@@ -239,8 +243,96 @@ test("layout pack and reorder", () => {
   assert(cycleSize("1x2", ["1x2", "2x2"]) === "2x2", "cycle");
 });
 
-test("hey nova is a greeting", () => {
-  for (const p of ["hey nova", "Hey Nova", "nova", "hi nova"]) {
+test("widget creator export includes hidden descriptors", () => {
+  assert(clampPct(120) === 100, "clamp high");
+  assert(clampPct(-4) === 0, "clamp low");
+  assert(snapPct(3.24) === 3, "snap");
+  const node = defaultNode("metric", 8, 8);
+  const moved = moveNode(node, 200, 0);
+  assert(moved.x + moved.w <= 100.01, "stay on artboard");
+  const stat = makeFromTemplate("stat");
+  assert(stat.sizes.includes("1x1") && stat.sizes.includes("2x2"), "stat sizes");
+  assert(nodesFor(stat, "1x1").length > 0, "1x1 layout");
+  const packed = packWidgets([
+    { id: "s1", type: "custom", page: 0, size: "1x2", order: 0, customId: stat.id },
+  ]);
+  assert(packed[0].col === 0 && packed[0].row === 0, "custom packs");
+  const json = serializeWidget(stat);
+  assert(json.includes("judie-widget"), "format tag");
+  assert(json.includes("climate.indoorTemp"), "descriptor in json");
+  const roundTrip = parseWidgetFile(json);
+  assert(roundTrip.name === stat.name, "round trip name");
+  const code = exportHookCode(stat);
+  assert(code.includes("@hook climate.indoorTemp"), "descriptor in exported code");
+  assert(code.includes("data-hook="), "data-hook attribute");
+  assert(!code.toLowerCase().includes("visible on the widget") || code.includes("NOT visible"), "notes invisibility");
+});
+
+test("widget creator grid is pixel cells not stretched percents", () => {
+  const small = CANONICAL["1x1"];
+  const large = CANONICAL["2x2"];
+  const snapped = snapBoxToGrid({ x: 11.1, y: 7.7, w: 22.2, h: 18.4 }, small);
+  const xPx = (snapped.x / 100) * small.w;
+  assert(Math.abs(xPx - Math.round(xPx / EDITOR_GRID_PX) * EDITOR_GRID_PX) < 0.02, "snaps to 8px");
+  assert(Math.floor(large.w / EDITOR_GRID_PX) > Math.floor(small.w / EDITOR_GRID_PX), "bigger size has more cells");
+});
+
+test("widget creator sanitizes dropped svg", () => {
+  const dirty =
+    '<svg viewBox="0 0 24 24" onclick="alert(1)"><script>alert(1)</script><circle cx="12" cy="12" r="8"/></svg>';
+  const clean = sanitizeSvg(dirty);
+  assert(!!clean && !clean.includes("<script"), "strip script");
+  assert(!!clean && !/onclick/i.test(clean), "strip handlers");
+  assert(sanitizeSvg("<div>nope</div>") === null, "reject non-svg");
+});
+
+test("widget creator preview packs empty neighbor sizes", () => {
+  const placed = packWidgets([
+    { id: "live", type: "custom", page: 0, size: "1x2", order: 0 },
+    { id: "a", type: "custom", page: 0, size: "1x1", order: 1 },
+    { id: "b", type: "custom", page: 0, size: "2x2", order: 2 },
+  ]);
+  assert(placed[0].id === "live" && placed[0].col === 0, "live first");
+  assert(placed.some((w) => w.size === "1x1"), "has 1x1 neighbor");
+  assert(placed.some((w) => w.size === "2x2"), "has 2x2 neighbor");
+});
+
+test("empty widget sizes stay off the home screen", () => {
+  const blank = makeFromTemplate("blank");
+  assert(filledSizes(blank).length === 0, "blank is not addable");
+  assert(nodesFor(blank, "1x2").length === 0, "empty 1x2 is empty");
+  const stat = makeFromTemplate("stat");
+  const stripped = {
+    ...stat,
+    layouts: { ...stat.layouts, "1x2": [] },
+  };
+  assert(!filledSizes(stripped).includes("1x2"), "unfilled 1x2 is omitted");
+  assert(nodesFor(stripped, "1x2").length === 0, "no layout fallback");
+  assert(filledSizes(stripped).includes("1x1"), "filled 1x1 remains");
+});
+
+test("metric hitbox hugs the glyphs", () => {
+  const shell = CANONICAL["1x2"];
+  const node = { ...defaultNode("metric", 8, 8, shell), w: 80, h: 40, text: "21°" };
+  const hit = hitBox(node, shell);
+  assert(hit.w < 35, `hitbox still huge (${hit.w})`);
+  assert(hit.h <= node.h, "height not larger than the old box");
+});
+
+test("editing 1x1 does not change 2x2", () => {
+  const stat = makeFromTemplate("stat");
+  const before = nodesFor(stat, "2x2");
+  const layouts = withLayout(stat.layouts, "1x1", [
+    defaultNode("text", 10, 10, CANONICAL["1x1"]),
+  ]);
+  const after = { ...stat, layouts };
+  assert(JSON.stringify(nodesFor(after, "2x2")) === JSON.stringify(before), "2x2 untouched");
+  assert(nodesFor(after, "1x1").length === 1, "1x1 replaced");
+  assert(nodesFor(after, "1x1")[0].kind === "text", "1x1 has the new node");
+});
+
+test("hey judie is a greeting", () => {
+  for (const p of ["hey judie", "Hey Judie", "judie", "hi judie"]) {
     const r = processUtterance(p, snap());
     assert(r.success, p);
     assert(r.intent === "social.hello", `${p} intent=${r.intent}`);
@@ -350,14 +442,14 @@ test("date slang still hits the calendar", () => {
 
 test("who-questions are not one bucket", () => {
   const you = processUtterance("who are you", snap());
-  assert(/nova/i.test(you.response), you.response);
+  assert(/judie/i.test(you.response), you.response);
   const made = processUtterance("who made you", snap());
   assert(made.intent !== "social.who" || /local|tablet|room|whoever|install/i.test(made.response), made.response);
-  assert(!/^nova\.?\s*(your )?room assistant\.?$/i.test(made.response.trim()), `creator collided with identity: ${made.response}`);
+  assert(!/^judie\.?\s*(your )?room assistant\.?$/i.test(made.response.trim()), `creator collided with identity: ${made.response}`);
   const built = processUtterance("who built this thing", snap());
   assert(/local|tablet|room|whoever|install/i.test(built.response), built.response);
   const siri = processUtterance("who is siri", snap());
-  assert(!/^nova/i.test(siri.response), `siri became identity: ${siri.response}`);
+  assert(!/^judie/i.test(siri.response), `siri became identity: ${siri.response}`);
   const jobs = processUtterance("who is Steve Jobs", snap());
   assert(!/room assistant/i.test(jobs.response), jobs.response);
 });
@@ -419,7 +511,7 @@ test("slang commands still work", () => {
     dim.actions.some((a) => a.type === "lights.brightness" && a.relative),
     JSON.stringify(dim.actions)
   );
-  const weather = processUtterance("ayo nova weather tomorrow", snap());
+  const weather = processUtterance("ayo judie weather tomorrow", snap());
   assert(/tomorrow/i.test(weather.response), weather.response);
 });
 

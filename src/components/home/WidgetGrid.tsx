@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { WidgetInstance } from "../../types/widgets";
 import { packWidgets } from "../../lib/layout";
+import { measureWidgetGrid } from "../../lib/widgetGrid";
 import { WidgetContainer } from "./WidgetContainer";
 
 interface Props {
@@ -17,11 +18,7 @@ export function WidgetGrid({ widgets }: Props) {
 
     const measure = () => {
       const rect = el.getBoundingClientRect();
-      const gap = Math.max(12, Math.min(20, rect.width * 0.012));
-      const cellW = rect.width / 6;
-      const rowsTarget = Math.max(3.2, Math.min(4.2, rect.height / (rect.width / 6)));
-      const cellH = rect.height / rowsTarget;
-      setMetrics({ cellW, cellH, gap });
+      setMetrics(measureWidgetGrid(rect.width, rect.height));
     };
 
     measure();

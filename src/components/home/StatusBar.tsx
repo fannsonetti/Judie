@@ -4,6 +4,7 @@ import { useRoomStore } from "../../store/roomStore";
 import { useAssistantStore } from "../../store/assistantStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { formatClock, formatDateLong } from "../../lib/time";
+import { usePerformanceStore } from "../../lib/performance";
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "",
@@ -26,6 +27,7 @@ export function StatusBar() {
   const setSettingsOpen = useAssistantStore((s) => s.setSettingsOpen);
   const setPaletteOpen = useAssistantStore((s) => s.setPaletteOpen);
   const roomName = useSettingsStore((s) => s.roomName);
+  const reduced = usePerformanceStore((s) => s.reduced);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -64,12 +66,12 @@ export function StatusBar() {
       }
     };
     void ping();
-    const id = window.setInterval(() => void ping(), 20_000);
+    const id = window.setInterval(() => void ping(), reduced ? 45_000 : 20_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [setServerStatus, setServices]);
+  }, [setServerStatus, setServices, reduced]);
 
   const listening = status === "listening";
   const statusLabel = STATUS_LABEL[status];
@@ -81,10 +83,10 @@ export function StatusBar() {
           type="button"
           className={`status-brand ${listening ? "listening" : ""}`}
           onClick={() => (listening ? stopListening() : startListening())}
-          aria-label={listening ? "Stop listening" : "Talk to Nova"}
+          aria-label={listening ? "Stop listening" : "Talk to Judie"}
         >
-          <span className={`nova-orb ${status}`} />
-          Nova
+          <span className={`judie-orb ${status}`} />
+          Judie
         </button>
         {statusLabel && <span className="status-state">{statusLabel}</span>}
         {dnd && <span className="status-dnd">DND</span>}

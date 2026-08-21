@@ -1,8 +1,8 @@
-# Nova
+# Judie
 
-Tablet-style room control for a 1920×1200 display. Tauri + React + TypeScript.
+Tablet-style room control for a 1920×1200 display (also runs on Raspberry Pi). Tauri + React + TypeScript.
 
-Nova is a local environment assistant, not a chatbot. Commands are parsed deterministically — no LLM is required.
+Judie is a local environment assistant, not a chatbot. Commands are parsed deterministically — no LLM is required.
 
 ## Run
 
@@ -13,16 +13,25 @@ npm run tauri dev    # desktop app
 npm test
 ```
 
+## Installers
+
+| Platform | How |
+| --- | --- |
+| Windows x64 | Double-click `build.bat` (or `npm run installer`) |
+| Raspberry Pi 3+ (64-bit OS) | On the Pi: `./scripts/build-pi.sh` — see [docs/raspberry-pi.md](docs/raspberry-pi.md) |
+
+`build-pi.bat` on Windows only prints instructions; the Pi `.deb` must be built on Linux aarch64.
+
 ## What it does
 
 - Home screen of live widgets (swipe pages, long-press to edit, layout saved locally)
 - Lights, scenes, media, purifier, climate, calendar, weather, timers, activity
-- Natural-language commands via **Ctrl+K** or tap **Nova** (Web Speech in the WebView)
+- Natural-language commands via **Ctrl+K** or tap **Judie** (Web Speech in the WebView)
 - Configurable routines (Good Night, Movie, Away, plus “when I say …”)
 - Timers, alarms, delayed actions (`turn the lights off in 20 minutes`)
 - Undo (say “undo” or Ctrl+Z)
 - Real weather from [Open-Meteo](https://open-meteo.com) (no API key)
-- Activity log with source (manual / Nova / routine / timer)
+- Activity log with source (manual / Judie / routine / timer)
 
 ## Commands (examples)
 
@@ -35,7 +44,7 @@ Speak or type variations — wording does not need to be exact:
 - “turn off the lights, set my alarm for 7 and tell me tomorrow’s weather”
 - “when I say focus mode, turn the ceiling light off and set volume to 20”
 
-Tap **Nova** in the status bar to talk. Space starts/stops listening when you are not typing. Escape cancels overlays and speech.
+Tap **Judie** in the status bar to talk. Space starts/stops listening when you are not typing. Escape cancels overlays and speech.
 
 ## Settings
 
@@ -51,6 +60,10 @@ Indoor climate and the music queue are **local to this tablet** until a sensor o
 
 Optional: if the Python [Nova Assistant](../Nova%20Assistant) is running on `127.0.0.1:8742`, the Server widget can show it as online (TCP check from the Tauri backend). This tablet still owns room state.
 
+## Custom widgets
+
+Design them in Judie: edit mode → add widget → **Open Widget Creator…**, then **Save to Judie**. Format spec: [docs/widget-format.md](docs/widget-format.md). You can still import a `.judie-widget.json` file from the gallery.
+
 ## Architecture
 
 ```
@@ -65,6 +78,6 @@ Debug overlay in development: **Ctrl+Shift+D** (intent, actions, timing — no h
 
 Conversation text is appended to a log file (not just the browser):
 
-`%AppData%\com.nova.app\logs\conversation.log`
+`%AppData%\com.judie.app\logs\conversation.log`
 
 Open it from Settings. There is also `conversation.jsonl` beside it.

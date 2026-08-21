@@ -8,7 +8,8 @@ export type WidgetType =
   | "quickControls"
   | "server"
   | "activity"
-  | "timers";
+  | "timers"
+  | "custom";
 
 export type WidgetSize = "1x1" | "1x2" | "2x2";
 
@@ -18,6 +19,7 @@ export interface WidgetInstance {
   page: number;
   size: WidgetSize;
   order: number;
+  customId?: string;
 }
 
 export interface SizeDims {
@@ -42,6 +44,7 @@ export const WIDGET_SUPPORTED_SIZES: Record<WidgetType, WidgetSize[]> = {
   server: ["1x1", "1x2"],
   timers: ["1x1", "1x2"],
   weather: ["1x1", "1x2", "2x2"],
+  custom: ["1x1", "1x2", "2x2"],
 };
 
 export const WIDGET_LABELS: Record<WidgetType, string> = {
@@ -55,6 +58,7 @@ export const WIDGET_LABELS: Record<WidgetType, string> = {
   server: "Server Status",
   activity: "Activity",
   timers: "Timers",
+  custom: "Custom",
 };
 
 export const GRID_COLS = 6;

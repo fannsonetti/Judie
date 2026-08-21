@@ -1,5 +1,5 @@
 {
-  "name": "nova",
+  "name": "judie",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,11 +8,16 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "tsx src/__tests__/run.ts"
+    "test": "tsx src/__tests__/run.ts",
+    "installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
+    "installer:pi": "bash scripts/build-pi.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "framer-motion": "^13.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

@@ -107,7 +107,7 @@ fn append_conversation_log(app: AppHandle, entry: LogEntry) -> Result<String, St
 fn pad_role(role: &str) -> String {
     match role.to_lowercase().as_str() {
         "you" | "user" => "YOU ".to_string(),
-        "nova" => "NOVA".to_string(),
+        "nova" | "judie" => "JUDIE".to_string(),
         other => format!("{:<4}", other.to_uppercase()),
     }
 }
@@ -117,6 +117,18 @@ pub fn run() {
     START.get_or_init(Instant::now);
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::Builder::new().app_name("Judie").build())
+        .setup(|app| {
+            use tauri_plugin_autostart::ManagerExt;
+            let _ = app.autolaunch().enable();
+
+            #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_system_status,
             append_conversation_log,

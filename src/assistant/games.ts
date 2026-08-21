@@ -80,14 +80,14 @@ export function tryGame(
 
   const throw_ = RPS.find((m) => t === m || t === `i pick ${m}` || t === `${m}!`);
   if (throw_) {
-    const nova = pick([...RPS]);
-    if (throw_ === nova) {
-      return { intent: "game.rps", response: `${cap(nova)}. Tie.`, game: null };
+    const mine = pick([...RPS]);
+    if (throw_ === mine) {
+      return { intent: "game.rps", response: `${cap(mine)}. Tie.`, game: null };
     }
-    if (beats(throw_, nova)) {
-      return { intent: "game.rps", response: `${cap(nova)}. You win.`, game: null };
+    if (beats(throw_, mine)) {
+      return { intent: "game.rps", response: `${cap(mine)}. You win.`, game: null };
     }
-    return { intent: "game.rps", response: `${cap(nova)}. I win.`, game: null };
+    return { intent: "game.rps", response: `${cap(mine)}. I win.`, game: null };
   }
 
   if (

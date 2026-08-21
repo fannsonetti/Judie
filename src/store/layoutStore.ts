@@ -15,6 +15,17 @@ import {
   normalizeOrders,
   reorderWidgets,
 } from "../lib/layout";
+import { getCustomWidget } from "../store/customWidgetStore";
+import { filledSizes } from "../slopbox/schema";
+
+function sizesFor(type: WidgetType, customId?: string): WidgetSize[] {
+  if (type === "custom") {
+    const def = getCustomWidget(customId);
+    if (def) return filledSizes(def);
+    return [];
+  }
+  return WIDGET_SUPPORTED_SIZES[type];
+}
 
 const DEFAULT_WIDGETS: WidgetInstance[] = [
   { id: "weather-1", type: "weather", page: 0, size: "2x2", order: 0 },
@@ -41,6 +52,7 @@ interface LayoutState {
   currentPage: number;
   editMode: boolean;
   galleryOpen: boolean;
+  creatorOpen: boolean;
   expandedId: string | null;
   expandedType: ExpandableWidgetType | null;
   draggingId: string | null;
@@ -49,6 +61,7 @@ interface LayoutState {
   enterEditMode: () => void;
   exitEditMode: () => void;
   setGalleryOpen: (open: boolean) => void;
+  setCreatorOpen: (open: boolean) => void;
   setDragging: (id: string | null) => void;
 
   expandWidget: (id: string, type: ExpandableWidgetType) => void;
@@ -57,7 +70,7 @@ interface LayoutState {
   reorder: (draggedId: string, targetId: string) => void;
   resizeWidget: (id: string) => void;
   removeWidget: (id: string) => void;
-  addWidget: (type: WidgetType, size: WidgetSize, page?: number) => void;
+  addWidget: (type: WidgetType, size: WidgetSize, page?: number, customId?: string) => void;
   moveWidgetToPage: (id: string, page: number) => void;
 }
 
@@ -68,6 +81,7 @@ export const useLayoutStore = create<LayoutState>()(
       currentPage: 0,
       editMode: false,
       galleryOpen: false,
+      creatorOpen: false,
       expandedId: null,
       expandedType: null,
       draggingId: null,
@@ -78,9 +92,13 @@ export const useLayoutStore = create<LayoutState>()(
       enterEditMode: () =>
         set({ editMode: true, expandedId: null, expandedType: null }),
 
-      exitEditMode: () => set({ editMode: false, galleryOpen: false, draggingId: null }),
+      exitEditMode: () =>
+        set({ editMode: false, galleryOpen: false, creatorOpen: false, draggingId: null }),
 
-      setGalleryOpen: (open) => set({ galleryOpen: open }),
+      setGalleryOpen: (open) => set({ galleryOpen: open, ...(open ? { creatorOpen: false } : {}) }),
+
+      setCreatorOpen: (open) =>
+        set({ creatorOpen: open, ...(open ? { galleryOpen: false } : {}) }),
 
       setDragging: (id) => set({ draggingId: id }),
 
@@ -100,7 +118,7 @@ export const useLayoutStore = create<LayoutState>()(
         set((s) => ({
           widgets: s.widgets.map((w) => {
             if (w.id !== id) return w;
-            const supported = WIDGET_SUPPORTED_SIZES[w.type];
+            const supported = sizesFor(w.type, w.customId);
             return { ...w, size: cycleSize(w.size, supported) };
           }),
         })),
@@ -110,10 +128,11 @@ export const useLayoutStore = create<LayoutState>()(
           widgets: normalizeOrders(s.widgets.filter((w) => w.id !== id)),
         })),
 
-      addWidget: (type, size, page) =>
+      addWidget: (type, size, page, customId) =>
         set((s) => {
           const targetPage = page ?? s.currentPage;
-          const supported = WIDGET_SUPPORTED_SIZES[type];
+          const supported = sizesFor(type, customId);
+          if (!supported.length) return s;
           const finalSize = supported.includes(size) ? size : supported[0];
           const widget: WidgetInstance = {
             id: createId(type),
@@ -121,6 +140,7 @@ export const useLayoutStore = create<LayoutState>()(
             page: targetPage,
             size: finalSize,
             order: nextAvailableOrder(s.widgets, targetPage),
+            customId: type === "custom" ? customId : undefined,
           };
           return { widgets: [...s.widgets, widget], galleryOpen: false };
         }),
@@ -136,7 +156,7 @@ export const useLayoutStore = create<LayoutState>()(
         }),
     }),
     {
-      name: "nova-layout",
+      name: "judie-layout",
       version: 3,
       partialize: (s) => ({ widgets: s.widgets, currentPage: s.currentPage }),
       migrate: (persisted: unknown, version: number) => {

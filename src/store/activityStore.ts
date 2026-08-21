@@ -38,7 +38,7 @@ export const useActivityStore = create<ActivityState>()(
       clear: () => set({ items: [] }),
     }),
     {
-      name: "nova-activity",
+      name: "judie-activity",
       partialize: (s) => ({ items: s.items.slice(0, 80) }),
     }
   )

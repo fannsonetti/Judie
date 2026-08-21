@@ -62,7 +62,7 @@ const EGGS: { test: (t: string) => boolean; say: () => string }[] = [
   },
   {
     test: (t) => /^are you (real|alive|sentient)$/.test(t),
-    say: () => "I'm Nova. That's the useful part.",
+    say: () => "I'm Judie. That's the useful part.",
   },
   {
     test: (t) => /^sing( (a song|something))?$/.test(t),

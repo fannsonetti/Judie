@@ -627,7 +627,7 @@ export const useRoomStore = create<RoomState>()(
       removeRoutine: (id) => get().applyActions([{ type: "routine.delete", id }], "user"),
     }),
     {
-      name: "nova-room",
+      name: "judie-room",
       partialize: (s) => ({
         lights: s.lights,
         scene: s.scene,

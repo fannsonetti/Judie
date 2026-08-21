@@ -3,7 +3,7 @@ import { log } from "./logger";
 
 export interface ConversationLogEntry {
   timestamp: string;
-  role: "you" | "nova";
+  role: "you" | "judie";
   text: string;
   source: string;
   intent?: string | null;

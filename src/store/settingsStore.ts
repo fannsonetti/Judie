@@ -14,6 +14,6 @@ export const useSettingsStore = create<SettingsState>()(
       update: (patch) => set(patch),
       reset: () => set(DEFAULT_INSTALLATION),
     }),
-    { name: "nova-settings" }
+    { name: "judie-settings" }
   )
 );

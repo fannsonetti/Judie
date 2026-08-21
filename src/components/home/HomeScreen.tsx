@@ -6,12 +6,14 @@ import { HomePage } from "./HomePage";
 import { PageIndicator } from "./PageIndicator";
 import { EditModeControls } from "./EditModeControls";
 import { WidgetGallery } from "./WidgetGallery";
+import { WidgetCreatorOverlay } from "./WidgetCreatorOverlay";
 import { ExpandedOverlay } from "./ExpandedOverlay";
 import { CommandPalette } from "./CommandPalette";
 import { SettingsOverlay } from "./SettingsOverlay";
 import { Toasts } from "./Toasts";
 import { DebugPanel } from "./DebugPanel";
-import { NovaRuntime } from "../../runtime/NovaRuntime";
+import { JudieRuntime } from "../../runtime/JudieRuntime";
+import { usePerformanceStore } from "../../lib/performance";
 
 export function HomeScreen() {
   const widgets = useLayoutStore((s) => s.widgets);
@@ -19,6 +21,7 @@ export function HomeScreen() {
   const setPage = useLayoutStore((s) => s.setPage);
   const editMode = useLayoutStore((s) => s.editMode);
   const expandedId = useLayoutStore((s) => s.expandedId);
+  const reduced = usePerformanceStore((s) => s.reduced);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef(0);
@@ -31,7 +34,7 @@ export function HomeScreen() {
   const onPointerDown = (e: React.PointerEvent) => {
     if (editMode || expandedId) return;
     const target = e.target as HTMLElement;
-    if (target.closest("input, button, .toggle, .slider, .palette-backdrop, .gallery-backdrop")) {
+    if (target.closest("input, button, .toggle, .slider, .palette-backdrop, .settings-backdrop")) {
       return;
     }
 
@@ -77,7 +80,7 @@ export function HomeScreen() {
 
   return (
     <div className="app-shell">
-      <NovaRuntime />
+      <JudieRuntime />
       <StatusBar />
       <div
         className="home-viewport"
@@ -91,7 +94,11 @@ export function HomeScreen() {
           className="home-track"
           style={{
             transform: `translate3d(${translate}%, 0, 0)`,
-            transition: isDragging ? "none" : "transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)",
+            transition: isDragging
+              ? "none"
+              : reduced
+                ? "transform 0.16s ease-out"
+                : "transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)",
           }}
         >
           {Array.from({ length: PAGE_COUNT }).map((_, page) => (
@@ -109,6 +116,7 @@ export function HomeScreen() {
 
       <ExpandedOverlay />
       <WidgetGallery />
+      <WidgetCreatorOverlay />
       <CommandPalette />
       <SettingsOverlay />
       <Toasts />

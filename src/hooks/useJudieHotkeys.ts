@@ -3,7 +3,7 @@ import { useAssistantStore } from "../store/assistantStore";
 import { useLayoutStore } from "../store/layoutStore";
 import { PAGE_COUNT } from "../types/widgets";
 
-export function useNovaHotkeys() {
+export function useJudieHotkeys() {
   const execute = useAssistantStore((s) => s.execute);
 
   useEffect(() => {
