@@ -17,7 +17,8 @@ if (Test-Path $passwordFile) {
 }
 
 Set-Location $root
-npx tauri build
+# Signing key is present — emit updater artifacts for this local release build.
+npx tauri build --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
 $installer = Get-ChildItem -Path (Join-Path $root "src-tauri\target\release\bundle\nsis") -Filter "*-setup.exe" | Select-Object -First 1
 if ($installer) {
