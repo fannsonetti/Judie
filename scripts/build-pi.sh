@@ -62,12 +62,10 @@ export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
 export CARGO_PROFILE_RELEASE_OPT_LEVEL=s
 export CARGO_PROFILE_RELEASE_STRIP=symbols
 
-echo "==> tauri build (deb + AppImage)"
+echo "==> tauri build (deb)"
 BUILD_ARGS=(--config src-tauri/tauri.linux.conf.json)
 if [[ -f "$KEY" ]]; then
   BUILD_ARGS+=(--config '{"bundle":{"createUpdaterArtifacts":true}}')
-else
-  BUILD_ARGS+=(--config '{"bundle":{"createUpdaterArtifacts":false}}')
 fi
 npx tauri build "${BUILD_ARGS[@]}"
 
