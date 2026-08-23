@@ -93,11 +93,21 @@ input:focus-visible {
   cursor: default;
 }
 
-.status-brand {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--text-muted);
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.status-version {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  opacity: 0.22;
+  pointer-events: none;
+  user-select: none;
 }
 
 .status-center {
@@ -199,6 +209,7 @@ input:focus-visible {
   display: flex;
   flex-direction: column;
   transition: box-shadow 0.2s ease;
+  contain: layout paint;
 }
 
 .widget-face {
@@ -1598,54 +1609,6 @@ input:focus-visible {
   margin: 8px 0 0;
   white-space: pre-wrap;
   color: var(--text-muted);
-}
-
-/* Raspberry Pi / low-power: same look, skip live backdrop-filter (expensive on Pi 3 GPU). */
-html.perf-pi {
-  text-rendering: optimizeSpeed;
-}
-
-html.perf-pi .app-shell {
-  background-color: var(--bg);
-  background-image: none;
-}
-
-html.perf-pi .app-shell::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(45, 123, 255, 0.07), transparent 55%),
-    radial-gradient(900px 500px at 90% 10%, rgba(255, 255, 255, 0.03), transparent 50%);
-}
-
-html.perf-pi .app-shell > * {
-  position: relative;
-  z-index: 1;
-}
-
-html.perf-pi .widget-shell {
-  contain: layout paint;
-}
-
-html.perf-pi .edit-bar,
-html.perf-pi .wg-backdrop,
-html.perf-pi .settings-backdrop,
-html.perf-pi .palette-backdrop,
-html.perf-pi .toast,
-html.perf-pi .expanded-overlay {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-
-html.perf-pi .widget-shell.edit-jiggle .widget-face {
-  animation: none !important;
-}
-
-html.perf-pi .tm-spark path {
-  filter: none !important;
 }
 
 .wx.system {

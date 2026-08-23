@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { WidgetSize } from "../types/widgets";
 import { SlopLayer } from "./render";
 import {
+  CANONICAL,
   duplicateNode,
   EDITOR_GRID_PX,
   moveNode,
@@ -14,7 +15,7 @@ import {
 } from "./schema";
 import { ContextMenu, MenuItem } from "./ContextMenu";
 import { PreviewHome } from "./PreviewHome";
-import { novaShellSize, NOVA_FRAME, NOVA_SAFE_BOTTOM, NOVA_STATUS_H, novaPagePad } from "../lib/widgetGrid";
+import { novaShellSize, NOVA_FRAME, NOVA_SAFE_BOTTOM, NOVA_STATUS_H, novaPagePad, liveFrame } from "../lib/widgetGrid";
 import { svgFromFile } from "./svg";
 
 type Handle = "nw" | "ne" | "sw" | "se";
@@ -97,12 +98,23 @@ function guidesFor(nodes: SlopNode[], current: SlopNode, snap = 0.7) {
   return uniq;
 }
 
-function PixelGrid({ width, height, step }: { width: number; height: number; step: number }) {
+function PixelGrid({
+  width,
+  height,
+  stepX,
+  stepY,
+}: {
+  width: number;
+  height: number;
+  stepX: number;
+  stepY: number;
+}) {
   const verts: number[] = [];
   const hors: number[] = [];
-  for (let x = step; x < width; x += step) verts.push(x);
-  for (let y = step; y < height; y += step) hors.push(y);
-  const major = step * 5;
+  for (let x = stepX; x < width; x += stepX) verts.push(x);
+  for (let y = stepY; y < height; y += stepY) hors.push(y);
+  const majorX = stepX * 5;
+  const majorY = stepY * 5;
   return (
     <svg
       className="slop-pixel-grid"
@@ -117,7 +129,7 @@ function PixelGrid({ width, height, step }: { width: number; height: number; ste
           y1={0}
           x2={x}
           y2={height}
-          className={x % major === 0 ? "major" : undefined}
+          className={Math.abs(x % majorX) < 0.01 ? "major" : undefined}
         />
       ))}
       {hors.map((y) => (
@@ -127,7 +139,7 @@ function PixelGrid({ width, height, step }: { width: number; height: number; ste
           y1={y}
           x2={width}
           y2={y}
-          className={y % major === 0 ? "major" : undefined}
+          className={Math.abs(y % majorY) < 0.01 ? "major" : undefined}
         />
       ))}
     </svg>
@@ -148,7 +160,9 @@ export function SlopCanvas({
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const faceRef = useRef<HTMLDivElement>(null);
-  const shell = novaShellSize(size);
+  const [frame, setFrame] = useState(NOVA_FRAME);
+  const canon = CANONICAL[size];
+  const shell = novaShellSize(size, frame);
   const [fitZoom, setFitZoom] = useState(1);
   const [guides, setGuides] = useState<{ axis: "x" | "y"; at: number }[]>([]);
   const [menu, setMenu] = useState<{
@@ -177,22 +191,31 @@ export function SlopCanvas({
   const selected = nodes.find((n) => n.id === selectedId) ?? null;
 
   useEffect(() => {
+    const sync = () => setFrame(liveFrame());
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, []);
+
+  useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
     const measure = () => {
       const r = el.getBoundingClientRect();
       const pad = 48;
+      const live = liveFrame();
       if (preview) {
-        setFitZoom(Math.min(1, (r.width - pad) / NOVA_FRAME.w, (r.height - pad) / NOVA_FRAME.h));
+        setFitZoom(Math.min(1, (r.width - pad) / live.w, (r.height - pad) / live.h));
       } else {
-        setFitZoom(Math.min(1, (r.width - pad) / shell.w, (r.height - pad) / shell.h));
+        const liveShell = novaShellSize(size, live);
+        setFitZoom(Math.min((r.width - pad) / liveShell.w, (r.height - pad) / liveShell.h));
       }
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [preview, shell.h, shell.w]);
+  }, [preview, size]);
 
   const displayScale = preview ? fitZoom : zoom;
 
@@ -204,7 +227,7 @@ export function SlopCanvas({
     setDraft(null);
   }, [def.id, size]);
 
-  const snapNode = (node: SlopNode) => ({ ...node, ...snapBoxToGrid(node, shell) });
+  const snapNode = (node: SlopNode) => ({ ...node, ...snapBoxToGrid(node, canon) });
 
   const onPointerMove = (e: PointerEvent) => {
     const face = faceRef.current;
@@ -337,9 +360,12 @@ export function SlopCanvas({
     : [
         { id: "add-text", label: "Add label" },
         { id: "add-metric", label: "Add metric" },
+        { id: "add-list", label: "Add list" },
+        { id: "add-pair", label: "Add pair" },
         { id: "add-icon", label: "Add icon" },
         { id: "add-bar", label: "Add bar" },
         { id: "add-button", label: "Add button" },
+        { id: "add-toggle", label: "Add toggle" },
         { id: "sep1", label: "", separator: true },
         { id: "paste", label: "Paste", disabled: !actions.canPaste },
       ];
@@ -350,7 +376,7 @@ export function SlopCanvas({
   }, [preview]);
 
   const editing = !preview;
-  const pad = novaPagePad();
+  const pad = novaPagePad(frame.w);
 
   return (
     <div
@@ -369,14 +395,14 @@ export function SlopCanvas({
       {preview ? (
         <div
           className="slop-preview-scale"
-          style={{ width: NOVA_FRAME.w * displayScale, height: NOVA_FRAME.h * displayScale }}
+          style={{ width: frame.w * displayScale, height: frame.h * displayScale }}
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div
             className="app-shell slop-preview-nova"
             style={{
-              width: NOVA_FRAME.w,
-              height: NOVA_FRAME.h,
+              width: frame.w,
+              height: frame.h,
               transform: `scale(${displayScale})`,
               transformOrigin: "top left",
             }}
@@ -397,7 +423,7 @@ export function SlopCanvas({
               className="slop-preview-page"
               style={{
                 padding: `${4}px ${pad}px ${NOVA_SAFE_BOTTOM}px`,
-                height: NOVA_FRAME.h - NOVA_STATUS_H,
+                height: frame.h - NOVA_STATUS_H,
               }}
             >
               <PreviewHome def={def} size={size} />
@@ -432,7 +458,12 @@ export function SlopCanvas({
                 height={shell.h}
               />
               {editing && showGrid && (
-                <PixelGrid width={shell.w} height={shell.h} step={EDITOR_GRID_PX} />
+                <PixelGrid
+                  width={shell.w}
+                  height={shell.h}
+                  stepX={EDITOR_GRID_PX * (shell.w / canon.w)}
+                  stepY={EDITOR_GRID_PX * (shell.h / canon.h)}
+                />
               )}
               {editing && nodes.length === 0 && (
                 <div className="slop-empty">Use Add to place an element on the canvas.</div>

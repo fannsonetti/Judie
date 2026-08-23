@@ -10,7 +10,10 @@ export type SlopKind =
   | "button"
   | "chip"
   | "divider"
-  | "box";
+  | "box"
+  | "list"
+  | "pair"
+  | "toggle";
 
 export type SlopAlign = "left" | "center" | "right";
 export type SlopValign = "top" | "middle" | "bottom";
@@ -66,6 +69,9 @@ export const SLOP_KINDS: { kind: SlopKind; label: string }[] = [
   { kind: "gauge", label: "Gauge" },
   { kind: "button", label: "Button" },
   { kind: "chip", label: "Chip" },
+  { kind: "list", label: "List" },
+  { kind: "pair", label: "Pair" },
+  { kind: "toggle", label: "Toggle" },
   { kind: "divider", label: "Divider" },
   { kind: "box", label: "Box" },
 ];
@@ -211,6 +217,34 @@ const KIND_DEFAULTS: Record<
     h: 28,
     fill: "rgba(255,255,255,0.05)",
     radius: 16,
+  },
+  list: {
+    w: 88,
+    h: 36,
+    text: "Living room\nKitchen\nBedroom",
+    fontSize: 13,
+    fontWeight: 550,
+    color: "#f4f5f7",
+    align: "left",
+    valign: "middle",
+  },
+  pair: {
+    w: 88,
+    h: 14,
+    text: "Humidity\n42%",
+    fontSize: 13,
+    fontWeight: 550,
+    color: "#8b909d",
+    align: "left",
+    valign: "middle",
+  },
+  toggle: {
+    w: 18,
+    h: 10,
+    value: 100,
+    accent: "#2d7bff",
+    fill: "rgba(255,255,255,0.14)",
+    radius: 99,
   },
 };
 

@@ -24,8 +24,8 @@ Reboot after that. Close Chromium and other heavy apps.
 ## Install from GitHub (recommended)
 
 ```bash
-curl -LO https://github.com/fannsonetti/Judie/releases/latest/download/Judie_0.1.5_arm64.deb
-sudo apt install -y ./Judie_0.1.5_arm64.deb
+curl -LO https://github.com/fannsonetti/Judie/releases/latest/download/Judie_0.1.6_arm64.deb
+sudo apt install -y ./Judie_0.1.6_arm64.deb
 ```
 
 The `.deb` registers **autostart**. After auto-login, Judie should open by itself — you should not need to type `judie`.
@@ -67,11 +67,9 @@ First build can take **30–90 minutes** on a Pi 3.
 
 The home screen is **one page** by default (extra pages only if you add widgets in edit mode). Off-screen pages are not kept mounted.
 
-Looks stay the same. Pi mode skips live backdrop-filter (a GPU tax) and spring layout animation — not the visual design.
+The tiny `judie` process in the task manager is only the GTK window. Painting runs in **WebKitWebProcess** — if Judie feels slow while CPU and RAM look idle, that is the compositor, not a missing blur toggle.
 
-If CPU sits around ~8% and the UI still stutters, that is the **WebKit compositor**, not RAM or heat. Judie disables WebKit’s DMA-BUF renderer on Linux (a VideoCore stall) and samples host stats on a background thread. Keep GPU memory at **128** in raspi-config.
-
-Override in **Settings → Room → Performance**: Auto / Desktop / Pi.
+On a Raspberry Pi, Judie paints on the CPU instead of waiting on VideoCore DMA-BUF. Looks stay the same. Keep GPU memory at **128** in raspi-config.
 
 ## Runtime tips for Pi 3
 

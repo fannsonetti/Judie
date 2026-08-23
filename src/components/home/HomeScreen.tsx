@@ -14,7 +14,6 @@ import { SettingsOverlay } from "./SettingsOverlay";
 import { Toasts } from "./Toasts";
 import { DebugPanel } from "./DebugPanel";
 import { JudieRuntime } from "../../runtime/JudieRuntime";
-import { usePerformanceStore } from "../../lib/performance";
 
 export function HomeScreen() {
   const widgets = useLayoutStore((s) => s.widgets);
@@ -22,7 +21,6 @@ export function HomeScreen() {
   const setPage = useLayoutStore((s) => s.setPage);
   const editMode = useLayoutStore((s) => s.editMode);
   const expandedId = useLayoutStore((s) => s.expandedId);
-  const reduced = usePerformanceStore((s) => s.reduced);
 
   const pageCount = visiblePageCount(widgets, editMode);
   const canSwipe = pageCount > 1 && !editMode && !expandedId;
@@ -35,13 +33,11 @@ export function HomeScreen() {
   const holdTimer = useRef<number | null>(null);
   const currentPageRef = useRef(currentPage);
   const pageCountRef = useRef(pageCount);
-  const reducedRef = useRef(reduced);
   const editModeRef = useRef(editMode);
   const expandedRef = useRef(expandedId);
   const canSwipeRef = useRef(canSwipe);
   currentPageRef.current = currentPage;
   pageCountRef.current = pageCount;
-  reducedRef.current = reduced;
   editModeRef.current = editMode;
   expandedRef.current = expandedId;
   canSwipeRef.current = canSwipe;
@@ -60,11 +56,7 @@ export function HomeScreen() {
     const n = Math.max(1, pageCountRef.current);
     if (!track) return;
     const pct = -page * (100 / n) + (offsetPx / (pageWidth() * n)) * 100;
-    track.style.transition = animate
-      ? reducedRef.current
-        ? "transform 0.16s ease-out"
-        : "transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)"
-      : "none";
+    track.style.transition = animate ? "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)" : "none";
     track.style.transform = `translate3d(${pct}%, 0, 0)`;
   };
 
@@ -141,7 +133,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     if (!isDragging) applyTrack(currentPage, 0, true);
-  }, [currentPage, pageCount, reduced, isDragging]);
+  }, [currentPage, pageCount, isDragging]);
 
   useEffect(() => {
     const onContext = (e: MouseEvent) => {

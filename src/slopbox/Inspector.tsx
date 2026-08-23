@@ -165,8 +165,17 @@ export function SlopInspector({
               />
             </Field>
             {hasText(node.kind) && (
-              <Field label="Text">
-                <input value={node.text ?? ""} onChange={(e) => onNode({ text: e.target.value })} />
+              <Field label={node.kind === "list" || node.kind === "pair" ? "Lines" : "Text"}>
+                {node.kind === "list" || node.kind === "pair" ? (
+                  <textarea
+                    className="slop-hook-note"
+                    rows={node.kind === "list" ? 4 : 2}
+                    value={node.text ?? ""}
+                    onChange={(e) => onNode({ text: e.target.value })}
+                  />
+                ) : (
+                  <input value={node.text ?? ""} onChange={(e) => onNode({ text: e.target.value })} />
+                )}
               </Field>
             )}
             {node.kind === "icon" && (
@@ -238,8 +247,8 @@ export function SlopInspector({
                 )}
               </>
             )}
-            {(node.kind === "bar" || node.kind === "gauge") && (
-              <Field label="Value">
+            {(node.kind === "bar" || node.kind === "gauge" || node.kind === "toggle") && (
+              <Field label={node.kind === "toggle" ? "On" : "Value"}>
                 <input
                   type="range"
                   min={0}
@@ -296,7 +305,7 @@ export function SlopInspector({
                 <Swatches value={node.fill} onChange={(fill) => onNode({ fill })} />
               </Field>
             )}
-            {(node.kind === "bar" || node.kind === "gauge") && (
+            {(node.kind === "bar" || node.kind === "gauge" || node.kind === "list" || node.kind === "pair" || node.kind === "toggle") && (
               <Field label="Accent">
                 <Swatches value={node.accent} onChange={(accent) => onNode({ accent })} />
               </Field>
@@ -342,9 +351,17 @@ export function SlopInspector({
 }
 
 function hasText(kind: SlopKind) {
-  return kind === "text" || kind === "metric" || kind === "button" || kind === "chip" || kind === "gauge";
+  return (
+    kind === "text" ||
+    kind === "metric" ||
+    kind === "button" ||
+    kind === "chip" ||
+    kind === "gauge" ||
+    kind === "list" ||
+    kind === "pair"
+  );
 }
 
 function hasFill(kind: SlopKind) {
-  return kind === "button" || kind === "chip" || kind === "box" || kind === "divider" || kind === "bar";
+  return kind === "button" || kind === "chip" || kind === "box" || kind === "divider" || kind === "bar" || kind === "toggle";
 }

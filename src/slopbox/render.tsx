@@ -159,6 +159,85 @@ export function SlopNodeView({
     );
   }
 
+  if (node.kind === "list") {
+    const lines = (node.text ?? "").split("\n").filter((line) => line.length > 0);
+    return (
+      <div
+        style={{
+          ...common,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-evenly",
+          fontSize: font,
+          fontWeight: node.fontWeight ?? 550,
+          color,
+        }}
+        {...hookProps}
+      >
+        {lines.map((line, i) => (
+          <div key={`${i}-${line}`} className="slop-list-row">
+            <span className="slop-list-dot" style={{ background: node.accent ?? "var(--accent)" }} />
+            <span className="slop-list-text">{line}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (node.kind === "pair") {
+    const [label, ...rest] = (node.text ?? "").split("\n");
+    const value = rest.join(" ").trim();
+    return (
+      <div
+        className="slop-pair"
+        style={{
+          ...common,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8 * scale,
+          fontSize: font,
+          fontWeight: node.fontWeight ?? 550,
+        }}
+        {...hookProps}
+      >
+        <span className="slop-pair-k">{label}</span>
+        <span className="slop-pair-v" style={{ color: node.accent ?? "#f4f5f7" }}>
+          {value}
+        </span>
+      </div>
+    );
+  }
+
+  if (node.kind === "toggle") {
+    const on = (node.value ?? 0) >= 50;
+    const h = Math.max(10, (node.h / 100) * CANONICAL[size].h * scale);
+    const w = Math.max(h * 1.7, (node.w / 100) * CANONICAL[size].w * scale);
+    const knob = Math.max(8, h - 4);
+    return (
+      <div style={{ ...common, display: "grid", placeItems: "center" }} {...hookProps}>
+        <span
+          className={`slop-toggle-face ${on ? "on" : ""}`}
+          style={{
+            width: w,
+            height: h,
+            borderRadius: radius || 99,
+            background: on ? (node.accent ?? "var(--accent)") : (node.fill ?? "rgba(255,255,255,0.14)"),
+          }}
+        >
+          <span
+            className="slop-toggle-knob-face"
+            style={{
+              width: knob,
+              height: knob,
+              transform: on ? `translateX(${w - knob - 2}px)` : "translateX(2px)",
+            }}
+          />
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{

@@ -5,7 +5,7 @@ import { useLayoutStore } from "../../store/layoutStore";
 import { useRoomStore } from "../../store/roomStore";
 import { SCENE_PRESETS } from "../../lib/mockData";
 import { WIDGET_LABELS, WidgetType } from "../../types/widgets";
-import { overlayTransition, usePerformanceStore } from "../../lib/performance";
+import { overlayTransition } from "../../lib/performance";
 
 interface Hit {
   id: string;
@@ -22,7 +22,6 @@ export function CommandPalette() {
   const status = useAssistantStore((s) => s.status);
   const startListening = useAssistantStore((s) => s.startListening);
   const stopListening = useAssistantStore((s) => s.stopListening);
-  const reduced = usePerformanceStore((s) => s.reduced);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -165,10 +164,10 @@ export function CommandPalette() {
         >
           <motion.div
             className="palette-panel"
-            initial={{ opacity: 0, y: reduced ? -8 : -28 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: reduced ? -6 : -20 }}
-            transition={overlayTransition(reduced)}
+            exit={{ opacity: 0, y: -14 }}
+            transition={overlayTransition()}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={onSheetPointerDown}
             onPointerUp={onSheetPointerUp}

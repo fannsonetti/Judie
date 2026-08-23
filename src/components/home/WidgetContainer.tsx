@@ -1,5 +1,4 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { motion } from "framer-motion";
 import {
   ExpandableWidgetType,
   PlacedWidget,
@@ -18,7 +17,6 @@ import { ActivityWidget } from "../widgets/ActivityWidget";
 import { TimersWidget } from "../widgets/TimersWidget";
 import { SystemWidget } from "../widgets/SystemWidget";
 import { SlopWidget } from "../widgets/SlopWidget";
-import { overlayTransition, usePerformanceStore } from "../../lib/performance";
 
 const EXPANDABLE = new Set<string>(["weather", "lights", "media", "purifier", "calendar"]);
 
@@ -38,7 +36,6 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
   const resizeWidget = useLayoutStore((s) => s.resizeWidget);
   const setDragging = useLayoutStore((s) => s.setDragging);
   const reorder = useLayoutStore((s) => s.reorder);
-  const reduced = usePerformanceStore((s) => s.reduced);
 
   const longPressTimer = useRef<number | null>(null);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
@@ -203,33 +200,9 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
     </>
   );
 
-  if (reduced) {
-    return (
-      <div className="widget-slot" data-widget-id={widget.id} style={slotStyle}>
-        <div
-          className={shellClass}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onClick={onClick}
-        >
-          {face}
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <motion.div
-      className="widget-slot"
-      layout={!isDragging}
-      data-widget-id={widget.id}
-      transition={overlayTransition(false)}
-      style={slotStyle}
-    >
-      <motion.div
-        layoutId={`widget-${widget.id}`}
+    <div className="widget-slot" data-widget-id={widget.id} style={slotStyle}>
+      <div
         className={shellClass}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -238,8 +211,8 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
         onClick={onClick}
       >
         {face}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { WidgetInstance, WidgetSize, SIZE_DIMS } from "../types/widgets";
 import { packWidgets } from "../lib/layout";
-import { novaHomeGridMetrics, novaShellSize } from "../lib/widgetGrid";
+import { novaHomeGridMetrics, novaShellSize, liveFrame } from "../lib/widgetGrid";
 import { SlopLayer } from "./render";
 import { SlopDef } from "./schema";
 
@@ -14,7 +14,7 @@ interface Props {
 
 function LiveFace({ def, size }: { def: SlopDef; size: WidgetSize }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [box, setBox] = useState(() => novaShellSize(size));
+  const [box, setBox] = useState(() => novaShellSize(size, liveFrame()));
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -37,7 +37,7 @@ function LiveFace({ def, size }: { def: SlopDef; size: WidgetSize }) {
 }
 
 export function PreviewHome({ def, size }: Props) {
-  const metrics = novaHomeGridMetrics();
+  const metrics = novaHomeGridMetrics(liveFrame());
   const widgets: WidgetInstance[] = [
     { id: "live", type: "custom", page: 0, size, order: 0 },
     ...FILL.map((s, i) => ({

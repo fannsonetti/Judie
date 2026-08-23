@@ -1,6 +1,5 @@
 import { useId } from "react";
 import { formatGb, useHostStats } from "../../lib/hostStats";
-import { usePerformanceStore } from "../../lib/performance";
 
 interface Props {
   size: string;
@@ -11,7 +10,6 @@ const MEM = "#a78bfa";
 
 export function SystemWidget({ size }: Props) {
   const { stats, available } = useHostStats();
-  const reduced = usePerformanceStore((s) => s.reduced);
   const wide = size === "1x2";
   const large = size === "2x2";
 
@@ -26,7 +24,7 @@ export function SystemWidget({ size }: Props) {
   const cpu = Math.round(stats.cpu);
   const mem = Math.round(stats.memory);
   const memDetail = `${formatGb(stats.memoryUsedMb)} / ${formatGb(stats.memoryTotalMb)}`;
-  const glow = !reduced;
+  const glow = true;
 
   const cpuBlock = (
     <MetricBlock label="CPU" value={cpu} values={stats.cpuHistory} color={CPU} glow={glow} />

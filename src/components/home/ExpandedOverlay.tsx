@@ -23,10 +23,12 @@ export function ExpandedOverlay() {
           onClick={collapseWidget}
         >
           <motion.div
-            layoutId={`widget-${expandedId}`}
             className="expanded-app"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
             onClick={(e) => e.stopPropagation()}
-            transition={{ type: "spring", stiffness: 320, damping: 34 }}
           >
             <button
               type="button"

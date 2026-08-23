@@ -11,7 +11,7 @@ import { useCustomWidgetStore } from "../../store/customWidgetStore";
 import { parseWidgetFile } from "../../slopbox/export";
 import { filledSizes } from "../../slopbox/schema";
 import { useSlopStore } from "../../slopbox/store";
-import { overlayTransition, usePerformanceStore } from "../../lib/performance";
+import { overlayTransition } from "../../lib/performance";
 
 const DESCRIPTIONS: Record<Exclude<WidgetType, "custom">, string> = {
   activity: "See a live feed of what Judie and your automations have been doing.",
@@ -49,7 +49,6 @@ export function WidgetGallery() {
   const customWidgets = useCustomWidgetStore((s) => s.widgets);
   const importOne = useCustomWidgetStore((s) => s.importOne);
   const fileRef = useRef<HTMLInputElement>(null);
-  const reduced = usePerformanceStore((s) => s.reduced);
 
   const types = useMemo(
     () =>
@@ -126,10 +125,10 @@ export function WidgetGallery() {
         >
           <motion.div
             className="wg-panel"
-            initial={{ opacity: 0, y: reduced ? 8 : 28, scale: reduced ? 1 : 0.97 }}
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: reduced ? 4 : 16, scale: reduced ? 1 : 0.97 }}
-            transition={overlayTransition(reduced)}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={overlayTransition()}
             onClick={(e) => e.stopPropagation()}
           >
             <input

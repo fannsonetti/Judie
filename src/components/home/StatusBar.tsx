@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useRoomStore } from "../../store/roomStore";
 import { useAssistantStore } from "../../store/assistantStore";
 import { formatClock, formatDateLong } from "../../lib/time";
-import { usePerformanceStore } from "../../lib/performance";
+import { JUDIE_VERSION } from "../../lib/version";
 
 const STATUS_LABEL: Record<string, string> = {
   idle: "",
@@ -21,27 +21,13 @@ export function StatusBar() {
   const setServerStatus = useRoomStore((s) => s.setServerStatus);
   const setServices = useRoomStore((s) => s.setServices);
   const status = useAssistantStore((s) => s.status);
-  const reduced = usePerformanceStore((s) => s.reduced);
   const pointer = useRef<{ y: number; x: number } | null>(null);
 
   useEffect(() => {
     const tick = () => setNow(new Date());
-    if (!reduced) {
-      const t = window.setInterval(tick, 1000);
-      return () => window.clearInterval(t);
-    }
-    const now = new Date();
-    const delay = Math.max(250, (60 - now.getSeconds()) * 1000 - now.getMilliseconds());
-    let interval = 0;
-    const timeout = window.setTimeout(() => {
-      tick();
-      interval = window.setInterval(tick, 60_000);
-    }, delay);
-    return () => {
-      window.clearTimeout(timeout);
-      if (interval) window.clearInterval(interval);
-    };
-  }, [reduced]);
+    const t = window.setInterval(tick, 1000);
+    return () => window.clearInterval(t);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,12 +61,12 @@ export function StatusBar() {
       }
     };
     void ping();
-    const id = window.setInterval(() => void ping(), reduced ? 45_000 : 20_000);
+    const id = window.setInterval(() => void ping(), 20_000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [setServerStatus, setServices, reduced]);
+  }, [setServerStatus, setServices]);
 
   const openCenter = () => useAssistantStore.getState().setPaletteOpen(true);
 
@@ -110,6 +96,9 @@ export function StatusBar() {
       }}
     >
       <div className="status-left">
+        <span className="status-version" aria-hidden>
+          {JUDIE_VERSION}
+        </span>
         {statusLabel && <span className="status-state">{statusLabel}</span>}
         {dnd && <span className="status-dnd">DND</span>}
       </div>

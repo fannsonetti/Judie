@@ -2,7 +2,7 @@ import { processUtterance, emptyContext } from "../assistant/process";
 import { applyContextFromResult } from "../assistant/process";
 import { RoomSnapshot } from "../assistant/types";
 import { packWidgets, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
-import { measureWidgetGrid } from "../lib/widgetGrid";
+import { homeScaleFor, measureWidgetGrid, novaShellSize, NOVA_FRAME } from "../lib/widgetGrid";
 import { GRID_ROWS } from "../types/widgets";
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
@@ -540,6 +540,23 @@ test("no fail-language in replies", () => {
     const r = processUtterance(p, snap());
     assert(!/\bfail\b|\berror\b|unrecognised|unmatched|null|undefined|not sure/i.test(r.response), `${p}: ${r.response}`);
   }
+});
+
+test("editor 100% uses the live home shell, not the 1920 design", () => {
+  const pi = { w: 1280, h: 800 };
+  const live = novaShellSize("1x2", pi);
+  const design = novaShellSize("1x2", NOVA_FRAME);
+  assert(live.w < design.w - 40, "a 1280 home tile is smaller than the 1920 design");
+  assert(Math.abs(homeScaleFor("1x2", NOVA_FRAME) - 1) < 0.001, "design tablet is 100%");
+});
+
+test("list pair and toggle are addable kinds", () => {
+  const list = defaultNode("list", 8, 8, CANONICAL["1x2"]);
+  const pair = defaultNode("pair", 8, 8, CANONICAL["1x2"]);
+  const toggle = defaultNode("toggle", 8, 8, CANONICAL["1x1"]);
+  assert(list.kind === "list" && (list.text ?? "").includes("\n"), "list has rows");
+  assert(pair.kind === "pair" && (pair.text ?? "").includes("\n"), "pair has label and value");
+  assert(toggle.kind === "toggle" && (toggle.value ?? 0) >= 50, "toggle defaults on");
 });
 
 if (failed) {

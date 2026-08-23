@@ -17,6 +17,7 @@ import {
   SlopNode,
 } from "./schema";
 import { useSlopStore } from "./store";
+import { KIND_GLYPH } from "./glyphs";
 import {
   SlopCanvas,
   bringToFront,
@@ -317,7 +318,7 @@ export function WidgetCreatorApp({ onClose }: Props) {
               className="slop-zoom-btn"
               disabled={preview}
               onClick={() => setZoom(1)}
-              title="Actual home-screen size"
+              title="Match the home screen widget size"
             >
               100%
             </button>
@@ -338,14 +339,17 @@ export function WidgetCreatorApp({ onClose }: Props) {
               Undo
             </button>
             <SlopDropMenu label="Add" disabled={!current || preview}>
-              <div className="slop-add-grid">
+              <div className="slop-add-list">
                 {SLOP_KINDS.map((item) => (
                   <button
                     key={item.kind}
                     type="button"
                     onClick={() => addKind(item.kind)}
                   >
-                    {item.label}
+                    <span className="slop-add-preview" aria-hidden>
+                      {KIND_GLYPH[item.kind]}
+                    </span>
+                    <span>{item.label}</span>
                   </button>
                 ))}
               </div>
