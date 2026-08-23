@@ -23,6 +23,7 @@ const DESCRIPTIONS: Record<Exclude<WidgetType, "custom">, string> = {
   quickControls: "One-tap access to your favourite scenes and room presets.",
   server: "Monitor the health and latency of local services and backend connections.",
   timers: "View and manage running timers, alarms, and reminders.",
+  system: "Live CPU and memory from this computer, plus the processes using the most.",
   weather: "Stay ahead of the forecast with real-time local weather conditions and upcoming predictions.",
 };
 

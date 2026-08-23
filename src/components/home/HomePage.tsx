@@ -5,14 +5,15 @@ import { WidgetGrid } from "./WidgetGrid";
 interface Props {
   page: number;
   widgets: WidgetInstance[];
+  width?: string;
 }
 
-export function HomePage({ widgets }: Props) {
+export function HomePage({ widgets, width }: Props) {
   const enterEditMode = useLayoutStore((s) => s.enterEditMode);
   const setGalleryOpen = useLayoutStore((s) => s.setGalleryOpen);
 
   return (
-    <section className="home-page">
+    <section className="home-page" style={width ? { width } : undefined}>
       {widgets.length === 0 ? (
         <div className="empty-page">
           <div className="empty-plus">+</div>

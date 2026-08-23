@@ -16,6 +16,7 @@ import { QuickControlsWidget } from "../widgets/QuickControlsWidget";
 import { ServerWidget } from "../widgets/ServerWidget";
 import { ActivityWidget } from "../widgets/ActivityWidget";
 import { TimersWidget } from "../widgets/TimersWidget";
+import { SystemWidget } from "../widgets/SystemWidget";
 import { SlopWidget } from "../widgets/SlopWidget";
 import { overlayTransition, usePerformanceStore } from "../../lib/performance";
 
@@ -249,6 +250,8 @@ function WidgetBody({ widget }: { widget: PlacedWidget }): ReactNode {
       return <ActivityWidget size={widget.size} />;
     case "timers":
       return <TimersWidget size={widget.size} />;
+    case "system":
+      return <SystemWidget size={widget.size} />;
     case "custom":
       return <SlopWidget customId={widget.customId} size={widget.size} />;
     default:

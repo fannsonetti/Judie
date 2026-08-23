@@ -1,16 +1,16 @@
-import { PAGE_COUNT } from "../../types/widgets";
 import { useLayoutStore } from "../../store/layoutStore";
 
 interface Props {
   page: number;
+  count: number;
 }
 
-export function PageIndicator({ page }: Props) {
+export function PageIndicator({ page, count }: Props) {
   const setPage = useLayoutStore((s) => s.setPage);
 
   return (
     <div className="page-indicator">
-      {Array.from({ length: PAGE_COUNT }).map((_, i) => (
+      {Array.from({ length: count }).map((_, i) => (
         <button
           key={i}
           type="button"

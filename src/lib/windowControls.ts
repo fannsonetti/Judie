@@ -1,0 +1,55 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+let restoreFullscreen = false;
+
+async function win() {
+  return getCurrentWindow();
+}
+
+export async function minimizeJudie() {
+  const w = await win();
+  try {
+    const fs = await w.isFullscreen();
+    restoreFullscreen = fs;
+    if (fs) await w.setFullscreen(false);
+  } catch {
+    restoreFullscreen = true;
+    try {
+      await w.setFullscreen(false);
+    } catch {
+      /* ignore */
+    }
+  }
+  await w.minimize();
+}
+
+export async function quitJudie() {
+  try {
+    const { exit } = await import("@tauri-apps/plugin-process");
+    await exit(0);
+  } catch {
+    await (await win()).close();
+  }
+}
+
+export async function enterFullscreen() {
+  await (await win()).setFullscreen(true);
+}
+
+export function watchKioskFocus() {
+  let unlisten: (() => void) | undefined;
+  void (async () => {
+    try {
+      const w = await win();
+      unlisten = await w.onFocusChanged(({ payload: focused }) => {
+        if (focused && restoreFullscreen) {
+          restoreFullscreen = false;
+          void w.setFullscreen(true);
+        }
+      });
+    } catch {
+      /* browser / vite */
+    }
+  })();
+  return () => unlisten?.();
+}

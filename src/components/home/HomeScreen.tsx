@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLayoutStore } from "../../store/layoutStore";
-import { PAGE_COUNT } from "../../types/widgets";
+import { visiblePageCount } from "../../lib/layout";
 import { StatusBar } from "./StatusBar";
 import { HomePage } from "./HomePage";
 import { PageIndicator } from "./PageIndicator";
@@ -23,24 +23,47 @@ export function HomeScreen() {
   const expandedId = useLayoutStore((s) => s.expandedId);
   const reduced = usePerformanceStore((s) => s.reduced);
 
+  const pageCount = visiblePageCount(widgets, editMode);
+  const canSwipe = pageCount > 1 && !editMode && !expandedId;
+
   const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef(0);
-  const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const pointer = useRef<{ x: number; startX: number; active: boolean } | null>(null);
+  const pointer = useRef<{ startX: number; active: boolean } | null>(null);
+  const currentPageRef = useRef(currentPage);
+  const pageCountRef = useRef(pageCount);
+  const reducedRef = useRef(reduced);
+  currentPageRef.current = currentPage;
+  pageCountRef.current = pageCount;
+  reducedRef.current = reduced;
 
   const pageWidth = () => viewportRef.current?.clientWidth ?? 1;
 
+  const applyTrack = (page: number, offsetPx: number, animate: boolean) => {
+    const track = trackRef.current;
+    const n = Math.max(1, pageCountRef.current);
+    if (!track) return;
+    const pct = -page * (100 / n) + (offsetPx / (pageWidth() * n)) * 100;
+    track.style.transition = animate
+      ? reducedRef.current
+        ? "transform 0.16s ease-out"
+        : "transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)"
+      : "none";
+    track.style.transform = `translate3d(${pct}%, 0, 0)`;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
-    if (editMode || expandedId) return;
+    if (!canSwipe) return;
     const target = e.target as HTMLElement;
     if (target.closest("input, button, .toggle, .slider, .palette-backdrop, .settings-backdrop")) {
       return;
     }
 
-    pointer.current = { x: e.clientX, startX: e.clientX, active: true };
+    pointer.current = { startX: e.clientX, active: true };
     dragOffsetRef.current = 0;
     setIsDragging(true);
+    applyTrack(currentPageRef.current, 0, false);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
@@ -48,25 +71,27 @@ export function HomeScreen() {
     if (!pointer.current?.active) return;
     const dx = e.clientX - pointer.current.startX;
     dragOffsetRef.current = dx;
-    setDragOffset(dx);
+    applyTrack(currentPageRef.current, dx, false);
   };
 
   const endDrag = () => {
     if (!pointer.current?.active) return;
     const dx = dragOffsetRef.current;
+    const n = pageCountRef.current;
     const threshold = pageWidth() * 0.18;
-    let next = currentPage;
-    if (dx < -threshold && currentPage < PAGE_COUNT - 1) next = currentPage + 1;
-    if (dx > threshold && currentPage > 0) next = currentPage - 1;
+    let next = currentPageRef.current;
+    if (dx < -threshold && next < n - 1) next += 1;
+    if (dx > threshold && next > 0) next -= 1;
     setPage(next);
     dragOffsetRef.current = 0;
-    setDragOffset(0);
     setIsDragging(false);
     pointer.current = null;
+    applyTrack(next, 0, true);
   };
 
-  const translate =
-    -currentPage * (100 / PAGE_COUNT) + (dragOffset / (pageWidth() * PAGE_COUNT)) * 100;
+  useEffect(() => {
+    if (!isDragging) applyTrack(currentPage, 0, true);
+  }, [currentPage, pageCount, reduced, isDragging]);
 
   useEffect(() => {
     const onContext = (e: MouseEvent) => {
@@ -77,6 +102,8 @@ export function HomeScreen() {
     window.addEventListener("contextmenu", onContext);
     return () => window.removeEventListener("contextmenu", onContext);
   }, []);
+
+  const pageWidthPct = `${100 / pageCount}%`;
 
   return (
     <div className="app-shell">
@@ -92,25 +119,31 @@ export function HomeScreen() {
       >
         <div
           className="home-track"
-          style={{
-            transform: `translate3d(${translate}%, 0, 0)`,
-            transition: isDragging
-              ? "none"
-              : reduced
-                ? "transform 0.16s ease-out"
-                : "transform 0.38s cubic-bezier(0.22, 1, 0.36, 1)",
-          }}
+          ref={trackRef}
+          style={{ width: `${pageCount * 100}%` }}
         >
-          {Array.from({ length: PAGE_COUNT }).map((_, page) => (
-            <HomePage
-              key={page}
-              page={page}
-              widgets={widgets.filter((w) => w.page === page)}
-            />
-          ))}
+          {Array.from({ length: pageCount }).map((_, page) => {
+            const nearby =
+              page === currentPage || (isDragging && Math.abs(page - currentPage) <= 1);
+            return nearby ? (
+              <HomePage
+                key={page}
+                page={page}
+                widgets={widgets.filter((w) => w.page === page)}
+                width={pageWidthPct}
+              />
+            ) : (
+              <section
+                key={page}
+                className="home-page"
+                style={{ width: pageWidthPct }}
+                aria-hidden
+              />
+            );
+          })}
         </div>
 
-        <PageIndicator page={currentPage} />
+        {pageCount > 1 && <PageIndicator page={currentPage} count={pageCount} />}
         {editMode && <EditModeControls />}
       </div>
 

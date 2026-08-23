@@ -5,6 +5,7 @@ import { useLayoutStore } from "../../store/layoutStore";
 import { useRoomStore } from "../../store/roomStore";
 import { SCENE_PRESETS } from "../../lib/mockData";
 import { WIDGET_LABELS, WidgetType } from "../../types/widgets";
+import { overlayTransition, usePerformanceStore } from "../../lib/performance";
 
 interface Hit {
   id: string;
@@ -18,20 +19,24 @@ export function CommandPalette() {
   const setOpen = useAssistantStore((s) => s.setPaletteOpen);
   const execute = useAssistantStore((s) => s.execute);
   const lastResponse = useAssistantStore((s) => s.lastResponse);
+  const status = useAssistantStore((s) => s.status);
+  const startListening = useAssistantStore((s) => s.startListening);
+  const stopListening = useAssistantStore((s) => s.stopListening);
+  const reduced = usePerformanceStore((s) => s.reduced);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const swipe = useRef<{ y: number } | null>(null);
   const lights = useRoomStore((s) => s.lights);
   const routines = useRoomStore((s) => s.routines);
   const setPage = useLayoutStore((s) => s.setPage);
   const addWidget = useLayoutStore((s) => s.addWidget);
+  const listening = status === "listening";
 
   useEffect(() => {
-    if (open) {
-      setQ("");
-      setSel(0);
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    if (!open) return;
+    setQ("");
+    setSel(0);
   }, [open]);
 
   const hits = useMemo<Hit[]>(() => {
@@ -83,15 +88,17 @@ export function CommandPalette() {
           setOpen(false);
         },
       },
-      ...(["weather", "lights", "media", "activity", "timers"] as WidgetType[]).map((type) => ({
-        id: `add-${type}`,
-        title: `Add ${WIDGET_LABELS[type]} widget`,
-        hint: "Widget",
-        run: () => {
-          addWidget(type, "1x2");
-          setOpen(false);
-        },
-      })),
+      ...(["weather", "lights", "media", "activity", "timers", "system"] as WidgetType[]).map(
+        (type) => ({
+          id: `add-${type}`,
+          title: `Add ${WIDGET_LABELS[type]} widget`,
+          hint: "Widget",
+          run: () => {
+            addWidget(type, "1x2");
+            setOpen(false);
+          },
+        })
+      ),
       {
         id: "page-0",
         title: "Go to page 1",
@@ -99,15 +106,6 @@ export function CommandPalette() {
         run: () => {
           setPage(0);
           setOpen(false);
-        },
-      },
-      {
-        id: "settings",
-        title: "Open settings",
-        hint: "Settings",
-        run: () => {
-          setOpen(false);
-          useAssistantStore.getState().setSettingsOpen(true);
         },
       },
       {
@@ -120,13 +118,11 @@ export function CommandPalette() {
         },
       },
     ];
-    if (!n) return items.slice(0, 12);
+    if (!n) return items.slice(0, 8);
     return items.filter(
       (i) => i.title.toLowerCase().includes(n) || i.hint.toLowerCase().includes(n)
     );
   }, [q, lights, routines, execute, setOpen, addWidget, setPage]);
-
-  if (!open) return null;
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -144,54 +140,101 @@ export function CommandPalette() {
     }
   };
 
+  const onSheetPointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("input, button, .palette-list")) return;
+    swipe.current = { y: e.clientY };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onSheetPointerUp = (e: React.PointerEvent) => {
+    const start = swipe.current;
+    swipe.current = null;
+    if (!start) return;
+    if (start.y - e.clientY > 40) setOpen(false);
+  };
+
   return (
     <AnimatePresence>
-      <motion.div
-        className="palette-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setOpen(false)}
-      >
+      {open && (
         <motion.div
-          className="palette-panel"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 10 }}
-          onClick={(e) => e.stopPropagation()}
+          className="palette-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setOpen(false)}
         >
-          <input
-            ref={inputRef}
-            className="palette-input"
-            placeholder="Hey Judie — lights off, dim, mute, 12 times 7…"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setSel(0);
-            }}
-            onKeyDown={onKey}
-            aria-label="Command"
-          />
-          {lastResponse && !q && (
-            <div className="palette-reply">{lastResponse}</div>
-          )}
-          <div className="palette-list">
-            {hits.map((h, i) => (
+          <motion.div
+            className="palette-panel"
+            initial={{ opacity: 0, y: reduced ? -8 : -28 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reduced ? -6 : -20 }}
+            transition={overlayTransition(reduced)}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={onSheetPointerDown}
+            onPointerUp={onSheetPointerUp}
+          >
+            <div className="cc-grab" aria-hidden />
+            <div className="cc-tiles">
               <button
-                key={h.id}
                 type="button"
-                className={`palette-item ${i === sel ? "active" : ""}`}
-                onMouseEnter={() => setSel(i)}
-                onClick={h.run}
+                className={`cc-tile ${listening ? "on" : ""}`}
+                onClick={() => (listening ? stopListening() : startListening())}
               >
-                <span>{h.title}</span>
-                <span className="w-secondary">{h.hint}</span>
+                <span className={`judie-orb ${status}`} />
+                {listening ? "Listening" : "Listen"}
               </button>
-            ))}
-            {hits.length === 0 && <div className="palette-empty">No matches</div>}
-          </div>
+              <button
+                type="button"
+                className="cc-tile"
+                onClick={() => {
+                  setOpen(false);
+                  useAssistantStore.getState().setSettingsOpen(true);
+                }}
+              >
+                Settings
+              </button>
+              <button
+                type="button"
+                className="cc-tile"
+                onClick={() => {
+                  setOpen(false);
+                  useLayoutStore.getState().enterEditMode();
+                }}
+              >
+                Edit Home
+              </button>
+            </div>
+            <input
+              ref={inputRef}
+              className="palette-input"
+              placeholder="Search or ask Judie"
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setSel(0);
+              }}
+              onKeyDown={onKey}
+              aria-label="Search"
+            />
+            {lastResponse && !q && <div className="palette-reply">{lastResponse}</div>}
+            <div className="palette-list">
+              {hits.map((h, i) => (
+                <button
+                  key={h.id}
+                  type="button"
+                  className={`palette-item ${i === sel ? "active" : ""}`}
+                  onMouseEnter={() => setSel(i)}
+                  onClick={h.run}
+                >
+                  <span>{h.title}</span>
+                  <span className="w-secondary">{h.hint}</span>
+                </button>
+              ))}
+              {hits.length === 0 && <div className="palette-empty">No matches</div>}
+            </div>
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
     </AnimatePresence>
   );
 }

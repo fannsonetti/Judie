@@ -4,6 +4,7 @@ import {
   WidgetInstance,
   WidgetSize,
   PlacedWidget,
+  MAX_PAGES,
 } from "../types/widgets";
 
 export function sizeDims(size: WidgetSize) {
@@ -136,4 +137,16 @@ export function cycleSize(
 
 export function createId(type: string): string {
   return `${type}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export function usedPageCount(widgets: WidgetInstance[]): number {
+  if (widgets.length === 0) return 1;
+  return Math.max(...widgets.map((w) => w.page), 0) + 1;
+}
+
+/** Extra empty page only while editing, so you can add another screen on purpose. */
+export function visiblePageCount(widgets: WidgetInstance[], editMode: boolean): number {
+  const used = usedPageCount(widgets);
+  if (editMode && used < MAX_PAGES) return used + 1;
+  return used;
 }

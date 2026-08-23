@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useRoomStore } from "../../store/roomStore";
 import { useAssistantStore } from "../../store/assistantStore";
-import { useSettingsStore } from "../../store/settingsStore";
 import { formatClock, formatDateLong } from "../../lib/time";
 import { usePerformanceStore } from "../../lib/performance";
 
@@ -22,12 +21,8 @@ export function StatusBar() {
   const setServerStatus = useRoomStore((s) => s.setServerStatus);
   const setServices = useRoomStore((s) => s.setServices);
   const status = useAssistantStore((s) => s.status);
-  const startListening = useAssistantStore((s) => s.startListening);
-  const stopListening = useAssistantStore((s) => s.stopListening);
-  const setSettingsOpen = useAssistantStore((s) => s.setSettingsOpen);
-  const setPaletteOpen = useAssistantStore((s) => s.setPaletteOpen);
-  const roomName = useSettingsStore((s) => s.roomName);
   const reduced = usePerformanceStore((s) => s.reduced);
+  const pointer = useRef<{ y: number; x: number } | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -73,21 +68,35 @@ export function StatusBar() {
     };
   }, [setServerStatus, setServices, reduced]);
 
-  const listening = status === "listening";
+  const openCenter = () => useAssistantStore.getState().setPaletteOpen(true);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    pointer.current = { y: e.clientY, x: e.clientX };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    const start = pointer.current;
+    pointer.current = null;
+    if (!start) return;
+    const dy = e.clientY - start.y;
+    const dx = Math.abs(e.clientX - start.x);
+    if (dy > 36 && dy > dx * 1.2) openCenter();
+  };
+
   const statusLabel = STATUS_LABEL[status];
 
   return (
-    <header className="status-bar">
+    <header
+      className="status-bar"
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        pointer.current = null;
+      }}
+    >
       <div className="status-left">
-        <button
-          type="button"
-          className={`status-brand ${listening ? "listening" : ""}`}
-          onClick={() => (listening ? stopListening() : startListening())}
-          aria-label={listening ? "Stop listening" : "Talk to Judie"}
-        >
-          <span className={`judie-orb ${status}`} />
-          Judie
-        </button>
+        <span className={`judie-orb ${status}`} aria-hidden />
         {statusLabel && <span className="status-state">{statusLabel}</span>}
         {dnd && <span className="status-dnd">DND</span>}
       </div>
@@ -96,27 +105,7 @@ export function StatusBar() {
         <div className="status-date">{formatDateLong(now)}</div>
       </div>
       <div className="status-right">
-        <span className="status-pill">{roomName}</span>
-        <span className="status-pill">
-          <span className={`status-dot ${server.online ? "" : "offline"}`} />
-          {server.online ? `${server.latency} ms` : "Offline"}
-        </span>
-        <button
-          type="button"
-          className="status-icon-btn"
-          aria-label="Commands"
-          onClick={() => setPaletteOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.2-3.2" /></svg>
-        </button>
-        <button
-          type="button"
-          className="status-icon-btn"
-          aria-label="Settings"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3" /><path d="M12 3v2M12 19v2M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M3 12h2M19 12h2M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5" /></svg>
-        </button>
+        <span className={`status-dot ${server.online ? "" : "offline"}`} />
       </div>
     </header>
   );

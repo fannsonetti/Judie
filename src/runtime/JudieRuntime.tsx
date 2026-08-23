@@ -13,12 +13,14 @@ export function JudieRuntime() {
   const notified = useRef(new Set<string>());
 
   useEffect(() => {
-    const id = window.setInterval(() => {
-      tickProgress();
+    const tick = () => {
       const room = useRoomStore.getState();
-      const due = room.dueTimers();
+      if (room.media.playing) tickProgress();
+
+      const latest = room.media.playing ? useRoomStore.getState() : room;
+      const due = latest.dueTimers();
       for (const t of due) {
-        room.completeTimer(t.id);
+        latest.completeTimer(t.id);
         useActivityStore.getState().push({
           source: "timer",
           title: t.kind === "alarm" ? `Alarm: ${t.name}` : `${t.name} done`,
@@ -38,12 +40,9 @@ export function JudieRuntime() {
       }
 
       const settings = useSettingsStore.getState();
-      if (settings.proactive.calendar && !room.doNotDisturb) {
+      if (settings.proactive.calendar && !latest.doNotDisturb) {
         const now = new Date();
-        const hh = now.getHours().toString().padStart(2, "0");
-        const mm = now.getMinutes().toString().padStart(2, "0");
-        const cur = `${hh}:${mm}`;
-        for (const ev of room.events) {
+        for (const ev of latest.events) {
           if (ev.dayOffset) continue;
           const [h, m] = ev.time.split(":").map(Number);
           if (!Number.isFinite(h) || !Number.isFinite(m)) continue;
@@ -57,10 +56,10 @@ export function JudieRuntime() {
               body: `${ev.time}${ev.detail ? ` · ${ev.detail}` : ""}`,
             });
           }
-          void cur;
         }
       }
-    }, 1000);
+    };
+    const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, [tickProgress]);
 

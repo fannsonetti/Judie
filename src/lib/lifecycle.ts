@@ -1,9 +1,8 @@
 import { enable } from "@tauri-apps/plugin-autostart";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { useAssistantStore } from "../store/assistantStore";
 
-export async function bootLifecycle() {
+export async function bootLifecycle(onUpdating?: () => void) {
   try {
     await enable();
   } catch (error) {
@@ -14,12 +13,7 @@ export async function bootLifecycle() {
     const update = await check();
     if (!update) return;
 
-    useAssistantStore.getState().pushToast({
-      kind: "info",
-      title: "Updating Judie",
-      body: `Installing ${update.version} from GitHub`,
-    });
-
+    onUpdating?.();
     await update.downloadAndInstall();
     await relaunch();
   } catch (error) {

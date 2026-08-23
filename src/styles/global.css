@@ -89,11 +89,8 @@ input:focus-visible {
   align-items: center;
   padding: 0 var(--page-pad);
   z-index: 20;
-  pointer-events: none;
-}
-
-.status-bar > * {
-  pointer-events: auto;
+  touch-action: pan-y;
+  cursor: default;
 }
 
 .status-brand {
@@ -156,13 +153,14 @@ input:focus-visible {
 .home-track {
   display: flex;
   height: 100%;
-  width: 300%;
+  width: 100%;
   will-change: transform;
   touch-action: pan-y;
 }
 
 .home-page {
-  width: calc(100% / 3);
+  flex: 0 0 auto;
+  width: 100%;
   height: 100%;
   padding: 4px var(--page-pad) var(--safe-bottom);
   position: relative;
@@ -1382,27 +1380,63 @@ input:focus-visible {
   position: absolute;
   inset: 0;
   z-index: 60;
-  background: rgba(8, 9, 12, 0.62);
+  background: rgba(8, 9, 12, 0.55);
   display: flex;
   justify-content: center;
-  padding: 12vh 24px 24px;
+  align-items: flex-start;
+  padding: 10px 20px 24px;
 }
 
 .palette-panel {
-  width: min(640px, 100%);
+  width: min(560px, 100%);
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
+  border-radius: 28px;
   overflow: hidden;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.cc-grab {
+  width: 36px;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.22);
+  margin: 10px auto 8px;
+}
+
+.cc-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 4px 14px 8px;
+}
+
+.cc-tile {
+  min-height: 64px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--text);
+}
+
+.cc-tile.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .palette-input {
   width: 100%;
   border: none;
   background: transparent;
-  padding: 22px 22px 14px;
-  font-size: 20px;
+  padding: 10px 22px 12px;
+  font-size: 18px;
   outline: none;
 }
 
@@ -1559,37 +1593,226 @@ input:focus-visible {
   color: var(--text-muted);
 }
 
-/* Raspberry Pi / low-power profile */
-html.perf-pi .app-shell {
-  background: var(--bg);
-}
-
+/* Raspberry Pi / low-power: same look, skip live backdrop-filter (expensive on Pi 3 GPU). */
 html.perf-pi .edit-bar,
 html.perf-pi .wg-backdrop,
 html.perf-pi .settings-backdrop,
 html.perf-pi .palette-backdrop,
-html.perf-pi .toast {
+html.perf-pi .toast,
+html.perf-pi .expanded-overlay {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-}
-
-html.perf-pi *,
-html.perf-pi *::before,
-html.perf-pi *::after {
-  transition-duration: 0.08s !important;
-  animation-duration: 0.08s !important;
-  scroll-behavior: auto !important;
-}
-
-html.perf-pi .home-track {
-  will-change: auto;
 }
 
 html.perf-pi .widget-shell.edit-jiggle .widget-face {
   animation: none !important;
 }
 
-html.perf-pi .widget-shell {
-  box-shadow: none;
+.wx.system {
+  padding: 10px 12px 8px;
+  gap: 0;
+}
+
+.tm-wait {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.tm-1x1 {
+  gap: 0;
+}
+
+.tm-block {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tm-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.tm-value {
+  font-size: clamp(22px, 3.4vw, 34px);
+  font-weight: 300;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  margin: 2px 0 4px;
+}
+
+.tm-spark {
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  min-height: 18px;
+  overflow: visible;
+}
+
+.tm-split {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 6px 0 8px;
+  flex-shrink: 0;
+}
+
+.tm-1x2 {
+  flex-direction: row;
+  gap: 12px;
+}
+
+.tm-metrics {
+  flex: 1.15;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tm-side {
+  flex: 0.95;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tm-side-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tm-proc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  min-height: 18px;
+}
+
+.tm-proc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-proc em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.tm-2x2 {
+  gap: 10px;
+}
+
+.tm-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  min-height: 0;
+  flex: 0 0 auto;
+}
+
+.tm-2x2 .tm-spark {
+  height: 36px;
+}
+
+.tm-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px 10px;
+}
+
+.tm-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tm-fact span {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tm-fact strong {
+  font-size: 12px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-cores {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+
+.tm-core {
+  flex: 1;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.tm-core-fill {
+  width: 100%;
+  background: #3dd68c;
+  opacity: 0.85;
+  min-height: 2px;
+}
+
+.tm-table {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+  flex: 1;
+}
+
+.tm-row {
+  display: grid;
+  grid-template-columns: 1fr 46px 52px;
+  gap: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tm-row.head {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tm-row span:nth-child(2),
+.tm-row span:nth-child(3) {
+  text-align: right;
+  color: var(--text-muted);
 }
 

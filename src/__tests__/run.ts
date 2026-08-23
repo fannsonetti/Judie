@@ -1,7 +1,7 @@
 import { processUtterance, emptyContext } from "../assistant/process";
 import { applyContextFromResult } from "../assistant/process";
 import { RoomSnapshot } from "../assistant/types";
-import { packWidgets, reorderWidgets, cycleSize, normalizeOrders } from "../lib/layout";
+import { packWidgets, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
@@ -241,6 +241,9 @@ test("layout pack and reorder", () => {
   const reordered = normalizeOrders(reorderWidgets(widgets, "c", "a"));
   assert(reordered.find((w) => w.id === "c")!.order < reordered.find((w) => w.id === "a")!.order, "c before a");
   assert(cycleSize("1x2", ["1x2", "2x2"]) === "2x2", "cycle");
+  assert(usedPageCount(widgets) === 1, "one used page");
+  assert(visiblePageCount(widgets, false) === 1, "no swipe pages");
+  assert(visiblePageCount(widgets, true) === 2, "edit offers one empty page");
 });
 
 test("widget creator export includes hidden descriptors", () => {

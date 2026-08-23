@@ -7,7 +7,10 @@
           "libwebkit2gtk-4.1-0",
           "libgtk-3-0",
           "libayatana-appindicator3-1"
-        ]
+        ],
+        "files": {
+          "/etc/xdg/autostart/judie.desktop": "linux/judie.desktop"
+        }
       }
     }
   },
@@ -17,9 +20,11 @@
         "title": "Judie",
         "width": 1280,
         "height": 800,
-        "resizable": true,
-        "fullscreen": false,
+        "resizable": false,
+        "decorations": false,
+        "fullscreen": true,
         "maximized": true,
+        "shadow": false,
         "minWidth": 800,
         "minHeight": 480
       }

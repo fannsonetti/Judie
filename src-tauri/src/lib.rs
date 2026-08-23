@@ -1,3 +1,5 @@
+mod host;
+
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, OpenOptions};
 use std::io::Write;
@@ -104,6 +106,11 @@ fn append_conversation_log(app: AppHandle, entry: LogEntry) -> Result<String, St
     Ok(path.to_string_lossy().into_owned())
 }
 
+#[tauri::command]
+fn get_host_stats() -> host::HostStats {
+    host::snapshot()
+}
+
 fn pad_role(role: &str) -> String {
     match role.to_lowercase().as_str() {
         "you" | "user" => "YOU ".to_string(),
@@ -123,6 +130,13 @@ pub fn run() {
             use tauri_plugin_autostart::ManagerExt;
             let _ = app.autolaunch().enable();
 
+            #[cfg(target_os = "linux")]
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.set_decorations(false);
+                let _ = win.set_fullscreen(true);
+                let _ = win.maximize();
+            }
+
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
             app.handle()
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
@@ -131,6 +145,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_system_status,
+            get_host_stats,
             append_conversation_log,
             conversation_log_path
         ])

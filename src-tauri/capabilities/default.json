@@ -5,10 +5,18 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-set-decorations",
+    "core:window:allow-maximize",
+    "core:window:allow-minimize",
+    "core:window:allow-close",
+    "core:window:allow-unminimize",
+    "core:window:allow-is-fullscreen",
     "opener:default",
     "autostart:allow-enable",
     "autostart:allow-is-enabled",
     "updater:default",
-    "process:default"
+    "process:default",
+    "process:allow-exit"
   ]
 }

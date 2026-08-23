@@ -3,6 +3,8 @@ import {
   reorderWidgets,
   normalizeOrders,
   cycleSize,
+  usedPageCount,
+  visiblePageCount,
 } from "../src/lib/layout.ts";
 import type { WidgetInstance } from "../src/types/widgets.ts";
 
@@ -52,4 +54,10 @@ assertNoOverlap(packed);
 assertNoOverlap(packed2);
 
 console.log("cycle media size:", cycleSize("2x1", ["2x1", "2x2"]));
+
+if (usedPageCount([]) !== 1) throw new Error("empty layout is one page");
+if (usedPageCount(widgets) !== 1) throw new Error("page 0 only");
+if (visiblePageCount(widgets, false) !== 1) throw new Error("no extra page outside edit");
+if (visiblePageCount(widgets, true) !== 2) throw new Error("edit adds one empty page");
+
 console.log("OK");

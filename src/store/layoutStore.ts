@@ -6,7 +6,7 @@ import {
   WidgetSize,
   WidgetType,
   WIDGET_SUPPORTED_SIZES,
-  PAGE_COUNT,
+  MAX_PAGES,
 } from "../types/widgets";
 import {
   createId,
@@ -14,6 +14,8 @@ import {
   nextAvailableOrder,
   normalizeOrders,
   reorderWidgets,
+  visiblePageCount,
+  usedPageCount,
 } from "../lib/layout";
 import { getCustomWidget } from "../store/customWidgetStore";
 import { filledSizes } from "../slopbox/schema";
@@ -35,16 +37,6 @@ const DEFAULT_WIDGETS: WidgetInstance[] = [
   { id: "climate-1", type: "climate", page: 0, size: "1x1", order: 4 },
   { id: "purifier-1", type: "purifier", page: 0, size: "1x1", order: 5 },
   { id: "quick-1", type: "quickControls", page: 0, size: "1x2", order: 6 },
-
-  { id: "server-1", type: "server", page: 1, size: "1x2", order: 0 },
-  { id: "media-2", type: "media", page: 1, size: "2x2", order: 1 },
-  { id: "climate-2", type: "climate", page: 1, size: "1x2", order: 2 },
-  { id: "calendar-2", type: "calendar", page: 1, size: "2x2", order: 3 },
-
-  { id: "weather-2", type: "weather", page: 2, size: "1x2", order: 0 },
-  { id: "lights-2", type: "lights", page: 2, size: "1x2", order: 1 },
-  { id: "purifier-2", type: "purifier", page: 2, size: "1x2", order: 2 },
-  { id: "server-2", type: "server", page: 2, size: "1x1", order: 3 },
 ];
 
 interface LayoutState {
@@ -86,14 +78,24 @@ export const useLayoutStore = create<LayoutState>()(
       expandedType: null,
       draggingId: null,
 
-      setPage: (page) =>
-        set({ currentPage: Math.max(0, Math.min(PAGE_COUNT - 1, page)) }),
+      setPage: (page) => {
+        const max = Math.max(0, visiblePageCount(get().widgets, get().editMode) - 1);
+        set({ currentPage: Math.max(0, Math.min(max, page)) });
+      },
 
       enterEditMode: () =>
         set({ editMode: true, expandedId: null, expandedType: null }),
 
-      exitEditMode: () =>
-        set({ editMode: false, galleryOpen: false, creatorOpen: false, draggingId: null }),
+      exitEditMode: () => {
+        const used = usedPageCount(get().widgets);
+        set({
+          editMode: false,
+          galleryOpen: false,
+          creatorOpen: false,
+          draggingId: null,
+          currentPage: Math.min(get().currentPage, Math.max(0, used - 1)),
+        });
+      },
 
       setGalleryOpen: (open) => set({ galleryOpen: open, ...(open ? { creatorOpen: false } : {}) }),
 
@@ -130,7 +132,7 @@ export const useLayoutStore = create<LayoutState>()(
 
       addWidget: (type, size, page, customId) =>
         set((s) => {
-          const targetPage = page ?? s.currentPage;
+          const targetPage = Math.max(0, Math.min(MAX_PAGES - 1, page ?? s.currentPage));
           const supported = sizesFor(type, customId);
           if (!supported.length) return s;
           const finalSize = supported.includes(size) ? size : supported[0];
@@ -147,9 +149,10 @@ export const useLayoutStore = create<LayoutState>()(
 
       moveWidgetToPage: (id, page) =>
         set((s) => {
+          const target = Math.max(0, Math.min(MAX_PAGES - 1, page));
           const widgets = s.widgets.map((w) =>
             w.id === id
-              ? { ...w, page, order: nextAvailableOrder(s.widgets, page) }
+              ? { ...w, page: target, order: nextAvailableOrder(s.widgets, target) }
               : w
           );
           return { widgets: normalizeOrders(widgets) };
@@ -157,11 +160,13 @@ export const useLayoutStore = create<LayoutState>()(
     }),
     {
       name: "judie-layout",
-      version: 3,
+      version: 4,
       partialize: (s) => ({ widgets: s.widgets, currentPage: s.currentPage }),
       migrate: (persisted: unknown, version: number) => {
-        if (version < 3) {
-          return { widgets: DEFAULT_WIDGETS, currentPage: 0 };
+        if (version < 4) {
+          const prev = persisted as { widgets?: WidgetInstance[]; currentPage?: number };
+          const widgets = (prev.widgets ?? DEFAULT_WIDGETS).filter((w) => w.page === 0);
+          return { widgets: widgets.length ? widgets : DEFAULT_WIDGETS, currentPage: 0 };
         }
         return persisted as object;
       },

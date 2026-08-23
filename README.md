@@ -24,9 +24,9 @@ npm test
 
 ## What it does
 
-- Home screen of live widgets (swipe pages, long-press to edit, layout saved locally)
+- Home screen of live widgets (long-press to edit, extra pages only if you add them)
 - Lights, scenes, media, purifier, climate, calendar, weather, timers, activity
-- Natural-language commands via **Ctrl+K** or tap **Judie** (Web Speech in the WebView)
+- Natural-language commands via swipe-down from the top (or **Ctrl+K**)
 - Configurable routines (Good Night, Movie, Away, plus “when I say …”)
 - Timers, alarms, delayed actions (`turn the lights off in 20 minutes`)
 - Undo (say “undo” or Ctrl+Z)
@@ -44,11 +44,11 @@ Speak or type variations — wording does not need to be exact:
 - “turn off the lights, set my alarm for 7 and tell me tomorrow’s weather”
 - “when I say focus mode, turn the ceiling light off and set volume to 20”
 
-Tap **Judie** in the status bar to talk. Space starts/stops listening when you are not typing. Escape cancels overlays and speech.
+Swipe down from the top of the screen (iPad-style) for search, listen, and settings. Space starts/stops listening when you are not typing. Escape cancels overlays and speech.
 
 ## Settings
 
-Gear in the status bar:
+Swipe down → **Settings**:
 
 - Room name and weather location (lat/lon)
 - Voice in / voice out

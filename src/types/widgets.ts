@@ -9,6 +9,7 @@ export type WidgetType =
   | "server"
   | "activity"
   | "timers"
+  | "system"
   | "custom";
 
 export type WidgetSize = "1x1" | "1x2" | "2x2";
@@ -43,6 +44,7 @@ export const WIDGET_SUPPORTED_SIZES: Record<WidgetType, WidgetSize[]> = {
   quickControls: ["1x1", "1x2"],
   server: ["1x1", "1x2"],
   timers: ["1x1", "1x2"],
+  system: ["1x1", "1x2", "2x2"],
   weather: ["1x1", "1x2", "2x2"],
   custom: ["1x1", "1x2", "2x2"],
 };
@@ -58,11 +60,12 @@ export const WIDGET_LABELS: Record<WidgetType, string> = {
   server: "Server Status",
   activity: "Activity",
   timers: "Timers",
+  system: "System",
   custom: "Custom",
 };
 
 export const GRID_COLS = 6;
-export const PAGE_COUNT = 3;
+export const MAX_PAGES = 6;
 
 export interface PlacedWidget extends WidgetInstance {
   col: number;

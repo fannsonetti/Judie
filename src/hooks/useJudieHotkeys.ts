@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useAssistantStore } from "../store/assistantStore";
 import { useLayoutStore } from "../store/layoutStore";
-import { PAGE_COUNT } from "../types/widgets";
+import { visiblePageCount } from "../lib/layout";
 
 export function useJudieHotkeys() {
   const execute = useAssistantStore((s) => s.execute);
@@ -61,7 +61,8 @@ export function useJudieHotkeys() {
 
       if (e.key === "ArrowRight") {
         const l = useLayoutStore.getState();
-        if (!l.editMode && !l.expandedId) l.setPage(Math.min(PAGE_COUNT - 1, l.currentPage + 1));
+        const max = visiblePageCount(l.widgets, l.editMode) - 1;
+        if (!l.editMode && !l.expandedId) l.setPage(Math.min(max, l.currentPage + 1));
       }
       if (e.key === "ArrowLeft") {
         const l = useLayoutStore.getState();
