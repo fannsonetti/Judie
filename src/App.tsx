@@ -20,12 +20,15 @@ function App() {
     return watchKioskFocus();
   }, []);
 
-  return (
-    <LayoutGroup id={reduced ? "pi" : "desktop"}>
+  const tree = (
+    <>
       <HomeScreen />
       {updating && <UpdateOverlay />}
-    </LayoutGroup>
+    </>
   );
+
+  if (reduced) return tree;
+  return <LayoutGroup id="desktop">{tree}</LayoutGroup>;
 }
 
 export default App;

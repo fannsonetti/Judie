@@ -1,4 +1,4 @@
-import { ReactNode, useRef, useState } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
   ExpandableWidgetType,
@@ -33,7 +33,6 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
   const editMode = useLayoutStore((s) => s.editMode);
   const draggingId = useLayoutStore((s) => s.draggingId);
   const expandedId = useLayoutStore((s) => s.expandedId);
-  const enterEditMode = useLayoutStore((s) => s.enterEditMode);
   const expandWidget = useLayoutStore((s) => s.expandWidget);
   const removeWidget = useLayoutStore((s) => s.removeWidget);
   const resizeWidget = useLayoutStore((s) => s.resizeWidget);
@@ -57,6 +56,7 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
 
   const isHidden = expandedId === widget.id;
   const isDragging = draggingId === widget.id;
+  if (isDragging) draggingRef.current = true;
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -85,19 +85,7 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
     lastTarget.current = null;
     setDragDelta({ x: 0, y: 0 });
 
-    if (!editMode) {
-      longPressTimer.current = window.setTimeout(() => {
-        didLongPress.current = true;
-        enterEditMode();
-        draggingRef.current = true;
-        setDragging(widget.id);
-        try {
-          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-      }, 500);
-    } else {
+    if (editMode || draggingId === widget.id) {
       draggingRef.current = true;
       setDragging(widget.id);
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -109,7 +97,9 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
     const dx = e.clientX - pressStart.current.x;
     const dy = e.clientY - pressStart.current.y;
 
-    if (!draggingRef.current) {
+    const draggingNow =
+      draggingRef.current || useLayoutStore.getState().draggingId === widget.id;
+    if (!draggingNow) {
       if (Math.hypot(dx, dy) > 10) {
         movedEnough.current = true;
         clearLongPress();
@@ -144,7 +134,7 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
     if (target.closest("input, button, .toggle, .slider, .icon-btn, .chip")) {
       return;
     }
-    if (editMode || didLongPress.current || movedEnough.current) {
+    if (useLayoutStore.getState().editMode || didLongPress.current || movedEnough.current) {
       didLongPress.current = false;
       movedEnough.current = false;
       return;
@@ -154,75 +144,100 @@ export function WidgetContainer({ widget, cellW, cellH, gap }: Props) {
     }
   };
 
+  const slotStyle: CSSProperties = {
+    left,
+    top,
+    width,
+    height,
+    padding: gap / 2,
+    opacity: isHidden ? 0 : 1,
+    pointerEvents: isHidden ? "none" : "auto",
+    zIndex: isDragging ? 40 : 1,
+    transform: isDragging ? `translate3d(${dragDelta.x}px, ${dragDelta.y}px, 0)` : undefined,
+  };
+
+  const shellClass = `widget-shell ${editMode ? "edit-jiggle" : ""} ${isDragging ? "dragging" : ""}`;
+
+  const face = (
+    <>
+      {editMode && (
+        <>
+          <button
+            type="button"
+            className="widget-remove"
+            aria-label="Remove widget"
+            onClick={(e) => {
+              e.stopPropagation();
+              removeWidget(widget.id);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="widget-resize"
+            aria-label="Resize widget"
+            onClick={(e) => {
+              e.stopPropagation();
+              resizeWidget(widget.id);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {widget.size}
+          </button>
+        </>
+      )}
+      <div
+        className="widget-face"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          animationDelay: editMode ? `${(widget.order % 5) * 40}ms` : undefined,
+        }}
+      >
+        <WidgetBody widget={widget} />
+      </div>
+    </>
+  );
+
+  if (reduced) {
+    return (
+      <div className="widget-slot" data-widget-id={widget.id} style={slotStyle}>
+        <div
+          className={shellClass}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onClick={onClick}
+        >
+          {face}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       className="widget-slot"
-      layout={!isDragging && !reduced}
+      layout={!isDragging}
       data-widget-id={widget.id}
-      transition={overlayTransition(reduced)}
-      style={{
-        left,
-        top,
-        width,
-        height,
-        padding: gap / 2,
-        opacity: isHidden ? 0 : 1,
-        pointerEvents: isHidden ? "none" : "auto",
-        zIndex: isDragging ? 40 : 1,
-        transform: isDragging
-          ? `translate3d(${dragDelta.x}px, ${dragDelta.y}px, 0)`
-          : undefined,
-      }}
+      transition={overlayTransition(false)}
+      style={slotStyle}
     >
       <motion.div
-        layoutId={reduced ? undefined : `widget-${widget.id}`}
-        className={`widget-shell ${editMode ? "edit-jiggle" : ""} ${isDragging ? "dragging" : ""}`}
+        layoutId={`widget-${widget.id}`}
+        className={shellClass}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onClick={onClick}
       >
-        {editMode && (
-          <>
-            <button
-              type="button"
-              className="widget-remove"
-              aria-label="Remove widget"
-              onClick={(e) => {
-                e.stopPropagation();
-                removeWidget(widget.id);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              className="widget-resize"
-              aria-label="Resize widget"
-              onClick={(e) => {
-                e.stopPropagation();
-                resizeWidget(widget.id);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              {widget.size}
-            </button>
-          </>
-        )}
-        <div
-          className="widget-face"
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: "flex",
-            flexDirection: "column",
-            animationDelay: editMode ? `${(widget.order % 5) * 40}ms` : undefined,
-          }}
-        >
-          <WidgetBody widget={widget} />
-        </div>
+        {face}
       </motion.div>
     </motion.div>
   );

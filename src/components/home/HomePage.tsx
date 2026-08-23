@@ -18,7 +18,7 @@ export function HomePage({ widgets, width }: Props) {
         <div className="empty-page">
           <div className="empty-plus">+</div>
           <h3>Add widgets to this page</h3>
-          <p>Hold any widget to rearrange, or add a new one from the gallery.</p>
+          <p>Hold anywhere on the Home Screen to rearrange, or add a widget from the gallery.</p>
           <div style={{ display: "flex", gap: 10 }}>
             <button type="button" className="chip" onClick={enterEditMode}>
               Edit Home Screen

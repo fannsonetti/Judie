@@ -25,9 +25,23 @@ export function StatusBar() {
   const pointer = useRef<{ y: number; x: number } | null>(null);
 
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+    const tick = () => setNow(new Date());
+    if (!reduced) {
+      const t = window.setInterval(tick, 1000);
+      return () => window.clearInterval(t);
+    }
+    const now = new Date();
+    const delay = Math.max(250, (60 - now.getSeconds()) * 1000 - now.getMilliseconds());
+    let interval = 0;
+    const timeout = window.setTimeout(() => {
+      tick();
+      interval = window.setInterval(tick, 60_000);
+    }, delay);
+    return () => {
+      window.clearTimeout(timeout);
+      if (interval) window.clearInterval(interval);
+    };
+  }, [reduced]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +110,6 @@ export function StatusBar() {
       }}
     >
       <div className="status-left">
-        <span className={`judie-orb ${status}`} aria-hidden />
         {statusLabel && <span className="status-state">{statusLabel}</span>}
         {dnd && <span className="status-dnd">DND</span>}
       </div>

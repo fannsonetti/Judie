@@ -6,7 +6,7 @@ export function EditModeControls() {
 
   return (
     <>
-      <div className="edit-hint">Hold a widget to rearrange</div>
+      <div className="edit-hint">Hold a widget to move it</div>
       <div className="edit-bar">
         <button type="button" className="primary" onClick={() => setGalleryOpen(true)}>
           Add Widget

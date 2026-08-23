@@ -1,5 +1,6 @@
 import { useId } from "react";
-import { formatGb, formatUptime, useHostStats } from "../../lib/hostStats";
+import { formatGb, useHostStats } from "../../lib/hostStats";
+import { usePerformanceStore } from "../../lib/performance";
 
 interface Props {
   size: string;
@@ -9,7 +10,8 @@ const CPU = "#3dd68c";
 const MEM = "#a78bfa";
 
 export function SystemWidget({ size }: Props) {
-  const { stats, available } = useHostStats(2000);
+  const { stats, available } = useHostStats();
+  const reduced = usePerformanceStore((s) => s.reduced);
   const wide = size === "1x2";
   const large = size === "2x2";
 
@@ -23,88 +25,66 @@ export function SystemWidget({ size }: Props) {
 
   const cpu = Math.round(stats.cpu);
   const mem = Math.round(stats.memory);
+  const memDetail = `${formatGb(stats.memoryUsedMb)} / ${formatGb(stats.memoryTotalMb)}`;
+  const glow = !reduced;
+
+  const cpuBlock = (
+    <MetricBlock label="CPU" value={cpu} values={stats.cpuHistory} color={CPU} glow={glow} />
+  );
+  const memBlock = (
+    <MetricBlock
+      label="Memory"
+      value={mem}
+      values={stats.memoryHistory}
+      color={MEM}
+      glow={glow}
+      detail={wide || large ? memDetail : undefined}
+    />
+  );
+
+  const processes = stats.top.slice(0, large ? 6 : 5);
 
   if (!wide && !large) {
     return (
       <div className="wx system fill tm-1x1">
-        <MetricBlock label="CPU" value={cpu} values={stats.cpuHistory} color={CPU} />
+        {cpuBlock}
         <div className="tm-split" />
-        <MetricBlock label="Memory" value={mem} values={stats.memoryHistory} color={MEM} />
-      </div>
-    );
-  }
-
-  if (wide) {
-    return (
-      <div className="wx system fill tm-1x2">
-        <div className="tm-metrics">
-          <MetricBlock label="CPU" value={cpu} values={stats.cpuHistory} color={CPU} />
-          <div className="tm-split" />
-          <MetricBlock label="Memory" value={mem} values={stats.memoryHistory} color={MEM} />
-        </div>
-        <div className="tm-side">
-          <div className="tm-side-label">Top</div>
-          {stats.top.slice(0, 5).map((p) => (
-            <div key={p.name} className="tm-proc">
-              <span className="tm-proc-name">{p.name}</span>
-              <em>{Math.round(p.cpu)}%</em>
-            </div>
-          ))}
-          {stats.top.length === 0 && <div className="wx-muted">No processes yet</div>}
-        </div>
+        {memBlock}
       </div>
     );
   }
 
   return (
-    <div className="wx system fill tm-2x2">
-      <div className="tm-hero">
-        <MetricBlock label="CPU" value={cpu} values={stats.cpuHistory} color={CPU} />
-        <MetricBlock label="Memory" value={mem} values={stats.memoryHistory} color={MEM} />
+    <div className={`wx system fill ${large ? "tm-2x2" : "tm-1x2"}`}>
+      <div className="tm-metrics">
+        {cpuBlock}
+        <div className="tm-split" />
+        {memBlock}
       </div>
-      <div className="tm-facts">
-        <Fact label="RAM" value={`${formatGb(stats.memoryUsedMb)} / ${formatGb(stats.memoryTotalMb)}`} />
-        <Fact
-          label="Swap"
-          value={
-            stats.swapTotalMb > 1
-              ? `${Math.round(stats.swap)}% · ${formatGb(stats.swapUsedMb)}`
-              : "Off"
-          }
-        />
-        <Fact
-          label="Load"
-          value={`${stats.load1.toFixed(2)}  ${stats.load5.toFixed(2)}  ${stats.load15.toFixed(2)}`}
-        />
-        <Fact
-          label="Temp"
-          value={stats.temperature != null ? `${Math.round(stats.temperature)}°` : "—"}
-        />
-        <Fact label="Up" value={formatUptime(stats.uptimeSec)} />
-        <Fact label="Procs" value={String(stats.processCount)} />
-      </div>
-      {stats.cores.length > 0 && (
-        <div className="tm-cores" aria-label="Per-core CPU">
-          {stats.cores.map((c, i) => (
-            <div key={i} className="tm-core">
-              <div className="tm-core-fill" style={{ height: `${Math.round(c)}%` }} />
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="tm-table">
-        <div className="tm-row head">
-          <span>Process</span>
-          <span>CPU</span>
-          <span>Mem</span>
-        </div>
-        {stats.top.slice(0, 6).map((p) => (
-          <div key={p.name} className="tm-row">
-            <span className="tm-proc-name">{p.name}</span>
-            <span>{p.cpu.toFixed(1)}%</span>
-            <span>{p.memoryPct >= 1 ? `${p.memoryPct.toFixed(1)}%` : `${Math.round(p.memoryMb)}M`}</span>
+      <div className="tm-side">
+        <div className="tm-side-label">Top</div>
+        {large && (
+          <div className="tm-row head">
+            <span>Process</span>
+            <span>CPU</span>
+            <span>Mem</span>
           </div>
-        ))}
+        )}
+        {processes.map((p) =>
+          large ? (
+            <div key={p.name} className="tm-row">
+              <span className="tm-proc-name">{p.name}</span>
+              <span>{p.cpu.toFixed(1)}%</span>
+              <span>{p.memoryPct >= 1 ? `${p.memoryPct.toFixed(1)}%` : `${Math.round(p.memoryMb)}M`}</span>
+            </div>
+          ) : (
+            <div key={p.name} className="tm-proc">
+              <span className="tm-proc-name">{p.name}</span>
+              <em>{Math.round(p.cpu)}%</em>
+            </div>
+          )
+        )}
+        {processes.length === 0 && <div className="wx-muted">No processes yet</div>}
       </div>
     </div>
   );
@@ -115,31 +95,35 @@ function MetricBlock({
   value,
   values,
   color,
+  glow,
+  detail,
 }: {
   label: string;
   value: number;
   values: number[];
   color: string;
+  glow: boolean;
+  detail?: string;
 }) {
   return (
     <div className="tm-block">
       <div className="tm-label">{label}</div>
       <div className="tm-value">{value}%</div>
-      <Sparkline values={values} color={color} />
+      {detail && <div className="tm-detail">{detail}</div>}
+      <Sparkline values={values} color={color} glow={glow} />
     </div>
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="tm-fact">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function Sparkline({ values, color }: { values: number[]; color: string }) {
+function Sparkline({
+  values,
+  color,
+  glow,
+}: {
+  values: number[];
+  color: string;
+  glow: boolean;
+}) {
   const w = 160;
   const h = 36;
   const uid = useId().replace(/:/g, "");
@@ -170,7 +154,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
         strokeWidth="2"
         strokeLinejoin="round"
         strokeLinecap="round"
-        style={{ filter: `drop-shadow(0 0 4px ${color})` }}
+        style={glow ? { filter: `drop-shadow(0 0 4px ${color})` } : undefined}
       />
     </svg>
   );

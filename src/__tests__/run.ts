@@ -2,6 +2,8 @@ import { processUtterance, emptyContext } from "../assistant/process";
 import { applyContextFromResult } from "../assistant/process";
 import { RoomSnapshot } from "../assistant/types";
 import { packWidgets, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
+import { measureWidgetGrid } from "../lib/widgetGrid";
+import { GRID_ROWS } from "../types/widgets";
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
@@ -244,6 +246,13 @@ test("layout pack and reorder", () => {
   assert(usedPageCount(widgets) === 1, "one used page");
   assert(visiblePageCount(widgets, false) === 1, "no swipe pages");
   assert(visiblePageCount(widgets, true) === 2, "edit offers one empty page");
+});
+
+test("full 4-row dashboard fits 16:10 and 16:9", () => {
+  const wide = measureWidgetGrid(1848, 1092);
+  const hd = measureWidgetGrid(1848, 972);
+  assert(Math.abs(wide.cellH * GRID_ROWS - 1092) < 0.01, "1920x1200 uses all 4 rows");
+  assert(Math.abs(hd.cellH * GRID_ROWS - 972) < 0.01, "1920x1080 uses all 4 rows");
 });
 
 test("widget creator export includes hidden descriptors", () => {

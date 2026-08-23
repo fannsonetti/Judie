@@ -2,10 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { WidgetSize } from "../types/widgets";
 import { SlopLayer } from "./render";
 import {
-  CANONICAL,
   duplicateNode,
   EDITOR_GRID_PX,
-  hitBox,
   moveNode,
   nodesFor,
   resizeNode,
@@ -16,12 +14,7 @@ import {
 } from "./schema";
 import { ContextMenu, MenuItem } from "./ContextMenu";
 import { PreviewHome } from "./PreviewHome";
-import {
-  NOVA_FRAME,
-  NOVA_SAFE_BOTTOM,
-  NOVA_STATUS_H,
-  novaPagePad,
-} from "../lib/widgetGrid";
+import { novaShellSize, NOVA_FRAME, NOVA_SAFE_BOTTOM, NOVA_STATUS_H, novaPagePad } from "../lib/widgetGrid";
 import { svgFromFile } from "./svg";
 
 type Handle = "nw" | "ne" | "sw" | "se";
@@ -49,6 +42,15 @@ interface Props {
   zoom?: number;
   onFitZoom?: (zoom: number) => void;
   actions: CanvasActions;
+}
+
+function pickNodeAt(nodes: SlopNode[], x: number, y: number): SlopNode | null {
+  const hits = nodes.filter(
+    (n) => x >= n.x && x <= n.x + n.w && y >= n.y && y <= n.y + n.h
+  );
+  if (!hits.length) return null;
+  hits.sort((a, b) => a.w * a.h - b.w * b.h);
+  return hits[0];
 }
 
 function pctPoint(
@@ -146,7 +148,7 @@ export function SlopCanvas({
 }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   const faceRef = useRef<HTMLDivElement>(null);
-  const shell = CANONICAL[size];
+  const shell = novaShellSize(size);
   const [fitZoom, setFitZoom] = useState(1);
   const [guides, setGuides] = useState<{ axis: "x" | "y"; at: number }[]>([]);
   const [menu, setMenu] = useState<{
@@ -172,10 +174,7 @@ export function SlopCanvas({
 
   const storeNodes = nodesFor(def, size);
   const nodes = draft ?? storeNodes;
-  const dragId = drag.current?.id ?? null;
-  const boxOf = (n: SlopNode) => (dragId === n.id ? n : hitBox(n, shell));
-  const visualNodes = nodes.map(boxOf);
-  const selected = visualNodes.find((n) => n.id === selectedId) ?? null;
+  const selected = nodes.find((n) => n.id === selectedId) ?? null;
 
   useEffect(() => {
     const el = stageRef.current;
@@ -259,10 +258,7 @@ export function SlopCanvas({
       setDraft(null);
       return;
     }
-    const persist =
-      d.kind === "move"
-        ? d.last.map((n) => (n.id === d.id ? hitBox(n, shell) : n))
-        : d.last;
+    const persist = d.last;
     setDraft(null);
     onNodesRef.current(persist, d.size);
   };
@@ -274,7 +270,7 @@ export function SlopCanvas({
     const face = faceRef.current;
     if (!face) return;
     onSelect(node.id);
-    const origin = hitBox(node, shell);
+    const origin = node;
     const startNodes = nodes.map((n) => (n.id === node.id ? origin : n));
     drag.current = {
       kind,
@@ -430,7 +426,7 @@ export function SlopCanvas({
           >
             <div ref={faceRef} className="widget-face slop-artboard-face">
               <SlopLayer
-                def={{ ...def, layouts: { ...def.layouts, [size]: visualNodes } }}
+                def={{ ...def, layouts: { ...def.layouts, [size]: nodes } }}
                 size={size}
                 width={shell.w}
                 height={shell.h}
@@ -439,29 +435,28 @@ export function SlopCanvas({
                 <PixelGrid width={shell.w} height={shell.h} step={EDITOR_GRID_PX} />
               )}
               {editing && nodes.length === 0 && (
-                <div className="slop-empty">
-                  Tap Add above, or use the palette to place elements on the canvas.
-                </div>
+                <div className="slop-empty">Use Add to place an element on the canvas.</div>
               )}
-              {editing &&
-                visualNodes.map((node) => (
-                  <button
-                    key={node.id}
-                    type="button"
-                    data-node-id={node.id}
-                    className={`slop-hit ${selectedId === node.id ? "selected" : ""}`}
-                    style={{
-                      left: `${node.x}%`,
-                      top: `${node.y}%`,
-                      width: `${node.w}%`,
-                      height: `${node.h}%`,
-                    }}
-                    onPointerDown={(e) => begin("move", node, e)}
-                    onContextMenu={(e) => openMenu(e, node.id)}
-                    onDoubleClick={() => onSelect(node.id)}
-                    aria-label={node.kind}
-                  />
-                ))}
+              {editing && (
+                <div
+                  className="slop-hit-layer"
+                  onPointerDown={(e) => {
+                    if (e.button === 2) return;
+                    const p = pctPoint(e.currentTarget, e.clientX, e.clientY);
+                    const node = pickNodeAt(nodes, p.x, p.y);
+                    if (!node) {
+                      onSelect(null);
+                      return;
+                    }
+                    begin("move", node, e);
+                  }}
+                  onContextMenu={(e) => {
+                    const p = pctPoint(e.currentTarget, e.clientX, e.clientY);
+                    const node = pickNodeAt(nodes, p.x, p.y);
+                    openMenu(e, node?.id ?? null);
+                  }}
+                />
+              )}
               {editing && selected && (
                 <div
                   className="slop-selection"

@@ -323,6 +323,104 @@
 
 .slop-top-actions button:disabled { opacity: 0.4; }
 
+.slop-drop {
+  position: relative;
+}
+
+.slop-drop-caret {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.slop-drop-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 188px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  z-index: 30;
+}
+
+.slop-drop-panel button,
+.slop-top-actions .slop-drop-panel button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.slop-drop-panel button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.slop-drop-panel button.danger {
+  color: #ffb4b4;
+}
+
+.slop-add-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.slop-explorer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.slop-explorer-item {
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+}
+
+.slop-explorer-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.slop-explorer-item.on {
+  background: rgba(45, 123, 255, 0.18);
+}
+
+.slop-explorer-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.slop-explorer-actions button {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.slop-explorer-actions button.danger {
+  color: #ffb4b4;
+  border-color: rgba(255, 92, 92, 0.35);
+}
+
 .slop-palette {
   display: flex;
   gap: 8px;
@@ -498,6 +596,14 @@
   border: 1px solid transparent;
   cursor: move;
   z-index: 2;
+  touch-action: none;
+}
+
+.slop-hit-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  cursor: default;
   touch-action: none;
 }
 
@@ -761,11 +867,17 @@
 .slop-preview-page {
   position: relative;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .slop-preview-grid {
+  position: relative;
   width: 100%;
   height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 .slop-ghost-shell {

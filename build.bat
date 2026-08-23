@@ -10,8 +10,19 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Building Judie installer...
-call npm run installer
+if not exist "node_modules\" (
+  echo Installing npm packages...
+  call npm install
+  if errorlevel 1 (
+    echo npm install failed.
+    pause
+    exit /b 1
+  )
+)
+
+echo Building Judie for Windows...
+echo This is an unsigned NSIS installer so you can run it locally.
+call npx tauri build --bundles nsis --no-sign
 if errorlevel 1 (
   echo.
   echo Build failed.
@@ -20,5 +31,5 @@ if errorlevel 1 (
 )
 
 echo.
-echo Build complete.
+echo Build complete. Installer is under src-tauri\target\release\bundle\nsis\
 pause

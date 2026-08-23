@@ -20,7 +20,7 @@
   --status-h: 56px;
   --page-pad: clamp(16px, 2.2vw, 36px);
   --grid-gap: clamp(12px, 1.2vw, 20px);
-  --safe-bottom: 48px;
+  --safe-bottom: 20px;
   color-scheme: dark;
   font-family: Inter, Geist, "Segoe UI", system-ui, -apple-system, sans-serif;
   font-synthesis: none;
@@ -154,8 +154,11 @@ input:focus-visible {
   display: flex;
   height: 100%;
   width: 100%;
-  will-change: transform;
   touch-action: pan-y;
+}
+
+.home-track.swiping {
+  will-change: transform;
 }
 
 .home-page {
@@ -164,6 +167,10 @@ input:focus-visible {
   height: 100%;
   padding: 4px var(--page-pad) var(--safe-bottom);
   position: relative;
+}
+
+.home-viewport.multi .home-page {
+  padding-bottom: 40px;
 }
 
 .widget-grid {
@@ -1594,6 +1601,35 @@ input:focus-visible {
 }
 
 /* Raspberry Pi / low-power: same look, skip live backdrop-filter (expensive on Pi 3 GPU). */
+html.perf-pi {
+  text-rendering: optimizeSpeed;
+}
+
+html.perf-pi .app-shell {
+  background-color: var(--bg);
+  background-image: none;
+}
+
+html.perf-pi .app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(45, 123, 255, 0.07), transparent 55%),
+    radial-gradient(900px 500px at 90% 10%, rgba(255, 255, 255, 0.03), transparent 50%);
+}
+
+html.perf-pi .app-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+html.perf-pi .widget-shell {
+  contain: layout paint;
+}
+
 html.perf-pi .edit-bar,
 html.perf-pi .wg-backdrop,
 html.perf-pi .settings-backdrop,
@@ -1606,6 +1642,10 @@ html.perf-pi .expanded-overlay {
 
 html.perf-pi .widget-shell.edit-jiggle .widget-face {
   animation: none !important;
+}
+
+html.perf-pi .tm-spark path {
+  filter: none !important;
 }
 
 .wx.system {
@@ -1648,6 +1688,13 @@ html.perf-pi .widget-shell.edit-jiggle .widget-face {
   line-height: 1.05;
   font-variant-numeric: tabular-nums;
   margin: 2px 0 4px;
+}
+
+.tm-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin: -2px 0 4px;
 }
 
 .tm-spark {
@@ -1719,72 +1766,16 @@ html.perf-pi .widget-shell.edit-jiggle .widget-face {
 }
 
 .tm-2x2 {
-  gap: 10px;
-}
-
-.tm-hero {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  min-height: 0;
-  flex: 0 0 auto;
+  flex-direction: row;
+  gap: 12px;
 }
 
 .tm-2x2 .tm-spark {
   height: 36px;
 }
 
-.tm-facts {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px 10px;
-}
-
-.tm-fact {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.tm-fact span {
-  font-size: 10px;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.tm-fact strong {
-  font-size: 12px;
-  font-weight: 550;
-  font-variant-numeric: tabular-nums;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tm-cores {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 22px;
-}
-
-.tm-core {
-  flex: 1;
-  height: 100%;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-}
-
-.tm-core-fill {
-  width: 100%;
-  background: #3dd68c;
-  opacity: 0.85;
-  min-height: 2px;
+.tm-2x2 .tm-side {
+  flex: 1.05;
 }
 
 .tm-table {

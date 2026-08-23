@@ -1,14 +1,15 @@
 use serde::Serialize;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use sysinfo::{
-    Components, CpuRefreshKind, MemoryRefreshKind, ProcessRefreshKind, ProcessesToUpdate,
-    RefreshKind, System,
+    CpuRefreshKind, MemoryRefreshKind, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System,
 };
 
 const HISTORY: usize = 32;
 const TOP_N: usize = 8;
+const SAMPLE_MS: u64 = 2000;
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -41,35 +42,76 @@ pub struct HostStats {
     pub top: Vec<HostProcess>,
 }
 
+impl HostStats {
+    fn empty() -> Self {
+        Self {
+            cpu: 0.0,
+            memory: 0.0,
+            memory_used_mb: 0.0,
+            memory_total_mb: 0.0,
+            swap: 0.0,
+            swap_used_mb: 0.0,
+            swap_total_mb: 0.0,
+            cores: Vec::new(),
+            load1: 0.0,
+            load5: 0.0,
+            load15: 0.0,
+            uptime_sec: 0,
+            process_count: 0,
+            temperature: None,
+            cpu_history: Vec::new(),
+            memory_history: Vec::new(),
+            top: Vec::new(),
+        }
+    }
+}
+
 struct HostState {
     sys: System,
-    primed: bool,
-    last: Instant,
     cpu_history: Vec<f32>,
     memory_history: Vec<f32>,
+    ticks: u32,
+    last_temp: Option<f32>,
+    last_temp_at: Instant,
+}
+
+fn cpu_kind() -> CpuRefreshKind {
+    CpuRefreshKind::nothing().with_cpu_usage()
+}
+
+fn mem_kind() -> MemoryRefreshKind {
+    MemoryRefreshKind::nothing().with_ram().with_swap()
+}
+
+fn proc_kind() -> ProcessRefreshKind {
+    ProcessRefreshKind::nothing().with_cpu().with_memory()
 }
 
 impl HostState {
     fn new() -> Self {
         let mut sys = System::new_with_specifics(
             RefreshKind::nothing()
-                .with_cpu(CpuRefreshKind::everything())
-                .with_memory(MemoryRefreshKind::everything())
-                .with_processes(ProcessRefreshKind::everything()),
+                .with_cpu(cpu_kind())
+                .with_memory(mem_kind())
+                .with_processes(proc_kind()),
         );
-        sys.refresh_cpu_all();
-        sys.refresh_memory();
+        sys.refresh_cpu_specifics(cpu_kind());
+        sys.refresh_memory_specifics(mem_kind());
         Self {
             sys,
-            primed: false,
-            last: Instant::now(),
             cpu_history: Vec::with_capacity(HISTORY),
             memory_history: Vec::with_capacity(HISTORY),
+            ticks: 0,
+            last_temp: None,
+            last_temp_at: Instant::now()
+                .checked_sub(Duration::from_secs(30))
+                .unwrap_or_else(Instant::now),
         }
     }
 }
 
-static HOST: Mutex<Option<HostState>> = Mutex::new(None);
+static STARTED: AtomicBool = AtomicBool::new(false);
+static LAST: Mutex<Option<HostStats>> = Mutex::new(None);
 
 fn push_hist(buf: &mut Vec<f32>, value: f32) {
     if buf.len() >= HISTORY {
@@ -105,47 +147,60 @@ fn skip_process(name: &str) -> bool {
 }
 
 fn cpu_temp() -> Option<f32> {
-    let mut components = Components::new();
-    components.refresh(true);
-    let mut best: Option<f32> = None;
-    for c in components.iter() {
-        let label = c.label().to_ascii_lowercase();
-        let Some(t) = c.temperature() else { continue };
-        if t <= 0.0 || t > 120.0 {
-            continue;
-        }
-        let prefer = label.contains("cpu")
-            || label.contains("package")
-            || label.contains("tdie")
-            || label.contains("soc")
-            || label.contains("thermal");
-        if prefer {
-            return Some(t);
-        }
-        if best.map(|b| t > b).unwrap_or(true) {
-            best = Some(t);
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(raw) = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp") {
+            if let Ok(n) = raw.trim().parse::<f32>() {
+                let t = if n > 200.0 { n / 1000.0 } else { n };
+                if t > 0.0 && t < 120.0 {
+                    return Some(t);
+                }
+            }
         }
     }
-    best
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        use sysinfo::Components;
+        let mut components = Components::new();
+        components.refresh(true);
+        let mut best: Option<f32> = None;
+        for c in components.iter() {
+            let label = c.label().to_ascii_lowercase();
+            let Some(t) = c.temperature() else { continue };
+            if t <= 0.0 || t > 120.0 {
+                continue;
+            }
+            let prefer = label.contains("cpu")
+                || label.contains("package")
+                || label.contains("tdie")
+                || label.contains("soc")
+                || label.contains("thermal");
+            if prefer {
+                return Some(t);
+            }
+            if best.map(|b| t > b).unwrap_or(true) {
+                best = Some(t);
+            }
+        }
+        return best;
+    }
+
+    #[cfg(target_os = "linux")]
+    None
 }
 
-pub fn snapshot() -> HostStats {
-    let mut slot = HOST.lock().unwrap_or_else(|e| e.into_inner());
-    let state = slot.get_or_insert_with(HostState::new);
+fn sample(state: &mut HostState) -> HostStats {
+    state.sys.refresh_cpu_specifics(cpu_kind());
+    state.sys.refresh_memory_specifics(mem_kind());
 
-    if !state.primed {
-        std::thread::sleep(Duration::from_millis(140));
-        state.primed = true;
-    } else if state.last.elapsed() < Duration::from_millis(400) {
-        // Reuse last sample if the UI polls faster than a useful CPU delta.
+    // Process list is the expensive part — every other tick is enough for the UI.
+    if state.ticks % 2 == 0 {
+        state
+            .sys
+            .refresh_processes_specifics(ProcessesToUpdate::All, true, proc_kind());
     }
-    state.last = Instant::now();
-
-    state.sys.refresh_cpu_all();
-    state.sys.refresh_memory();
-    state
-        .sys
-        .refresh_processes(ProcessesToUpdate::All, true);
+    state.ticks = state.ticks.wrapping_add(1);
 
     let cpu = state.sys.global_cpu_usage().clamp(0.0, 100.0);
     let total_mem = state.sys.total_memory().max(1);
@@ -197,6 +252,11 @@ pub fn snapshot() -> HostStats {
     top.sort_by(|a, b| b.cpu.partial_cmp(&a.cpu).unwrap_or(std::cmp::Ordering::Equal));
     top.truncate(TOP_N);
 
+    if state.last_temp_at.elapsed() >= Duration::from_secs(4) {
+        state.last_temp = cpu_temp();
+        state.last_temp_at = Instant::now();
+    }
+
     let load = System::load_average();
 
     HostStats {
@@ -213,9 +273,37 @@ pub fn snapshot() -> HostStats {
         load15: load.fifteen as f32,
         uptime_sec: System::uptime(),
         process_count,
-        temperature: cpu_temp(),
+        temperature: state.last_temp,
         cpu_history: state.cpu_history.clone(),
         memory_history: state.memory_history.clone(),
         top,
     }
+}
+
+/// Start the background sampler so UI invokes never sleep or walk /proc.
+pub fn warm() {
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let _ = std::thread::Builder::new()
+        .name("judie-host".into())
+        .spawn(|| {
+            let mut state = HostState::new();
+            std::thread::sleep(Duration::from_millis(160));
+            loop {
+                let stats = sample(&mut state);
+                if let Ok(mut slot) = LAST.lock() {
+                    *slot = Some(stats);
+                }
+                std::thread::sleep(Duration::from_millis(SAMPLE_MS));
+            }
+        });
+}
+
+pub fn snapshot() -> HostStats {
+    warm();
+    LAST.lock()
+        .ok()
+        .and_then(|g| g.clone())
+        .unwrap_or_else(HostStats::empty)
 }

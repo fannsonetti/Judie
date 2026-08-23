@@ -48,44 +48,66 @@ const EMPTY: HostStats = {
   top: [],
 };
 
-export function useHostStats(intervalMs = 2000) {
-  const [stats, setStats] = useState<HostStats>(EMPTY);
-  const [available, setAvailable] = useState(false);
+const INTERVAL_MS = 2000;
+const listeners = new Set<() => void>();
+let cached: HostStats = EMPTY;
+let available = false;
+let timer: number | null = null;
+let refs = 0;
+let inflight = false;
+
+function notify() {
+  for (const fn of listeners) fn();
+}
+
+async function pull() {
+  if (inflight) return;
+  inflight = true;
+  try {
+    const next = await invoke<HostStats>("get_host_stats");
+    cached = next;
+    available = true;
+    notify();
+  } catch {
+    available = false;
+    notify();
+  } finally {
+    inflight = false;
+  }
+}
+
+function retain() {
+  refs += 1;
+  if (timer != null) return;
+  void pull();
+  timer = window.setInterval(() => void pull(), INTERVAL_MS);
+}
+
+function release() {
+  refs = Math.max(0, refs - 1);
+  if (refs > 0 || timer == null) return;
+  window.clearInterval(timer);
+  timer = null;
+}
+
+/** One shared poller so every System widget shows the same numbers. */
+export function useHostStats() {
+  const [, bump] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
-    const pull = async () => {
-      try {
-        const next = await invoke<HostStats>("get_host_stats");
-        if (!cancelled) {
-          setStats(next);
-          setAvailable(true);
-        }
-      } catch {
-        if (!cancelled) setAvailable(false);
-      }
-    };
-    void pull();
-    const id = window.setInterval(() => void pull(), intervalMs);
+    const onChange = () => bump((n) => n + 1);
+    listeners.add(onChange);
+    retain();
     return () => {
-      cancelled = true;
-      window.clearInterval(id);
+      listeners.delete(onChange);
+      release();
     };
-  }, [intervalMs]);
+  }, []);
 
-  return { stats, available };
+  return { stats: cached, available };
 }
 
 export function formatGb(mb: number): string {
   if (mb < 1024) return `${Math.round(mb)} MB`;
   return `${(mb / 1024).toFixed(1)} GB`;
-}
-
-export function formatUptime(sec: number): string {
-  const d = Math.floor(sec / 86400);
-  const h = Math.floor((sec % 86400) / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
 }

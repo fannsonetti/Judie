@@ -12,6 +12,7 @@ import {
   nodesFor,
   nudgeNodePx,
   snapBoxToGrid,
+  SLOP_KINDS,
   SlopKind,
   SlopNode,
 } from "./schema";
@@ -24,7 +25,7 @@ import {
   sendToBack,
 } from "./Canvas";
 import { SlopInspector } from "./Inspector";
-import { SlopPalette } from "./Palette";
+import { SlopDropMenu } from "./DropMenu";
 import { SlopSidebar } from "./Sidebar";
 import {
   downloadText,
@@ -336,70 +337,38 @@ export function WidgetCreatorApp({ onClose }: Props) {
             <button type="button" onClick={undo} disabled={histTick >= 0 && past.current.length === 0}>
               Undo
             </button>
-            <button
-              type="button"
-              disabled={!selectedNode || preview}
-              onClick={() => {
-                const result = duplicateSelected(nodes, nodeId);
-                if (result) {
-                  commit(
-                    result.nodes.map((n) =>
-                      n.id === result.id ? { ...n, ...snapBoxToGrid(n, CANONICAL[size]) } : n
-                    )
-                  );
-                  setNodeId(result.id);
-                }
+            <SlopDropMenu label="Add" disabled={!current || preview}>
+              <div className="slop-add-grid">
+                {SLOP_KINDS.map((item) => (
+                  <button
+                    key={item.kind}
+                    type="button"
+                    onClick={() => addKind(item.kind)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </SlopDropMenu>
+            <SlopDropMenu
+              label="Save"
+              primary
+              disabled={!current}
+              items={[
+                { id: "judie", label: "Save to Judie" },
+                { id: "json", label: "Export JSON" },
+                { id: "code", label: "Export code" },
+                { id: "import", label: "Import JSON" },
+              ]}
+              onPick={(id) => {
+                if (id === "judie") saveToJudie();
+                if (id === "json") exportJson();
+                if (id === "code") exportCode();
+                if (id === "import") fileRef.current?.click();
               }}
-            >
-              Duplicate
-            </button>
-            <button
-              type="button"
-              disabled={!selectedNode || preview}
-              onClick={() => {
-                const next = bringToFront(nodes, nodeId);
-                if (next) commit(next);
-              }}
-            >
-              Front
-            </button>
-            <button
-              type="button"
-              disabled={!selectedNode || preview}
-              onClick={() => {
-                const next = sendToBack(nodes, nodeId);
-                if (next) commit(next);
-              }}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              className="danger"
-              disabled={!selectedNode || preview}
-              onClick={() => {
-                const next = deleteSelected(nodes, nodeId);
-                if (next) {
-                  commit(next);
-                  setNodeId(null);
-                }
-              }}
-            >
-              Delete
-            </button>
-            <button type="button" onClick={exportJson} disabled={!current}>
-              Export JSON
-            </button>
-            <button type="button" onClick={exportCode} disabled={!current}>
-              Export code
-            </button>
-            <button type="button" className="primary" onClick={saveToJudie} disabled={!current}>
-              Save to Judie
-            </button>
+            />
           </div>
         </header>
-
-        {!preview && <SlopPalette onAdd={(kind) => addKind(kind)} />}
 
         {current ? (
           <SlopCanvas
@@ -491,9 +460,27 @@ export function WidgetCreatorApp({ onClose }: Props) {
           def={current}
           size={size}
           node={selectedNode}
+          nodes={nodes}
+          onSelect={setNodeId}
           onNode={patchNode}
           onDef={(p) => patch(current.id, p)}
           onCopyLayout={(from) => copyLayout(current.id, from, size)}
+          onFront={() => {
+            const next = bringToFront(nodes, nodeId);
+            if (next) commit(next);
+          }}
+          onBack={() => {
+            const next = sendToBack(nodes, nodeId);
+            if (next) commit(next);
+          }}
+          onDelete={() => {
+            const next = deleteSelected(nodes, nodeId);
+            if (next) {
+              commit(next);
+              setNodeId(null);
+            }
+          }}
+          preview={preview}
         />
       )}
     </div>

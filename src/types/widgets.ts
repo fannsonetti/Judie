@@ -65,6 +65,7 @@ export const WIDGET_LABELS: Record<WidgetType, string> = {
 };
 
 export const GRID_COLS = 6;
+export const GRID_ROWS = 4;
 export const MAX_PAGES = 6;
 
 export interface PlacedWidget extends WidgetInstance {

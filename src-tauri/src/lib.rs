@@ -1,4 +1,6 @@
 mod host;
+#[cfg(target_os = "linux")]
+mod linux_webview;
 
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, OpenOptions};
@@ -122,6 +124,10 @@ fn pad_role(role: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     START.get_or_init(Instant::now);
+    #[cfg(target_os = "linux")]
+    linux_webview::prepare();
+    host::warm();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -135,6 +141,7 @@ pub fn run() {
                 let _ = win.set_decorations(false);
                 let _ = win.set_fullscreen(true);
                 let _ = win.maximize();
+                linux_webview::tune(&win);
             }
 
             #[cfg(any(target_os = "macos", windows, target_os = "linux"))]

@@ -2043,7 +2043,7 @@ dependencies = [
 
 [[package]]
 name = "judie"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -2054,6 +2054,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "webkit2gtk",
 ]
 
 [[package]]

@@ -2,15 +2,22 @@ import { ReactNode } from "react";
 import { WidgetSize } from "../types/widgets";
 import { SlopIcon, SLOP_ICONS } from "./icons";
 import { ALL_WIDGET_SIZES, filledSizes, nodesFor, SLOP_KINDS, SLOP_SWATCHES, SlopDef, SlopKind, SlopNode } from "./schema";
+import { SlopExplorer } from "./Explorer";
 import { sanitizeSvg } from "./svg";
 
 interface Props {
   def: SlopDef;
   size: WidgetSize;
   node: SlopNode | null;
+  nodes: SlopNode[];
+  onSelect: (id: string | null) => void;
   onNode: (patch: Partial<SlopNode>) => void;
   onDef: (patch: Partial<SlopDef>) => void;
   onCopyLayout: (from: WidgetSize) => void;
+  onFront: () => void;
+  onBack: () => void;
+  onDelete: () => void;
+  preview?: boolean;
 }
 
 function Field({
@@ -85,9 +92,15 @@ export function SlopInspector({
   def,
   size,
   node,
+  nodes,
+  onSelect,
   onNode,
   onDef,
   onCopyLayout,
+  onFront,
+  onBack,
+  onDelete,
+  preview,
 }: Props) {
   const kindLabel = SLOP_KINDS.find((k) => k.kind === node?.kind)?.label ?? "None";
   const available = filledSizes(def);
@@ -95,6 +108,16 @@ export function SlopInspector({
   return (
     <aside className="slop-inspector">
       <h2>Inspector</h2>
+
+      <SlopExplorer
+        nodes={nodes}
+        selectedId={node?.id ?? null}
+        onSelect={onSelect}
+        onFront={onFront}
+        onBack={onBack}
+        onDelete={onDelete}
+        disabled={preview}
+      />
 
       <div className="slop-block">
         <div className="slop-block-title">Widget</div>
@@ -119,8 +142,8 @@ export function SlopInspector({
         </Field>
       </div>
 
-      {!node ? (
-        <p className="slop-hint">Select an element on the canvas.</p>
+        {!node ? (
+        <p className="slop-hint">Pick an element in the list, or click it on the canvas.</p>
       ) : (
         <>
           <div className="slop-block">

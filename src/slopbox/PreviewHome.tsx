@@ -1,14 +1,39 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { WidgetInstance, WidgetSize, SIZE_DIMS } from "../types/widgets";
 import { packWidgets } from "../lib/layout";
-import { novaHomeGridMetrics } from "../lib/widgetGrid";
+import { novaHomeGridMetrics, novaShellSize } from "../lib/widgetGrid";
 import { SlopLayer } from "./render";
-import { CANONICAL, SlopDef } from "./schema";
+import { SlopDef } from "./schema";
 
 const FILL: WidgetSize[] = ["1x1", "1x2", "2x2", "1x1", "1x2", "1x1", "2x2", "1x2", "1x1", "1x2", "1x1", "2x2"];
 
 interface Props {
   def: SlopDef;
   size: WidgetSize;
+}
+
+function LiveFace({ def, size }: { def: SlopDef; size: WidgetSize }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState(() => novaShellSize(size));
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 1 && r.height > 1) setBox({ w: r.width, h: r.height });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [size]);
+
+  return (
+    <div ref={ref} className="widget-face">
+      <SlopLayer def={def} size={size} width={box.w} height={box.h} />
+    </div>
+  );
 }
 
 export function PreviewHome({ def, size }: Props) {
@@ -32,7 +57,6 @@ export function PreviewHome({ def, size }: Props) {
         const width = dims.cols * metrics.cellW;
         const height = dims.rows * metrics.cellH;
         const live = w.id === "live";
-        const inner = CANONICAL[w.size];
         return (
           <div
             key={w.id}
@@ -48,9 +72,7 @@ export function PreviewHome({ def, size }: Props) {
           >
             <div className={`widget-shell ${live ? "" : "slop-ghost-shell"}`}>
               {live ? (
-                <div className="widget-face">
-                  <SlopLayer def={def} size={size} width={inner.w} height={inner.h} />
-                </div>
+                <LiveFace def={def} size={size} />
               ) : (
                 <div className="widget-face slop-ghost-face">
                   <span>{w.size.replace("x", " × ")}</span>

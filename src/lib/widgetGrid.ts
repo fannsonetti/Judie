@@ -1,8 +1,8 @@
-import { SIZE_DIMS, WidgetSize } from "../types/widgets";
+import { GRID_COLS, GRID_ROWS, SIZE_DIMS, WidgetSize } from "../types/widgets";
 
 export const NOVA_FRAME = { w: 1920, h: 1200 };
 export const NOVA_STATUS_H = 56;
-export const NOVA_SAFE_BOTTOM = 48;
+export const NOVA_SAFE_BOTTOM = 20;
 export const NOVA_PAGE_TOP = 4;
 
 export interface GridMetrics {
@@ -11,12 +11,11 @@ export interface GridMetrics {
   gap: number;
 }
 
-/** Same packing math Judie uses on the home grid. */
+/** 6×4 home grid. Fills 16:9 and 16:10 (1920×1200) without clipping a full dashboard. */
 export function measureWidgetGrid(width: number, height: number): GridMetrics {
   const gap = Math.max(12, Math.min(20, width * 0.012));
-  const cellW = width / 6;
-  const rowsTarget = Math.max(3.2, Math.min(4.2, height / (width / 6)));
-  const cellH = height / rowsTarget;
+  const cellW = width / GRID_COLS;
+  const cellH = height / GRID_ROWS;
   return { cellW, cellH, gap };
 }
 
