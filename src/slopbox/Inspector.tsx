@@ -165,11 +165,11 @@ export function SlopInspector({
               />
             </Field>
             {hasText(node.kind) && (
-              <Field label={node.kind === "list" || node.kind === "pair" ? "Lines" : "Text"}>
-                {node.kind === "list" || node.kind === "pair" ? (
+              <Field label={node.kind === "chart" ? "Series" : node.kind === "list" || node.kind === "pair" ? "Lines" : "Text"}>
+                {node.kind === "list" || node.kind === "pair" || node.kind === "chart" ? (
                   <textarea
                     className="slop-hook-note"
-                    rows={node.kind === "list" ? 4 : 2}
+                    rows={node.kind === "list" ? 4 : node.kind === "chart" ? 3 : 2}
                     value={node.text ?? ""}
                     onChange={(e) => onNode({ text: e.target.value })}
                   />
@@ -262,7 +262,7 @@ export function SlopInspector({
 
           <div className="slop-block">
             <div className="slop-block-title">Type</div>
-            {hasText(node.kind) && (
+            {hasText(node.kind) && node.kind !== "chart" && (
               <>
                 <Field label="Size">
                   <Num value={node.fontSize ?? 13} step={1} onChange={(fontSize) => onNode({ fontSize })} />
@@ -305,7 +305,7 @@ export function SlopInspector({
                 <Swatches value={node.fill} onChange={(fill) => onNode({ fill })} />
               </Field>
             )}
-            {(node.kind === "bar" || node.kind === "gauge" || node.kind === "list" || node.kind === "pair" || node.kind === "toggle") && (
+            {(node.kind === "bar" || node.kind === "gauge" || node.kind === "list" || node.kind === "pair" || node.kind === "toggle" || node.kind === "chart") && (
               <Field label="Accent">
                 <Swatches value={node.accent} onChange={(accent) => onNode({ accent })} />
               </Field>
@@ -358,7 +358,8 @@ function hasText(kind: SlopKind) {
     kind === "chip" ||
     kind === "gauge" ||
     kind === "list" ||
-    kind === "pair"
+    kind === "pair" ||
+    kind === "chart"
   );
 }
 

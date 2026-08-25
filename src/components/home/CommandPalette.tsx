@@ -164,9 +164,9 @@ export function CommandPalette() {
         >
           <motion.div
             className="palette-panel"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
+            initial={{ opacity: 0, y: -16, x: 12 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: -10, x: 8 }}
             transition={overlayTransition()}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={onSheetPointerDown}

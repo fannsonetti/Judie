@@ -1,8 +1,8 @@
 import { CSSProperties } from "react";
 import { WidgetSize } from "../types/widgets";
-import { Gauge } from "../components/widgets/chrome";
+import { Gauge, Sparkline } from "../components/widgets/chrome";
 import { SlopIcon } from "./icons";
-import { CANONICAL, nodesFor, scaleFor, SlopDef, SlopNode } from "./schema";
+import { CANONICAL, chartSeries, nodesFor, scaleFor, SlopDef, SlopNode } from "./schema";
 
 interface LayerProps {
   def: SlopDef;
@@ -205,6 +205,18 @@ export function SlopNodeView({
         <span className="slop-pair-v" style={{ color: node.accent ?? "#f4f5f7" }}>
           {value}
         </span>
+      </div>
+    );
+  }
+
+  if (node.kind === "chart") {
+    return (
+      <div className="slop-chart" style={common} {...hookProps}>
+        <Sparkline
+          values={chartSeries(node.text)}
+          color={node.accent ?? "#3dd68c"}
+          stroke={Math.max(1.2, 2 * scale)}
+        />
       </div>
     );
   }

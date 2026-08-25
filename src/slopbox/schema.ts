@@ -13,7 +13,8 @@ export type SlopKind =
   | "box"
   | "list"
   | "pair"
-  | "toggle";
+  | "toggle"
+  | "chart";
 
 export type SlopAlign = "left" | "center" | "right";
 export type SlopValign = "top" | "middle" | "bottom";
@@ -72,6 +73,7 @@ export const SLOP_KINDS: { kind: SlopKind; label: string }[] = [
   { kind: "list", label: "List" },
   { kind: "pair", label: "Pair" },
   { kind: "toggle", label: "Toggle" },
+  { kind: "chart", label: "Chart" },
   { kind: "divider", label: "Divider" },
   { kind: "box", label: "Box" },
 ];
@@ -89,6 +91,17 @@ export const SLOP_SWATCHES = [
   "#72B043",
   "#ffffff",
 ];
+
+export const DEFAULT_CHART_SERIES = "18, 24, 21, 38, 34, 52, 47, 61, 55, 72, 66, 78";
+
+export function chartSeries(text?: string): number[] {
+  const parsed = (text ?? "")
+    .split(/[, \n]+/)
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n));
+  if (parsed.length >= 2) return parsed;
+  return [18, 24, 21, 38, 34, 52, 47, 61, 55, 72, 66, 78];
+}
 
 export function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
@@ -245,6 +258,12 @@ const KIND_DEFAULTS: Record<
     accent: "#2d7bff",
     fill: "rgba(255,255,255,0.14)",
     radius: 99,
+  },
+  chart: {
+    w: 84,
+    h: 22,
+    text: DEFAULT_CHART_SERIES,
+    accent: "#3dd68c",
   },
 };
 

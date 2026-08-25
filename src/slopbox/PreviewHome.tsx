@@ -63,8 +63,8 @@ export function PreviewHome({ def, size }: Props) {
             className="widget-slot"
             style={{
               position: "absolute",
-              left: w.col * metrics.cellW,
-              top: w.row * metrics.cellH,
+              left: metrics.offsetX + w.col * metrics.cellW,
+              top: metrics.offsetY + w.row * metrics.cellH,
               width,
               height,
               padding: metrics.gap / 2,

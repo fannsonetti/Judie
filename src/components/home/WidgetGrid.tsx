@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { WidgetInstance } from "../../types/widgets";
-import { packWidgets } from "../../lib/layout";
+import { placeWidgets } from "../../lib/layout";
 import { measureWidgetGrid } from "../../lib/widgetGrid";
 import { WidgetContainer } from "./WidgetContainer";
 
@@ -10,7 +10,13 @@ interface Props {
 
 export function WidgetGrid({ widgets }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const [metrics, setMetrics] = useState({ cellW: 160, cellH: 160, gap: 16 });
+  const [metrics, setMetrics] = useState({
+    cellW: 160,
+    cellH: 160,
+    gap: 16,
+    offsetX: 0,
+    offsetY: 0,
+  });
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -27,7 +33,7 @@ export function WidgetGrid({ widgets }: Props) {
     return () => ro.disconnect();
   }, []);
 
-  const placed = packWidgets(widgets);
+  const placed = placeWidgets(widgets);
 
   return (
     <div className="widget-grid" ref={ref}>
@@ -38,6 +44,8 @@ export function WidgetGrid({ widgets }: Props) {
           cellW={metrics.cellW}
           cellH={metrics.cellH}
           gap={metrics.gap}
+          offsetX={metrics.offsetX}
+          offsetY={metrics.offsetY}
         />
       ))}
     </div>

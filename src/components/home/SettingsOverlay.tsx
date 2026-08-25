@@ -75,9 +75,9 @@ export function SettingsOverlay() {
         >
           <motion.div
             className="settings-sheet"
-            initial={{ opacity: 0, y: -22 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -14 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={overlayTransition()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -310,6 +310,24 @@ export function SettingsOverlay() {
               {tab === "app" && (
                 <>
                   <p className="settings-kicker">Window</p>
+                  <div className="settings-group">
+                    <div className="settings-switch-row">
+                      <div>
+                        <div className="settings-switch-title">Lock 16:10</div>
+                        <div className="settings-switch-hint">
+                          Letterbox on 16:9 so the home grid is not stretched
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`settings-toggle ${settings.lockAspect1610 ? "on" : ""}`}
+                        aria-pressed={settings.lockAspect1610}
+                        onClick={() => update({ lockAspect1610: !settings.lockAspect1610 })}
+                      >
+                        <span className="settings-toggle-knob" />
+                      </button>
+                    </div>
+                  </div>
                   <div className="settings-power">
                     <button type="button" className="settings-power-card" onClick={onMinimize} disabled={busy !== null}>
                       <span className="settings-power-ico" aria-hidden>

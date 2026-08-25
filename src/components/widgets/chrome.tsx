@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useId } from "react";
 
 export function Ico({
   children,
@@ -80,14 +80,31 @@ export function aqTone(quality: string) {
   return { fg: "#72B043", bg: "rgba(114,176,67,0.16)", label: "Good" };
 }
 
-export function monthCells(view: Date) {
+export type MonthCell = {
+  date: Date;
+  day: number;
+  outside: boolean;
+};
+
+/** Weeks that touch this month, with adjacent-month days filled in (Apple-style). */
+export function monthCells(view: Date): MonthCell[] {
   const year = view.getFullYear();
   const month = view.getMonth();
-  const first = new Date(year, month, 1).getDay();
-  const days = new Date(year, month + 1, 0).getDate();
-  const cells: Array<number | null> = Array(first).fill(null);
-  for (let d = 1; d <= days; d++) cells.push(d);
-  while (cells.length % 7) cells.push(null);
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  const end = new Date(last);
+  end.setDate(last.getDate() + (6 - last.getDay()));
+  const cells: MonthCell[] = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const date = new Date(d);
+    cells.push({
+      date,
+      day: date.getDate(),
+      outside: date.getMonth() !== month,
+    });
+  }
   return cells;
 }
 
@@ -112,29 +129,27 @@ export function MiniMonth({
         ))}
       </div>
       <div className="wx-month-grid">
-        {cells.map((d, i) => {
-          if (!d) return <span key={i} className="empty" />;
-          const date = new Date(view.getFullYear(), view.getMonth(), d);
+        {cells.map((cell, i) => {
           const isToday =
-            d === today.getDate() &&
-            view.getMonth() === today.getMonth() &&
-            view.getFullYear() === today.getFullYear();
+            cell.date.getDate() === today.getDate() &&
+            cell.date.getMonth() === today.getMonth() &&
+            cell.date.getFullYear() === today.getFullYear();
           const isSelected =
-            d === sel.getDate() &&
-            view.getMonth() === sel.getMonth() &&
-            view.getFullYear() === sel.getFullYear();
+            cell.date.getDate() === sel.getDate() &&
+            cell.date.getMonth() === sel.getMonth() &&
+            cell.date.getFullYear() === sel.getFullYear();
           return (
             <button
               key={i}
               type="button"
-              className={`wx-day-btn ${isSelected ? "selected" : ""} ${isToday && !isSelected ? "is-today" : ""}`}
+              className={`wx-day-btn ${cell.outside ? "outside" : ""} ${isSelected ? "selected" : ""} ${isToday && !isSelected ? "is-today" : ""}`}
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                onSelect?.(date);
+                onSelect?.(cell.date);
               }}
             >
-              {d}
+              {cell.day}
             </button>
           );
         })}
@@ -200,5 +215,105 @@ export function FillBar({
     <div className="wx-bar">
       <div className="wx-bar-fill" style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: color }} />
     </div>
+  );
+}
+
+export function WeatherGlyph({ condition, size = 48 }: { condition: string; size?: number }) {
+  const c = condition.toLowerCase();
+  const rain = c.includes("rain") || c.includes("drizzle") || c.includes("storm");
+  const clear = c.includes("clear") || c.includes("sun");
+  return (
+    <svg
+      className="wx-glyph"
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      fill="none"
+      aria-hidden
+    >
+      {clear && !rain ? (
+        <>
+          <circle cx="32" cy="32" r="12" fill="#FFD56A" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+            const r = ((deg - 90) * Math.PI) / 180;
+            const x1 = 32 + Math.cos(r) * 18;
+            const y1 = 32 + Math.sin(r) * 18;
+            const x2 = 32 + Math.cos(r) * 24;
+            const y2 = 32 + Math.sin(r) * 24;
+            return (
+              <line
+                key={deg}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="#FFD56A"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            );
+          })}
+        </>
+      ) : (
+        <>
+          <ellipse cx="28" cy="30" rx="14" ry="10" fill="#D7E3F4" />
+          <ellipse cx="40" cy="32" rx="12" ry="9" fill="#C5D4EA" />
+          <ellipse cx="34" cy="26" rx="10" ry="8" fill="#E8EEF7" />
+          {rain && (
+            <>
+              <line x1="24" y1="44" x2="20" y2="54" stroke="#8EC8FF" strokeWidth="3" strokeLinecap="round" />
+              <line x1="34" y1="46" x2="30" y2="56" stroke="#8EC8FF" strokeWidth="3" strokeLinecap="round" />
+              <line x1="44" y1="44" x2="40" y2="54" stroke="#8EC8FF" strokeWidth="3" strokeLinecap="round" />
+            </>
+          )}
+        </>
+      )}
+    </svg>
+  );
+}
+
+export function Sparkline({
+  values,
+  color,
+  stroke = 2,
+}: {
+  values: number[];
+  color: string;
+  stroke?: number;
+}) {
+  const w = 160;
+  const h = 36;
+  const uid = useId().replace(/:/g, "");
+  const pts = values.length < 2 ? [0, 0] : values;
+  const last = pts.length - 1;
+  const d = pts
+    .map((v, i) => {
+      const x = last <= 0 ? 0 : (i / last) * w;
+      const y = h - (Math.min(100, Math.max(0, v)) / 100) * (h - 2) - 1;
+      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const area = `${d} L${w},${h} L0,${h} Z`;
+
+  return (
+    <svg className="tm-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden>
+      <defs>
+        <linearGradient id={`spark-fill-${uid}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.45" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#spark-fill-${uid})`} />
+      <path
+        d={d}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="nonScalingStroke"
+        style={{ filter: `drop-shadow(0 0 4px ${color})` }}
+      />
+    </svg>
   );
 }

@@ -1,5 +1,7 @@
 import { useActivityStore } from "../../store/activityStore";
+import { DEMO_ACTIVITY } from "../../lib/demoStats";
 import { formatClock } from "../../lib/time";
+import { useWidgetDemo } from "./demo";
 
 interface Props {
   size: string;
@@ -15,17 +17,15 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 export function ActivityWidget({ size }: Props) {
-  const items = useActivityStore((s) => s.items);
+  const demo = useWidgetDemo();
+  const live = useActivityStore((s) => s.items);
+  const items = demo ? DEMO_ACTIVITY : live;
   const large = size === "2x2";
   const small = size === "1x1";
-  const shown = items.slice(0, small ? 4 : large ? 8 : 5);
+  const shown = items.slice(0, small ? 3 : large ? 7 : 5);
 
   return (
     <div className="wx activity fill">
-      <div className="wx-head">
-        <span className="wx-app-name">Activity</span>
-        <span className="wx-muted">{items.length}</span>
-      </div>
       <div className="act-list grow">
         {shown.length === 0 && (
           <>
@@ -35,7 +35,7 @@ export function ActivityWidget({ size }: Props) {
         )}
         {shown.map((item) => (
           <div key={item.id} className="act-row">
-            <span>{formatClock(new Date(item.ts))}</span>
+            {!small && <span>{formatClock(new Date(item.ts))}</span>}
             <strong>{item.title}</strong>
             {!small && <em>{SOURCE_LABEL[item.source] ?? item.source}</em>}
           </div>

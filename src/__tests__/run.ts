@@ -1,18 +1,19 @@
 import { processUtterance, emptyContext } from "../assistant/process";
 import { applyContextFromResult } from "../assistant/process";
 import { RoomSnapshot } from "../assistant/types";
-import { packWidgets, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
+import { packWidgets, placeWidgets, canPlaceWidget, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
 import { homeScaleFor, measureWidgetGrid, novaShellSize, NOVA_FRAME } from "../lib/widgetGrid";
-import { GRID_ROWS } from "../types/widgets";
+import { DEMO_ACTIVITY, DEMO_HOST_STATS, DEMO_MEDIA, DEMO_TIMERS, DEMO_WEATHER } from "../lib/demoStats";
+import { GRID_COLS, GRID_ROWS, WidgetInstance, WIDGET_LABELS } from "../types/widgets";
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
-import { WidgetInstance } from "../types/widgets";
 import { DEFAULT_LIGHTS, DEFAULT_QUEUE, DEFAULT_EVENTS, HOURLY_FORECAST } from "../lib/mockData";
-import { clampPct, snapPct, snapBoxToGrid, EDITOR_GRID_PX, CANONICAL, moveNode, defaultNode, nodesFor, filledSizes, hitBox, withLayout } from "../slopbox/schema";
+import { clampPct, snapPct, snapBoxToGrid, EDITOR_GRID_PX, CANONICAL, moveNode, defaultNode, nodesFor, filledSizes, hitBox, withLayout, chartSeries } from "../slopbox/schema";
 import { makeFromTemplate } from "../slopbox/templates";
 import { exportHookCode, parseWidgetFile, serializeWidget } from "../slopbox/export";
 import { sanitizeSvg } from "../slopbox/svg";
+import { monthCells } from "../components/widgets/chrome";
 
 function snap(): RoomSnapshot {
   return {
@@ -248,11 +249,38 @@ test("layout pack and reorder", () => {
   assert(visiblePageCount(widgets, true) === 2, "edit offers one empty page");
 });
 
-test("full 4-row dashboard fits 16:10 and 16:9", () => {
+test("free placement keeps empty zones", () => {
+  const widgets: WidgetInstance[] = [
+    { id: "a", type: "weather", page: 0, size: "1x1", order: 0, col: 0, row: 0 },
+    { id: "b", type: "lights", page: 0, size: "1x1", order: 1, col: 5, row: 3 },
+  ];
+  const placed = placeWidgets(widgets);
+  assert(placed.length === 2, "both placed");
+  assert(placed.find((w) => w.id === "a")!.col === 0 && placed.find((w) => w.id === "a")!.row === 0, "a stays");
+  assert(placed.find((w) => w.id === "b")!.col === 5 && placed.find((w) => w.id === "b")!.row === 3, "b stays in corner");
+  assert(canPlaceWidget(widgets, "a", 2, 1), "empty cell free");
+  assert(!canPlaceWidget(widgets, "a", 5, 3), "occupied blocked");
+});
+
+test("square cells keep ratio with side padding when height-limited", () => {
   const wide = measureWidgetGrid(1848, 1092);
   const hd = measureWidgetGrid(1848, 972);
-  assert(Math.abs(wide.cellH * GRID_ROWS - 1092) < 0.01, "1920x1200 uses all 4 rows");
-  assert(Math.abs(hd.cellH * GRID_ROWS - 972) < 0.01, "1920x1080 uses all 4 rows");
+  assert(Math.abs(wide.cellW - wide.cellH) < 0.01, "16:10 cells are square");
+  assert(Math.abs(hd.cellW - hd.cellH) < 0.01, "16:9 cells are square");
+  assert(Math.abs(wide.cellH * GRID_ROWS - 1092) < 0.01, "1920x1200 fills height");
+  assert(Math.abs(hd.cellH * GRID_ROWS - 972) < 0.01, "1920x1080 fills height");
+  assert(wide.offsetX > 0, "side padding when taller aspect");
+  assert(hd.offsetX >= wide.offsetX - 0.01, "more side pad on shorter height");
+  assert(Math.abs(wide.cellW * GRID_COLS + wide.offsetX * 2 - 1848) < 0.01, "pads fill width");
+});
+
+test("gallery demo stats are frozen and look occupied", () => {
+  assert(DEMO_HOST_STATS.cpuHistory.length >= 8, "cpu spark has points");
+  assert(DEMO_HOST_STATS.top.length >= 4, "process list");
+  assert(DEMO_WEATHER.hourly.length >= 5, "hourly forecast");
+  assert(DEMO_ACTIVITY.length >= 4, "activity rows");
+  assert(DEMO_TIMERS[0].fireText === "8:12", "timer uses a static countdown");
+  assert(DEMO_MEDIA.playing && DEMO_MEDIA.queue.length > 1, "media demo is playing");
 });
 
 test("widget creator export includes hidden descriptors", () => {
@@ -550,13 +578,24 @@ test("editor 100% uses the live home shell, not the 1920 design", () => {
   assert(Math.abs(homeScaleFor("1x2", NOVA_FRAME) - 1) < 0.001, "design tablet is 100%");
 });
 
-test("list pair and toggle are addable kinds", () => {
+test("list pair toggle and chart are addable kinds", () => {
   const list = defaultNode("list", 8, 8, CANONICAL["1x2"]);
   const pair = defaultNode("pair", 8, 8, CANONICAL["1x2"]);
   const toggle = defaultNode("toggle", 8, 8, CANONICAL["1x1"]);
+  const chart = defaultNode("chart", 8, 8, CANONICAL["1x1"]);
   assert(list.kind === "list" && (list.text ?? "").includes("\n"), "list has rows");
   assert(pair.kind === "pair" && (pair.text ?? "").includes("\n"), "pair has label and value");
   assert(toggle.kind === "toggle" && (toggle.value ?? 0) >= 50, "toggle defaults on");
+  assert(chart.kind === "chart" && chartSeries(chart.text).length >= 8, "chart has a series");
+  assert(!("trends" in WIDGET_LABELS), "trends widget is gone");
+});
+
+test("calendar month fills adjacent-month days", () => {
+  const cells = monthCells(new Date(2026, 7, 1));
+  assert(cells.length === 42, "six weeks covering August 2026");
+  assert(cells.slice(0, 6).every((c) => c.outside), "Sunday-Friday before Saturday the 1st");
+  assert(cells[6].day === 1 && !cells[6].outside, "the 1st sits on Saturday");
+  assert(cells[cells.length - 1].outside, "trailing next-month days fill the last week");
 });
 
 if (failed) {

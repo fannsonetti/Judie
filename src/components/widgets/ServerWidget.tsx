@@ -1,21 +1,22 @@
 import { useRoomStore } from "../../store/roomStore";
+import { DEMO_SERVER } from "../../lib/demoStats";
+import { useWidgetDemo } from "./demo";
 
 interface Props {
   size: string;
 }
 
 export function ServerWidget({ size }: Props) {
-  const server = useRoomStore((s) => s.server);
+  const demo = useWidgetDemo();
+  const live = useRoomStore((s) => s.server);
+  const server = demo ? DEMO_SERVER : live;
   const medium = size === "1x2";
+  const up = server.services.filter((s) => s.online).length;
 
   return (
     <div className="wx server fill">
-      <div className="wx-head">
-        <span className="wx-app-name">Server</span>
-        <span className="wx-muted">{server.online ? "Online" : "Offline"}</span>
-      </div>
-      <div className="wx-metric sm">{server.online ? "Online" : "Offline"}</div>
-      <div className="wx-muted">{server.latency} ms latency</div>
+      <div className="wx-metric sm">{server.online ? `${server.latency} ms` : "Offline"}</div>
+      <div className="wx-muted">{up}/{server.services.length} up</div>
       <div className="svc-list grow">
         {(medium ? server.services : server.services.slice(0, 3)).map((svc) => (
           <div key={svc.name} className="svc-row">

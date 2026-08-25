@@ -1,5 +1,6 @@
-import { useId } from "react";
 import { formatGb, useHostStats } from "../../lib/hostStats";
+import { Sparkline } from "./chrome";
+import { useWidgetDemo } from "./demo";
 
 interface Props {
   size: string;
@@ -9,9 +10,12 @@ const CPU = "#3dd68c";
 const MEM = "#a78bfa";
 
 export function SystemWidget({ size }: Props) {
-  const { stats, available } = useHostStats();
+  const demo = useWidgetDemo();
+  const { stats, available } = useHostStats(demo);
   const wide = size === "1x2";
   const large = size === "2x2";
+  /** 2x2 sparks render taller; keep the stroke optically similar to 1x1/1x2. */
+  const stroke = large ? 1.25 : 2;
 
   if (!available && stats.cpuHistory.length === 0) {
     return (
@@ -24,10 +28,15 @@ export function SystemWidget({ size }: Props) {
   const cpu = Math.round(stats.cpu);
   const mem = Math.round(stats.memory);
   const memDetail = `${formatGb(stats.memoryUsedMb)} / ${formatGb(stats.memoryTotalMb)}`;
-  const glow = true;
 
   const cpuBlock = (
-    <MetricBlock label="CPU" value={cpu} values={stats.cpuHistory} color={CPU} glow={glow} />
+    <MetricBlock
+      label="CPU"
+      value={cpu}
+      values={stats.cpuHistory}
+      color={CPU}
+      stroke={stroke}
+    />
   );
   const memBlock = (
     <MetricBlock
@@ -35,7 +44,7 @@ export function SystemWidget({ size }: Props) {
       value={mem}
       values={stats.memoryHistory}
       color={MEM}
-      glow={glow}
+      stroke={stroke}
       detail={wide || large ? memDetail : undefined}
     />
   );
@@ -73,7 +82,9 @@ export function SystemWidget({ size }: Props) {
             <div key={p.name} className="tm-row">
               <span className="tm-proc-name">{p.name}</span>
               <span>{p.cpu.toFixed(1)}%</span>
-              <span>{p.memoryPct >= 1 ? `${p.memoryPct.toFixed(1)}%` : `${Math.round(p.memoryMb)}M`}</span>
+              <span>
+                {p.memoryPct >= 1 ? `${p.memoryPct.toFixed(1)}%` : `${Math.round(p.memoryMb)}M`}
+              </span>
             </div>
           ) : (
             <div key={p.name} className="tm-proc">
@@ -93,14 +104,14 @@ function MetricBlock({
   value,
   values,
   color,
-  glow,
+  stroke,
   detail,
 }: {
   label: string;
   value: number;
   values: number[];
   color: string;
-  glow: boolean;
+  stroke: number;
   detail?: string;
 }) {
   return (
@@ -108,52 +119,7 @@ function MetricBlock({
       <div className="tm-label">{label}</div>
       <div className="tm-value">{value}%</div>
       {detail && <div className="tm-detail">{detail}</div>}
-      <Sparkline values={values} color={color} glow={glow} />
+      <Sparkline values={values} color={color} stroke={stroke} />
     </div>
-  );
-}
-
-function Sparkline({
-  values,
-  color,
-  glow,
-}: {
-  values: number[];
-  color: string;
-  glow: boolean;
-}) {
-  const w = 160;
-  const h = 36;
-  const uid = useId().replace(/:/g, "");
-  const pts = values.length < 2 ? [0, 0] : values;
-  const last = pts.length - 1;
-  const d = pts
-    .map((v, i) => {
-      const x = last <= 0 ? 0 : (i / last) * w;
-      const y = h - (Math.min(100, Math.max(0, v)) / 100) * (h - 2) - 1;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  const area = `${d} L${w},${h} L0,${h} Z`;
-
-  return (
-    <svg className="tm-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden>
-      <defs>
-        <linearGradient id={`tm-fill-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.45" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#tm-fill-${uid})`} />
-      <path
-        d={d}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        style={glow ? { filter: `drop-shadow(0 0 4px ${color})` } : undefined}
-      />
-    </svg>
   );
 }

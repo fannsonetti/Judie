@@ -39,6 +39,9 @@ pub struct HostStats {
     pub temperature: Option<f32>,
     pub cpu_history: Vec<f32>,
     pub memory_history: Vec<f32>,
+    pub swap_history: Vec<f32>,
+    pub load_history: Vec<f32>,
+    pub temp_history: Vec<f32>,
     pub top: Vec<HostProcess>,
 }
 
@@ -61,6 +64,9 @@ impl HostStats {
             temperature: None,
             cpu_history: Vec::new(),
             memory_history: Vec::new(),
+            swap_history: Vec::new(),
+            load_history: Vec::new(),
+            temp_history: Vec::new(),
             top: Vec::new(),
         }
     }
@@ -70,6 +76,9 @@ struct HostState {
     sys: System,
     cpu_history: Vec<f32>,
     memory_history: Vec<f32>,
+    swap_history: Vec<f32>,
+    load_history: Vec<f32>,
+    temp_history: Vec<f32>,
     ticks: u32,
     last_temp: Option<f32>,
     last_temp_at: Instant,
@@ -101,6 +110,9 @@ impl HostState {
             sys,
             cpu_history: Vec::with_capacity(HISTORY),
             memory_history: Vec::with_capacity(HISTORY),
+            swap_history: Vec::with_capacity(HISTORY),
+            load_history: Vec::with_capacity(HISTORY),
+            temp_history: Vec::with_capacity(HISTORY),
             ticks: 0,
             last_temp: None,
             last_temp_at: Instant::now()
@@ -216,8 +228,13 @@ fn sample(state: &mut HostState) -> HostStats {
 
     push_hist(&mut state.cpu_history, cpu);
     push_hist(&mut state.memory_history, memory);
+    push_hist(&mut state.swap_history, swap);
 
+    let load = System::load_average();
     let ncpus = state.sys.cpus().len().max(1) as f32;
+    let load_pct = ((load.one as f32) / ncpus * 100.0).clamp(0.0, 100.0);
+    push_hist(&mut state.load_history, load_pct);
+
     let cores: Vec<f32> = state
         .sys
         .cpus()
@@ -256,8 +273,11 @@ fn sample(state: &mut HostState) -> HostStats {
         state.last_temp = cpu_temp();
         state.last_temp_at = Instant::now();
     }
-
-    let load = System::load_average();
+    if let Some(t) = state.last_temp {
+        // Map 30–95°C into a 0–100 spark scale so the chart has shape.
+        let temp_pct = ((t - 30.0) / 65.0 * 100.0).clamp(0.0, 100.0);
+        push_hist(&mut state.temp_history, temp_pct);
+    }
 
     HostStats {
         cpu,
@@ -276,6 +296,9 @@ fn sample(state: &mut HostState) -> HostStats {
         temperature: state.last_temp,
         cpu_history: state.cpu_history.clone(),
         memory_history: state.memory_history.clone(),
+        swap_history: state.swap_history.clone(),
+        load_history: state.load_history.clone(),
+        temp_history: state.temp_history.clone(),
         top,
     }
 }

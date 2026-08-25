@@ -1,6 +1,7 @@
 import { useRoomStore } from "../../store/roomStore";
 import { useActivityStore } from "../../store/activityStore";
 import { Ico } from "./chrome";
+import { useWidgetDemo } from "./demo";
 
 const ACTIONS = [
   { id: "goodNight" as const, label: "Good Night", icon: "night" },
@@ -21,15 +22,14 @@ interface Props {
 }
 
 export function QuickControlsWidget({ size = "1x2" }: Props) {
+  const demo = useWidgetDemo();
   const applyQuickControl = useRoomStore((s) => s.applyQuickControl);
-  const doNotDisturb = useRoomStore((s) => s.doNotDisturb);
+  const liveDnd = useRoomStore((s) => s.doNotDisturb);
+  const doNotDisturb = demo ? false : liveDnd;
   const small = size === "1x1";
 
   return (
     <div className="wx quick fill" onPointerDown={(e) => e.stopPropagation()}>
-      <div className="wx-head">
-        <span className="wx-app-name">Controls</span>
-      </div>
       <div className={`quick-grid grow ${small ? "tiny" : ""}`}>
         {ACTIONS.map((a) => {
           const active = a.id === "dnd" && doNotDisturb;
@@ -40,6 +40,7 @@ export function QuickControlsWidget({ size = "1x2" }: Props) {
               className={`quick-btn ${active ? "on" : ""}`}
               onClick={(e) => {
                 e.stopPropagation();
+                if (demo) return;
                 applyQuickControl(a.id);
                 useActivityStore.getState().push({
                   source: a.id === "goodNight" || a.id === "movie" ? "routine" : "user",

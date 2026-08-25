@@ -7,6 +7,8 @@ export interface InstallationConfig {
   voiceEnabled: boolean;
   speakReplies: boolean;
   assistantBaseUrl: string;
+  /** Letterbox the UI to 16:10 so 16:9 screens do not stretch the home grid. */
+  lockAspect1610: boolean;
   proactive: {
     timers: boolean;
     calendar: boolean;
@@ -25,6 +27,7 @@ export const DEFAULT_INSTALLATION: InstallationConfig = {
   voiceEnabled: true,
   speakReplies: true,
   assistantBaseUrl: "http://127.0.0.1:8742",
+  lockAspect1610: false,
   proactive: {
     timers: true,
     calendar: true,

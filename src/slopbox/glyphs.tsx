@@ -26,4 +26,16 @@ export const KIND_GLYPH: Record<SlopKind, ReactNode> = {
     </span>
   ),
   toggle: <span className="slop-glyph-toggle" aria-hidden />,
+  chart: (
+    <svg width="22" height="12" viewBox="0 0 22 12" aria-hidden>
+      <path
+        d="M1 9 L5 6 L9 8 L13 3 L17 5 L21 2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  ),
 };

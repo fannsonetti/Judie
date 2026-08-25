@@ -70,7 +70,16 @@ export function StatusBar() {
 
   const openCenter = () => useAssistantStore.getState().setPaletteOpen(true);
 
+  const inRightThird = (clientX: number) => {
+    const w = typeof window !== "undefined" ? window.innerWidth : 1;
+    return clientX >= (w * 2) / 3;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
+    if (!inRightThird(e.clientX)) {
+      pointer.current = null;
+      return;
+    }
     pointer.current = { y: e.clientY, x: e.clientX };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -79,6 +88,7 @@ export function StatusBar() {
     const start = pointer.current;
     pointer.current = null;
     if (!start) return;
+    if (!inRightThird(start.x)) return;
     const dy = e.clientY - start.y;
     const dx = Math.abs(e.clientX - start.x);
     if (dy > 36 && dy > dx * 1.2) openCenter();

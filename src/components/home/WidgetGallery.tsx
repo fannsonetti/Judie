@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   WidgetType,
@@ -12,6 +12,9 @@ import { parseWidgetFile } from "../../slopbox/export";
 import { filledSizes } from "../../slopbox/schema";
 import { useSlopStore } from "../../slopbox/store";
 import { overlayTransition } from "../../lib/performance";
+import { liveFrame, liveShellSize } from "../../lib/widgetGrid";
+import { WidgetFace } from "../widgets/WidgetFace";
+import { WidgetDemoProvider } from "../widgets/demo";
 
 const DESCRIPTIONS: Record<Exclude<WidgetType, "custom">, string> = {
   activity: "See a live feed of what Judie and your automations have been doing.",
@@ -33,12 +36,6 @@ const SIZE_LABEL: Record<WidgetSize, string> = {
   "2x2": "Large",
 };
 
-const SIZE_ASPECT: Record<WidgetSize, { w: number; h: number }> = {
-  "1x1": { w: 80, h: 80 },
-  "1x2": { w: 140, h: 80 },
-  "2x2": { w: 140, h: 140 },
-};
-
 type Sel = { kind: "builtin"; type: Exclude<WidgetType, "custom"> } | { kind: "custom"; id: string };
 
 export function WidgetGallery() {
@@ -49,6 +46,8 @@ export function WidgetGallery() {
   const customWidgets = useCustomWidgetStore((s) => s.widgets);
   const importOne = useCustomWidgetStore((s) => s.importOne);
   const fileRef = useRef<HTMLInputElement>(null);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  const [dragX, setDragX] = useState(0);
 
   const types = useMemo(
     () =>
@@ -59,8 +58,9 @@ export function WidgetGallery() {
   );
 
   const [selected, setSelected] = useState<Sel>({ kind: "builtin", type: types[0] });
-  const [hoveredSize, setHoveredSize] = useState<WidgetSize | null>(null);
+  const [sizeIndex, setSizeIndex] = useState(0);
   const [query, setQuery] = useState("");
+  const [frame, setFrame] = useState(() => liveFrame());
   const q = query.trim().toLowerCase();
 
   const visible = types.filter((t) => WIDGET_LABELS[t].toLowerCase().includes(q));
@@ -84,12 +84,26 @@ export function WidgetGallery() {
         ? filledSizes(custom)
         : []
       : WIDGET_SUPPORTED_SIZES[current.type];
-  const activeSize = hoveredSize && sizes.includes(hoveredSize) ? hoveredSize : null;
+  const activeSize = sizes[Math.min(sizeIndex, Math.max(0, sizes.length - 1))] ?? sizes[0];
   const name = current.kind === "custom" ? (custom?.name ?? "Custom") : WIDGET_LABELS[current.type];
   const desc =
     current.kind === "custom"
-      ? "Custom widget from Widget Creator. Select a size to add it to the home screen."
+      ? "Custom widget from Widget Creator. Swipe to pick a size, then add it to Home."
       : DESCRIPTIONS[current.type];
+  const selKey = current.kind === "custom" ? `c:${current.id}` : `b:${current.type}`;
+
+  useEffect(() => {
+    setSizeIndex(0);
+    setDragX(0);
+  }, [selKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    const sync = () => setFrame(liveFrame());
+    sync();
+    window.addEventListener("resize", sync);
+    return () => window.removeEventListener("resize", sync);
+  }, [open]);
 
   const importFile = async (file: File | undefined) => {
     if (!file) return;
@@ -111,6 +125,45 @@ export function WidgetGallery() {
       }
     }
     setCreatorOpen(true);
+  };
+
+  const go = (next: number) => {
+    if (sizes.length === 0) return;
+    setSizeIndex(Math.max(0, Math.min(sizes.length - 1, next)));
+    setDragX(0);
+  };
+
+  const addCurrent = () => {
+    if (!activeSize) return;
+    if (current.kind === "custom") addWidget("custom", activeSize, undefined, current.id);
+    else addWidget(current.type, activeSize);
+    setGalleryOpen(false);
+  };
+
+  const onSwipeDown = (e: React.PointerEvent) => {
+    swipe.current = { x: e.clientX, y: e.clientY };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onSwipeMove = (e: React.PointerEvent) => {
+    if (!swipe.current || sizes.length < 2) return;
+    setDragX(e.clientX - swipe.current.x);
+  };
+
+  const onSwipeUp = (e: React.PointerEvent) => {
+    const start = swipe.current;
+    swipe.current = null;
+    if (!start || sizes.length < 2) {
+      setDragX(0);
+      return;
+    }
+    const dx = e.clientX - start.x;
+    const dy = Math.abs(e.clientY - start.y);
+    if (Math.abs(dx) > 48 && Math.abs(dx) > dy) {
+      go(sizeIndex + (dx < 0 ? 1 : -1));
+    } else {
+      setDragX(0);
+    }
   };
 
   return (
@@ -175,10 +228,7 @@ export function WidgetGallery() {
                         key={w.id}
                         type="button"
                         className={`wg-list-item ${current.kind === "custom" && current.id === w.id ? "active" : ""}`}
-                        onClick={() => {
-                          setSelected({ kind: "custom", id: w.id });
-                          setHoveredSize(null);
-                        }}
+                        onClick={() => setSelected({ kind: "custom", id: w.id })}
                       >
                         <span className="wg-list-name">{w.name}</span>
                       </button>
@@ -193,10 +243,7 @@ export function WidgetGallery() {
                         key={type}
                         type="button"
                         className={`wg-list-item ${current.kind === "builtin" && type === current.type ? "active" : ""}`}
-                        onClick={() => {
-                          setSelected({ kind: "builtin", type });
-                          setHoveredSize(null);
-                        }}
+                        onClick={() => setSelected({ kind: "builtin", type })}
                       >
                         <span className="wg-list-name">{WIDGET_LABELS[type]}</span>
                       </button>
@@ -220,55 +267,83 @@ export function WidgetGallery() {
                 <p className="wg-detail-desc">{desc}</p>
               </div>
 
-              <div className="wg-divider" />
+              {sizes.length === 0 ? (
+                <p className="wg-hint">
+                  This widget has no completed sizes. Open Widget Creator and lay out at least one size.
+                </p>
+              ) : (
+                <>
+                  <div
+                    className="wg-carousel"
+                    onPointerDown={onSwipeDown}
+                    onPointerMove={onSwipeMove}
+                    onPointerUp={onSwipeUp}
+                    onPointerCancel={() => {
+                      swipe.current = null;
+                      setDragX(0);
+                    }}
+                  >
+                    <div
+                      className="wg-track"
+                      style={{
+                        transform: `translate3d(calc(${-Math.min(sizeIndex, Math.max(0, sizes.length - 1)) * 100}% + ${dragX}px), 0, 0)`,
+                        transition: swipe.current ? "none" : "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+                      }}
+                    >
+                      {sizes.map((s) => {
+                        const box = liveShellSize(s, frame);
+                        return (
+                          <div key={s} className="wg-slide">
+                            <div
+                              className="widget-shell wg-preview-shell"
+                              style={{
+                                width: box.w,
+                                height: box.h,
+                              }}
+                            >
+                              <div className="widget-face">
+                                <WidgetDemoProvider>
+                                  <WidgetFace
+                                    type={current.kind === "custom" ? "custom" : current.type}
+                                    size={s}
+                                    customId={current.kind === "custom" ? current.id : undefined}
+                                  />
+                                </WidgetDemoProvider>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              <p className="wg-size-label">Choose a Size</p>
-
-              <div className="wg-sizes">
-                {sizes.length === 0 ? (
-                  <p className="wg-hint">
-                    This widget has no completed sizes. Open Widget Creator and lay out at least one size.
-                  </p>
-                ) : (
-                  sizes.map((s) => {
-                    const dim = SIZE_ASPECT[s];
-                    return (
+                  <div className="wg-dots" role="tablist" aria-label="Widget sizes">
+                    {sizes.map((s, i) => (
                       <button
                         key={s}
                         type="button"
-                        className={`wg-size-card ${activeSize === s ? "active" : ""}`}
-                        onMouseEnter={() => setHoveredSize(s)}
-                        onMouseLeave={() => setHoveredSize(null)}
-                        onClick={() => {
-                          if (current.kind === "custom") addWidget("custom", s, undefined, current.id);
-                          else addWidget(current.type, s);
-                          setGalleryOpen(false);
-                        }}
-                      >
-                        <div
-                          className="wg-size-preview"
-                          style={{ width: dim.w, height: dim.h }}
-                        />
-                        <span className="wg-size-name">{SIZE_LABEL[s]}</span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              {current.kind === "custom" ? (
-                <>
-                  <p className="wg-hint">Descriptors stay in the definition, not on the tile.</p>
-                  <button
-                    type="button"
-                    className="wg-hint-btn"
-                    onClick={() => openCreator(current.id)}
-                  >
-                    Edit in Widget Creator
+                        role="tab"
+                        aria-selected={i === sizeIndex}
+                        className={`wg-dot ${i === sizeIndex ? "on" : ""}`}
+                        onClick={() => go(i)}
+                      />
+                    ))}
+                  </div>
+                  <p className="wg-size-caption">{activeSize ? SIZE_LABEL[activeSize] : ""}</p>
+                  <button type="button" className="wg-add" onClick={addCurrent}>
+                    Add to Home
                   </button>
                 </>
-              ) : (
-                <p className="wg-hint">Select a size to add this widget.</p>
+              )}
+
+              {current.kind === "custom" && (
+                <button
+                  type="button"
+                  className="wg-hint-btn"
+                  onClick={() => openCreator(current.id)}
+                >
+                  Edit in Widget Creator
+                </button>
               )}
             </div>
           </motion.div>

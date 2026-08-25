@@ -11,9 +11,12 @@ import { WidgetCreatorOverlay } from "./WidgetCreatorOverlay";
 import { ExpandedOverlay } from "./ExpandedOverlay";
 import { CommandPalette } from "./CommandPalette";
 import { SettingsOverlay } from "./SettingsOverlay";
+import { RemoveConfirm } from "./RemoveConfirm";
 import { Toasts } from "./Toasts";
 import { DebugPanel } from "./DebugPanel";
 import { JudieRuntime } from "../../runtime/JudieRuntime";
+
+const TRIPLE_MS = 480;
 
 export function HomeScreen() {
   const widgets = useLayoutStore((s) => s.widgets);
@@ -31,6 +34,7 @@ export function HomeScreen() {
   const [isDragging, setIsDragging] = useState(false);
   const pointer = useRef<{ startX: number; startY: number; active: boolean } | null>(null);
   const holdTimer = useRef<number | null>(null);
+  const triple = useRef<{ count: number; at: number }>({ count: 0, at: 0 });
   const currentPageRef = useRef(currentPage);
   const pageCountRef = useRef(pageCount);
   const editModeRef = useRef(editMode);
@@ -63,9 +67,30 @@ export function HomeScreen() {
   const ignoreHoldTarget = (target: HTMLElement) =>
     Boolean(
       target.closest(
-        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .widget-resize, .expanded-overlay"
+        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .widget-resize, .expanded-overlay, .confirm-backdrop"
       )
     );
+
+  const tryTripleClick = () => {
+    if (editModeRef.current || expandedRef.current) return;
+    const overlay =
+      useAssistantStore.getState().paletteOpen ||
+      useAssistantStore.getState().settingsOpen ||
+      useLayoutStore.getState().galleryOpen ||
+      useLayoutStore.getState().creatorOpen ||
+      useLayoutStore.getState().pendingRemoveId;
+    if (overlay) return;
+
+    const now = performance.now();
+    if (now - triple.current.at > TRIPLE_MS) triple.current.count = 0;
+    triple.current.at = now;
+    triple.current.count += 1;
+    if (triple.current.count >= 3) {
+      triple.current.count = 0;
+      clearHold();
+      useLayoutStore.getState().enterEditMode();
+    }
+  };
 
   const onPointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
@@ -74,7 +99,8 @@ export function HomeScreen() {
       useAssistantStore.getState().paletteOpen ||
       useAssistantStore.getState().settingsOpen ||
       useLayoutStore.getState().galleryOpen ||
-      useLayoutStore.getState().creatorOpen;
+      useLayoutStore.getState().creatorOpen ||
+      useLayoutStore.getState().pendingRemoveId;
     if (overlay) return;
 
     pointer.current = { startX: e.clientX, startY: e.clientY, active: false };
@@ -85,6 +111,7 @@ export function HomeScreen() {
       holdTimer.current = window.setTimeout(() => {
         holdTimer.current = null;
         pointer.current = null;
+        triple.current.count = 0;
         useLayoutStore.getState().enterEditMode();
         const slot = holdTarget.closest("[data-widget-id]") as HTMLElement | null;
         if (slot?.dataset.widgetId) {
@@ -112,9 +139,17 @@ export function HomeScreen() {
     applyTrack(currentPageRef.current, dx, false);
   };
 
-  const endDrag = () => {
+  const endDrag = (e?: React.PointerEvent) => {
+    const wasSwipe = pointer.current?.active;
+    const moved =
+      pointer.current &&
+      Math.hypot(
+        (e?.clientX ?? pointer.current.startX) - pointer.current.startX,
+        (e?.clientY ?? pointer.current.startY) - pointer.current.startY
+      ) > 10;
     clearHold();
-    if (!pointer.current?.active) {
+    if (!wasSwipe) {
+      if (!moved && !editModeRef.current) tryTripleClick();
       pointer.current = null;
       return;
     }
@@ -136,9 +171,9 @@ export function HomeScreen() {
   }, [currentPage, pageCount, isDragging]);
 
   useEffect(() => {
-    const onContext = (e: MouseEvent) => {
-      if ((e.target as HTMLElement).closest(".widget-shell")) {
-        e.preventDefault();
+    const onContext = (ev: MouseEvent) => {
+      if ((ev.target as HTMLElement).closest(".widget-shell")) {
+        ev.preventDefault();
       }
     };
     window.addEventListener("contextmenu", onContext);
@@ -153,7 +188,7 @@ export function HomeScreen() {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
-      onPointerCancel={endDrag}
+      onPointerCancel={() => endDrag()}
     >
       <JudieRuntime />
       <StatusBar />
@@ -196,6 +231,7 @@ export function HomeScreen() {
       <WidgetCreatorOverlay />
       <CommandPalette />
       <SettingsOverlay />
+      <RemoveConfirm />
       <Toasts />
       <DebugPanel />
     </div>

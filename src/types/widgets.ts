@@ -20,6 +20,10 @@ export interface WidgetInstance {
   page: number;
   size: WidgetSize;
   order: number;
+  /** Grid column (0-based). When set with row, empty cells can remain empty. */
+  col?: number;
+  /** Grid row (0-based). */
+  row?: number;
   customId?: string;
 }
 

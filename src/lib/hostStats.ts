@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { DEMO_HOST_STATS } from "./demoStats";
 
 export interface HostProcess {
   name: string;
@@ -25,6 +26,9 @@ export interface HostStats {
   temperature: number | null;
   cpuHistory: number[];
   memoryHistory: number[];
+  swapHistory: number[];
+  loadHistory: number[];
+  tempHistory: number[];
   top: HostProcess[];
 }
 
@@ -45,6 +49,9 @@ const EMPTY: HostStats = {
   temperature: null,
   cpuHistory: [],
   memoryHistory: [],
+  swapHistory: [],
+  loadHistory: [],
+  tempHistory: [],
   top: [],
 };
 
@@ -65,7 +72,17 @@ async function pull() {
   inflight = true;
   try {
     const next = await invoke<HostStats>("get_host_stats");
-    cached = next;
+    cached = {
+      ...EMPTY,
+      ...next,
+      cpuHistory: next.cpuHistory ?? [],
+      memoryHistory: next.memoryHistory ?? [],
+      swapHistory: next.swapHistory ?? [],
+      loadHistory: next.loadHistory ?? [],
+      tempHistory: next.tempHistory ?? [],
+      top: next.top ?? [],
+      cores: next.cores ?? [],
+    };
     available = true;
     notify();
   } catch {
@@ -91,10 +108,11 @@ function release() {
 }
 
 /** One shared poller so every System widget shows the same numbers. */
-export function useHostStats() {
+export function useHostStats(demo = false) {
   const [, bump] = useState(0);
 
   useEffect(() => {
+    if (demo) return;
     const onChange = () => bump((n) => n + 1);
     listeners.add(onChange);
     retain();
@@ -102,8 +120,9 @@ export function useHostStats() {
       listeners.delete(onChange);
       release();
     };
-  }, []);
+  }, [demo]);
 
+  if (demo) return { stats: DEMO_HOST_STATS, available: true };
   return { stats: cached, available };
 }
 
