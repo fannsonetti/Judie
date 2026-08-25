@@ -79,11 +79,25 @@ jobs:
           CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS: -C link-arg=--sysroot=/opt/armhf -C link-arg=-lsystemd
         run: npm run tauri build -- --target armv7-unknown-linux-gnueabihf --config src-tauri/tauri.linux.conf.json
 
+      # Upload only — do not PATCH release metadata (that needs broader token rights
+      # and races the Windows job). Wait for the release Windows/tauri-action creates.
       - name: Upload armhf .deb to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: src-tauri/target/armv7-unknown-linux-gnueabihf/release/bundle/deb/*_armhf.deb
-          fail_on_unmatched_files: true
-          draft: false
-          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(src-tauri/target/armv7-unknown-linux-gnueabihf/release/bundle/deb/*_armhf.deb)
+          if (( ${#files[@]} == 0 )); then
+            echo "No armhf .deb found" >&2
+            exit 1
+          fi
+          for _ in $(seq 1 90); do
+            if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+              gh release upload "${{ github.ref_name }}" "${files[@]}" --clobber
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for release ${{ github.ref_name }}" >&2
+          exit 1
