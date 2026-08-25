@@ -1,4 +1,8 @@
 # Used by CI when cross-compiling the Linux .deb to 32-bit ARM.
 # Native armv7 builds (on the Pi) do not pass --target, so this is unused there.
+#
+# --sysroot must be a *linker* flag. Passing it to rustc itself makes rustc look
+# for libcore in the Debian sysroot and fail.
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
+rustflags = ["-C", "link-arg=--sysroot=/opt/armhf"]
