@@ -15,13 +15,16 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 if [[ ! -d "$SYSROOT/usr/lib/arm-linux-gnueabihf" ]]; then
   sudo debootstrap --arch=armhf --variant=minbase bookworm "$SYSROOT" http://deb.debian.org/debian
-  sudo chroot "$SYSROOT" apt-get update
-  sudo DEBIAN_FRONTEND=noninteractive chroot "$SYSROOT" apt-get install -y \
-    libc6-dev \
-    libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
-    librsvg2-dev libssl-dev libxdo-dev pkg-config \
-    libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libglib2.0-dev
 fi
+
+sudo chroot "$SYSROOT" apt-get update
+# Always install (idempotent) so new deps land even if the sysroot dir already exists.
+sudo DEBIAN_FRONTEND=noninteractive chroot "$SYSROOT" apt-get install -y \
+  libc6-dev \
+  libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev \
+  librsvg2-dev libssl-dev libxdo-dev pkg-config \
+  libjavascriptcoregtk-4.1-dev libsoup-3.0-dev libglib2.0-dev \
+  libdbus-1-dev libsystemd-dev
 
 # Debootstrap writes absolute symlinks (/lib/...). The cross-linker follows them
 # onto the host filesystem unless they are rewritten relative to the sysroot.
@@ -31,6 +34,7 @@ fi
 
 PKG_LIB="$SYSROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
 PKG_SHARE="$SYSROOT/usr/share/pkgconfig"
+RUSTFLAGS="-C link-arg=--sysroot=$SYSROOT -C link-arg=-lsystemd"
 
 export_line() {
   echo "$1"
@@ -52,4 +56,5 @@ export_line "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc"
 export_line "CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++"
 export_line "BINDGEN_EXTRA_CLANG_ARGS_armv7_unknown_linux_gnueabihf=--sysroot=$SYSROOT"
 # gtk-sys builds as an rlib. The first real GTK link is judie (cdylib/staticlib).
-export_line "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS=-C link-arg=--sysroot=$SYSROOT"
+# dbus needs libsystemd for sd_* symbols.
+export_line "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS=$RUSTFLAGS"

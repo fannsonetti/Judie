@@ -3,6 +3,10 @@
 #
 # --sysroot must be a *linker* flag. Passing it to rustc itself makes rustc look
 # for libcore in the Debian sysroot and fail.
+# -lsystemd: libdbus (pulled in by GTK/zbus) needs sd_* symbols from libsystemd.
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
-rustflags = ["-C", "link-arg=--sysroot=/opt/armhf"]
+rustflags = [
+  "-C", "link-arg=--sysroot=/opt/armhf",
+  "-C", "link-arg=-lsystemd",
+]
