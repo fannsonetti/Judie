@@ -433,8 +433,8 @@ export function SettingsOverlay() {
                     </button>
                     {releaseError && <p className="settings-note">{releaseError}</p>}
                     <p className="settings-note">
-                      Picks a GitHub release for this computer and installs it. The app will close
-                      and reopen.
+                      Picks a GitHub release for this computer and installs it without a password
+                      prompt. The app will close and reopen.
                     </p>
                   </div>
 

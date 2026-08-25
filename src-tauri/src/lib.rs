@@ -1,6 +1,7 @@
-mod host;
+pub mod host;
 mod install;
-#[cfg(target_os = "linux")]
+mod releases;
+#[cfg(all(target_os = "linux", feature = "tauri-ui"))]
 mod linux_webview;
 
 use serde::{Deserialize, Serialize};
@@ -120,8 +121,18 @@ fn list_releases() -> Result<Vec<install::ReleaseInfo>, String> {
 }
 
 #[tauri::command]
+fn check_latest_update() -> Result<install::LatestUpdate, String> {
+    install::check_latest()
+}
+
+#[tauri::command]
 fn install_release(app: AppHandle, tag: String) -> Result<(), String> {
     install::install_release(app, tag)
+}
+
+#[tauri::command]
+fn install_latest_update(app: AppHandle) -> Result<(), String> {
+    install::install_latest(app)
 }
 
 #[tauri::command]
@@ -152,7 +163,7 @@ fn pad_role(role: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     START.get_or_init(Instant::now);
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", feature = "tauri-ui"))]
     linux_webview::prepare();
 
     tauri::Builder::default()
@@ -180,7 +191,7 @@ pub fn run() {
 
             install::apply_kiosk(app.handle());
 
-            #[cfg(target_os = "linux")]
+            #[cfg(all(target_os = "linux", feature = "tauri-ui"))]
             if let Some(win) = app.get_webview_window("main") {
                 linux_webview::tune(&win);
             }
@@ -197,7 +208,9 @@ pub fn run() {
             append_conversation_log,
             conversation_log_path,
             list_releases,
+            check_latest_update,
             install_release,
+            install_latest_update,
             uninstall_judie,
             get_kiosk,
             set_kiosk

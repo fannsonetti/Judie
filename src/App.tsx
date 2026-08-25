@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { HomeScreen } from "./components/home/HomeScreen";
 import { UpdateOverlay } from "./components/home/UpdateOverlay";
-import { bootLifecycle } from "./lib/lifecycle";
+import { bootLifecycle, useUpdateStore } from "./lib/lifecycle";
 import { watchKioskFocus } from "./lib/windowControls";
 import { useSettingsStore } from "./store/settingsStore";
 import "./styles/global.css";
@@ -10,11 +10,11 @@ import "./styles/chrome.css";
 import "./styles/slopbox.css";
 
 function App() {
-  const [updating, setUpdating] = useState(false);
+  const installing = useUpdateStore((s) => s.installing);
   const lockAspect1610 = useSettingsStore((s) => s.lockAspect1610);
 
   useEffect(() => {
-    void bootLifecycle(() => setUpdating(true));
+    bootLifecycle();
     return watchKioskFocus();
   }, []);
 
@@ -22,7 +22,7 @@ function App() {
     <div className={`aspect-frame${lockAspect1610 ? " locked-1610" : ""}`}>
       <div className="aspect-stage">
         <HomeScreen />
-        {updating && <UpdateOverlay />}
+        {installing && <UpdateOverlay />}
       </div>
     </div>
   );

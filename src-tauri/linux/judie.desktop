@@ -2,7 +2,7 @@
 Type=Application
 Name=Judie
 Comment=Judie room control
-Exec=env WEBKIT_DISABLE_DMABUF_RENDERER=1 judie
+Exec=judie
 Icon=judie
 Terminal=false
 Categories=Utility;

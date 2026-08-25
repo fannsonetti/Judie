@@ -165,6 +165,53 @@ input:focus-visible {
   color: var(--text-muted);
 }
 
+.update-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px var(--page-pad);
+  background: rgba(245, 176, 70, 0.14);
+  border-bottom: 1px solid rgba(245, 176, 70, 0.28);
+  color: #f3d7a4;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 19;
+}
+
+.update-bar-msg {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.update-bar-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f3d7a4;
+  color: #1a1408;
+  cursor: pointer;
+}
+
+.update-bar-btn.ghost {
+  background: transparent;
+  color: #f3d7a4;
+  border: 1px solid rgba(243, 215, 164, 0.35);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

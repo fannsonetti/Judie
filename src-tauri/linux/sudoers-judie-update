@@ -1,0 +1,2 @@
+# Judie may apply a staged .deb without a password prompt.
+ALL ALL=(root) NOPASSWD: /usr/lib/judie/apply-update

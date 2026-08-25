@@ -3,6 +3,7 @@ import { useLayoutStore } from "../../store/layoutStore";
 import { useAssistantStore } from "../../store/assistantStore";
 import { visiblePageCount } from "../../lib/layout";
 import { StatusBar } from "./StatusBar";
+import { UpdateBar } from "./UpdateBar";
 import { HomePage } from "./HomePage";
 import { PageIndicator } from "./PageIndicator";
 import { EditModeControls } from "./EditModeControls";
@@ -67,7 +68,7 @@ export function HomeScreen() {
   const ignoreHoldTarget = (target: HTMLElement) =>
     Boolean(
       target.closest(
-        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .expanded-overlay, .confirm-backdrop"
+        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .expanded-overlay, .confirm-backdrop, .update-bar"
       )
     );
 
@@ -192,6 +193,7 @@ export function HomeScreen() {
     >
       <JudieRuntime />
       <StatusBar />
+      <UpdateBar />
       <div
         className={`home-viewport${pageCount > 1 ? " multi" : ""}`}
         ref={viewportRef}

@@ -5,11 +5,13 @@
       "deb": {
         "depends": [
           "libwebkit2gtk-4.1-0",
-          "libgtk-3-0t64 | libgtk-3-0",
+          "libgtk-3-0 | libgtk-3-0t64",
           "libayatana-appindicator3-1"
         ],
         "files": {
-          "/etc/xdg/autostart/judie.desktop": "linux/judie.desktop"
+          "/etc/xdg/autostart/judie.desktop": "linux/judie.desktop",
+          "/usr/lib/judie/apply-update": "linux/apply-update",
+          "/etc/sudoers.d/judie-update": "linux/sudoers-judie-update"
         }
       }
     }

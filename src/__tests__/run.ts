@@ -16,7 +16,7 @@ import { sanitizeSvg } from "../slopbox/svg";
 import { overlayTransition } from "../lib/performance";
 import { isLinuxWebview } from "../lib/platform";
 import { monthCells } from "../components/widgets/chrome";
-import { generateUninstallChallenge, releaseLabel, type ReleaseInfo } from "../lib/install";
+import { generateUninstallChallenge, isNewerVersion, releaseLabel, type ReleaseInfo } from "../lib/install";
 
 function snap(): RoomSnapshot {
   return {
@@ -608,15 +608,22 @@ test("linux motion helpers are inert in node", () => {
 
 test("release labels mark the running copy", () => {
   const rel: ReleaseInfo = {
-    tag: "v0.1.1",
-    name: "Judie 0.1.1",
+    tag: "v0.1.7",
+    name: "Judie 0.1.7",
     publishedAt: "",
     current: true,
     installable: true,
-    assetName: "Judie_0.1.1_armhf.deb",
+    assetName: "Judie_0.1.7_armhf.deb",
     assetUrl: "",
   };
   assert(releaseLabel(rel).includes("this version"), releaseLabel(rel));
+});
+
+test("newer GitHub tags are detected without auto-installing", () => {
+  assert(isNewerVersion("0.1.1", "0.1.0"), "0.1.1 beats 0.1.0");
+  assert(isNewerVersion("v0.1.2", "0.1.1"), "v prefix is ignored");
+  assert(!isNewerVersion("0.1.0", "0.1.1"), "older is not newer");
+  assert(!isNewerVersion("0.1.1", "0.1.1"), "same version is current");
 });
 
 test("uninstall challenge is 12 mixed letters and digits", () => {

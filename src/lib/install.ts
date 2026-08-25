@@ -17,6 +17,24 @@ export function releaseLabel(r: ReleaseInfo) {
   return `${r.name}${now}`;
 }
 
+export function isNewerVersion(candidate: string, current: string) {
+  const parse = (raw: string) => {
+    const parts = raw
+      .trim()
+      .replace(/^v/, "")
+      .split(".")
+      .map((p) => parseInt(p.replace(/\D.*$/, ""), 10) || 0);
+    return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0] as const;
+  };
+  const a = parse(candidate);
+  const b = parse(current);
+  for (let i = 0; i < 3; i++) {
+    if (a[i] > b[i]) return true;
+    if (a[i] < b[i]) return false;
+  }
+  return false;
+}
+
 export async function listInstallations(): Promise<ReleaseInfo[]> {
   return invoke<ReleaseInfo[]>("list_releases");
 }

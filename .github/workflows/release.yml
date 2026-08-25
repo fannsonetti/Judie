@@ -36,7 +36,7 @@ jobs:
             Install `Judie_*_x64-setup.exe`.
 
             ## Raspberry Pi (32-bit)
-            Install the `.deb` from the Linux armhf assets, or see [docs/raspberry-pi.md](docs/raspberry-pi.md).
+            Native Slint kiosk `.deb` (no WebKit). See [docs/raspberry-pi.md](docs/raspberry-pi.md).
             Pi 3 (1 GB) should run **32-bit Raspberry Pi OS**.
           releaseDraft: false
           prerelease: false
@@ -46,11 +46,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: armv7-unknown-linux-gnueabihf
@@ -58,11 +53,7 @@ jobs:
       - name: Armhf sysroot
         run: bash scripts/ci-armhf-sysroot.sh
 
-      - name: Install frontend
-        run: npm ci
-
-      # tauri-action looks for *_armv7.deb; the bundler correctly names Debian packages *_armhf.deb.
-      - name: Build armhf .deb
+      - name: Build native Pi binary + .deb
         env:
           PKG_CONFIG_ALLOW_CROSS: "1"
           PKG_CONFIG_ALLOW_SYSTEM_CFLAGS: "1"
@@ -76,11 +67,14 @@ jobs:
           CC_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-gcc
           CXX_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-g++
           BINDGEN_EXTRA_CLANG_ARGS_armv7_unknown_linux_gnueabihf: --sysroot=/opt/armhf
-          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS: -C link-arg=--sysroot=/opt/armhf -C link-arg=-lsystemd
-        run: npm run tauri build -- --target armv7-unknown-linux-gnueabihf --config src-tauri/tauri.linux.conf.json
+          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS: -C link-arg=--sysroot=/opt/armhf
+        run: |
+          set -euo pipefail
+          cd src-tauri
+          cargo build --release --no-default-features --features pi-native --bin judie-pi --target armv7-unknown-linux-gnueabihf
+          cd ..
+          bash scripts/package-armhf-deb.sh
 
-      # Upload only — do not PATCH release metadata (that needs broader token rights
-      # and races the Windows job). Wait for the release Windows/tauri-action creates.
       - name: Upload armhf .deb to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

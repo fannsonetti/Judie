@@ -1,0 +1,25 @@
+#!/bin/sh
+# Passwordless helper: only installs a Judie .deb staged in /tmp/judie-update.
+set -e
+DEB="${1:-}"
+[ -n "$DEB" ] || { echo "usage: apply-update <deb>" >&2; exit 1; }
+[ -f "$DEB" ] || { echo "missing package" >&2; exit 1; }
+
+case "$DEB" in
+  /tmp/judie-update/*.deb) ;;
+  *) echo "refused path" >&2; exit 1 ;;
+esac
+
+base=$(basename "$DEB")
+case "$base" in
+  Judie_*.deb|judie_*.deb|Judie-*.deb|judie-*.deb) ;;
+  *) echo "refused name" >&2; exit 1 ;;
+esac
+
+if [ -n "${SUDO_UID:-}" ]; then
+  owner=$(stat -c '%u' "$DEB" 2>/dev/null || stat -f '%u' "$DEB")
+  [ "$owner" = "$SUDO_UID" ] || { echo "refused owner" >&2; exit 1; }
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -y --reinstall "$DEB"

@@ -1,0 +1,216 @@
+export component MainWindow inherits Window {
+    title: "Judie";
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    background: #0a0a10;
+    no-frame: true;
+
+    in-out property <string> clock: "--:--";
+    in-out property <string> date-text: "";
+    in-out property <float> cpu: 0;
+    in-out property <float> memory: 0;
+    in-out property <string> mem-detail: "";
+    in-out property <string> temp-text: "";
+    in-out property <string> uptime-text: "";
+    in-out property <string> load-text: "";
+    in-out property <bool> update-available: false;
+    in-out property <string> update-label: "";
+    in-out property <string> update-error: "";
+    in-out property <bool> updating: false;
+
+    callback update-now();
+    callback dismiss-update();
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        if root.update-available: Rectangle {
+            background: #2a2214;
+            VerticalLayout {
+                padding-left: 20px;
+                padding-right: 16px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text {
+                        text: root.updating ? "Installing update…" : (root.update-error != "" ? root.update-error : root.update-label);
+                        color: #f3d7a4;
+                        font-size: 13px;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                        wrap: word-wrap;
+                        horizontal-stretch: 1;
+                    }
+                    if !root.updating: Rectangle {
+                        width: 88px;
+                        height: 28px;
+                        border-radius: 14px;
+                        background: #f3d7a4;
+                        TouchArea {
+                            clicked => { root.update-now(); }
+                            Text {
+                                text: "Update";
+                                color: #1a1408;
+                                font-size: 12px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                    Rectangle {
+                        width: 64px;
+                        height: 28px;
+                        border-radius: 14px;
+                        border-width: 1px;
+                        border-color: #f3d7a4;
+                        TouchArea {
+                            clicked => { root.dismiss-update(); }
+                            Text {
+                                text: "Later";
+                                color: #f3d7a4;
+                                font-size: 12px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 16px;
+
+        HorizontalLayout {
+            spacing: 12px;
+            Text {
+                text: "Judie";
+                color: #f4f4f5;
+                font-size: 22px;
+                font-weight: 700;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: root.date-text;
+                color: #a1a1aa;
+                font-size: 14px;
+                vertical-alignment: center;
+            }
+            Text {
+                text: root.clock;
+                color: #f4f4f5;
+                font-size: 28px;
+                font-weight: 600;
+            }
+        }
+
+        Rectangle {
+            height: 1px;
+            background: #27272a;
+        }
+
+        HorizontalLayout {
+            spacing: 16px;
+            vertical-stretch: 1;
+
+            MetricCard {
+                title: "CPU";
+                value: round(root.cpu) + "%";
+                accent: #3dd68c;
+                level: root.cpu / 100;
+            }
+
+            MetricCard {
+                title: "Memory";
+                value: round(root.memory) + "%";
+                detail: root.mem-detail;
+                accent: #a78bfa;
+                level: root.memory / 100;
+            }
+
+            VerticalLayout {
+                spacing: 10px;
+                min-width: 220px;
+                InfoRow { label: "Temp"; value: root.temp-text; }
+                InfoRow { label: "Load"; value: root.load-text; }
+                InfoRow { label: "Uptime"; value: root.uptime-text; }
+                Rectangle { vertical-stretch: 1; }
+                Text {
+                    text: "Native Pi UI";
+                    color: #52525b;
+                    font-size: 12px;
+                }
+            }
+        }
+        }
+    }
+}
+
+component MetricCard inherits Rectangle {
+    in property <string> title;
+    in property <string> value;
+    in property <string> detail: "";
+    in property <color> accent;
+    in property <float> level;
+
+    background: #14141c;
+    border-radius: 18px;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 10px;
+
+        Text {
+            text: root.title;
+            color: #a1a1aa;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        Text {
+            text: root.value;
+            color: root.accent;
+            font-size: 42px;
+            font-weight: 700;
+        }
+        if root.detail != "": Text {
+            text: root.detail;
+            color: #71717a;
+            font-size: 12px;
+        }
+        Rectangle {
+            height: 8px;
+            border-radius: 4px;
+            background: #27272a;
+            Rectangle {
+                width: parent.width * clamp(root.level, 0, 1);
+                height: parent.height;
+                border-radius: 4px;
+                background: root.accent;
+            }
+        }
+    }
+}
+
+component InfoRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    spacing: 8px;
+    Text {
+        text: root.label;
+        color: #71717a;
+        font-size: 12px;
+        min-width: 64px;
+    }
+    Text {
+        text: root.value;
+        color: #e4e4e7;
+        font-size: 13px;
+        horizontal-stretch: 1;
+    }
+}
