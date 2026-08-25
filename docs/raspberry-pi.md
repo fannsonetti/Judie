@@ -70,9 +70,9 @@ Reboot after that. Close Chromium and other heavy apps.
 
 ```bash
 
-curl -LO https://github.com/fannsonetti/Judie/releases/download/v0.1.7/Judie_0.1.7_armhf.deb
+curl -LO https://github.com/fannsonetti/Judie/releases/download/v0.1.2/Judie_0.1.2_armhf.deb
 
-sudo apt install -y ./Judie_0.1.7_armhf.deb
+sudo apt install -y ./Judie_0.1.2_armhf.deb
 
 ```
 
@@ -101,8 +101,8 @@ On boot, Judie asks GitHub whether a newer release exists. If it does, a small *
 Tap **Update** to install. Linux packages ship `/usr/lib/judie/apply-update` plus a sudoers rule so that step is silent. The first time you move off an older copy that still uses `pkexec`, install once from a terminal:
 
 ```bash
-curl -LO https://github.com/fannsonetti/Judie/releases/download/v0.1.7/Judie_0.1.7_armhf.deb
-sudo apt install -y ./Judie_0.1.7_armhf.deb
+curl -LO https://github.com/fannsonetti/Judie/releases/download/v0.1.2/Judie_0.1.2_armhf.deb
+sudo apt install -y ./Judie_0.1.2_armhf.deb
 ```
 
 After that, later versions apply from the bar with no prompt.

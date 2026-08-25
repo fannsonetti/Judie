@@ -608,12 +608,12 @@ test("linux motion helpers are inert in node", () => {
 
 test("release labels mark the running copy", () => {
   const rel: ReleaseInfo = {
-    tag: "v0.1.7",
-    name: "Judie 0.1.7",
+    tag: "v0.1.2",
+    name: "Judie 0.1.2",
     publishedAt: "",
     current: true,
     installable: true,
-    assetName: "Judie_0.1.7_armhf.deb",
+    assetName: "Judie_0.1.2_armhf.deb",
     assetUrl: "",
   };
   assert(releaseLabel(rel).includes("this version"), releaseLabel(rel));
