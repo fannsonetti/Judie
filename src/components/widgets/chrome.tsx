@@ -1,4 +1,4 @@
-import { ReactNode, useId } from "react";
+import { ReactNode } from "react";
 
 export function Ico({
   children,
@@ -171,7 +171,9 @@ export function Gauge({
 }) {
   const r = 38;
   const c = 2 * Math.PI * r;
-  const dash = Math.max(0.08, Math.min(1, pct)) * c * 0.78;
+  // 270° horseshoe, gap centered on the bottom so the arc is not lopsided.
+  const arc = c * 0.75;
+  const dash = Math.max(0.08, Math.min(1, pct)) * arc;
   const gap = c - dash;
   return (
     <div className="wx-gauge" style={{ width: size, height: size }}>
@@ -184,8 +186,8 @@ export function Gauge({
           stroke="rgba(255,255,255,0.08)"
           strokeWidth="9"
           strokeLinecap="round"
-          strokeDasharray={`${c * 0.78} ${c}`}
-          transform="rotate(140 50 50)"
+          strokeDasharray={`${arc} ${c}`}
+          transform="rotate(135 50 50)"
         />
         <circle
           cx="50"
@@ -196,7 +198,7 @@ export function Gauge({
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={`${dash} ${gap}`}
-          transform="rotate(140 50 50)"
+          transform="rotate(135 50 50)"
         />
       </svg>
       <div className="wx-gauge-inner">{children}</div>
@@ -275,44 +277,34 @@ export function WeatherGlyph({ condition, size = 48 }: { condition: string; size
 export function Sparkline({
   values,
   color,
-  stroke = 2,
 }: {
   values: number[];
   color: string;
-  stroke?: number;
 }) {
   const w = 160;
   const h = 36;
-  const uid = useId().replace(/:/g, "");
+  const pad = 1.5;
   const pts = values.length < 2 ? [0, 0] : values;
   const last = pts.length - 1;
   const d = pts
     .map((v, i) => {
       const x = last <= 0 ? 0 : (i / last) * w;
-      const y = h - (Math.min(100, Math.max(0, v)) / 100) * (h - 2) - 1;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      const y = h - pad - (Math.min(100, Math.max(0, v)) / 100) * (h - pad * 2);
+      return `${i === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .join(" ");
-  const area = `${d} L${w},${h} L0,${h} Z`;
 
   return (
     <svg className="tm-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden>
-      <defs>
-        <linearGradient id={`spark-fill-${uid}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.45" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill={`url(#spark-fill-${uid})`} />
       <path
         d={d}
         fill="none"
         stroke={color}
-        strokeWidth={stroke}
-        strokeLinejoin="round"
-        strokeLinecap="round"
+        strokeWidth="1.5"
+        strokeLinejoin="miter"
+        strokeLinecap="butt"
+        strokeMiterlimit="8"
         vectorEffect="nonScalingStroke"
-        style={{ filter: `drop-shadow(0 0 4px ${color})` }}
       />
     </svg>
   );

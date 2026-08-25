@@ -16,7 +16,6 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function StatusBar() {
   const [now, setNow] = useState(() => new Date());
-  const server = useRoomStore((s) => s.server);
   const dnd = useRoomStore((s) => s.doNotDisturb);
   const setServerStatus = useRoomStore((s) => s.setServerStatus);
   const setServices = useRoomStore((s) => s.setServices);
@@ -126,9 +125,7 @@ export function StatusBar() {
         <div className="status-time">{formatClock(now)}</div>
         <div className="status-date">{formatDateLong(now)}</div>
       </div>
-      <div className="status-right">
-        <span className={`status-dot ${server.online ? "" : "offline"}`} />
-      </div>
+      <div className="status-right" aria-hidden />
     </header>
   );
 }

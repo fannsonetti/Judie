@@ -85,10 +85,6 @@ async function main() {
   console.log("edit mode:", (await page.locator(".edit-bar").count()) > 0);
 
   if ((await page.locator(".edit-bar").count()) > 0) {
-    await climate.locator(".widget-resize").click();
-    await page.waitForTimeout(250);
-    console.log("climate size:", await climate.locator(".widget-resize").textContent());
-
     // Drag reorder: weather -> lights
     const weather = shells.filter({ hasText: "Hafnarfjörður" }).first();
     const wbox = await weather.boundingBox();

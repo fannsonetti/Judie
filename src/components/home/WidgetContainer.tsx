@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   ExpandableWidgetType,
   GRID_COLS,
@@ -11,6 +11,16 @@ import { useLayoutStore } from "../../store/layoutStore";
 import { WidgetFace } from "../widgets/WidgetFace";
 
 const EXPANDABLE = new Set<string>(["weather", "lights", "media", "purifier", "calendar"]);
+const PULL = 0.46;
+const SETTLE_MS = 280;
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
+
+function easeOutCubic(t: number) {
+  return 1 - (1 - t) ** 3;
+}
 
 interface Props {
   widget: PlacedWidget;
@@ -35,17 +45,19 @@ export function WidgetContainer({
   const pendingRemoveId = useLayoutStore((s) => s.pendingRemoveId);
   const expandWidget = useLayoutStore((s) => s.expandWidget);
   const requestRemoveWidget = useLayoutStore((s) => s.requestRemoveWidget);
-  const resizeWidget = useLayoutStore((s) => s.resizeWidget);
   const setDragging = useLayoutStore((s) => s.setDragging);
   const placeWidget = useLayoutStore((s) => s.placeWidget);
 
   const pressStart = useRef<{ x: number; y: number } | null>(null);
-  const grabOffset = useRef({ x: 0, y: 0 });
+  const originCenter = useRef({ x: 0, y: 0 });
   const movedEnough = useRef(false);
   const draggingRef = useRef(false);
+  const settlingRef = useRef(false);
+  const centeredRef = useRef(false);
   const snapRef = useRef<{ col: number; row: number } | null>(null);
+  const visualRef = useRef({ x: 0, y: 0 });
+  const settleRaf = useRef(0);
   const [dragDelta, setDragDelta] = useState({ x: 0, y: 0 });
-  const [snapPreview, setSnapPreview] = useState<{ col: number; row: number } | null>(null);
 
   const dims = SIZE_DIMS[widget.size];
   const width = dims.cols * cellW;
@@ -58,23 +70,39 @@ export function WidgetContainer({
   const isPendingRemove = pendingRemoveId === widget.id;
   if (isDragging) draggingRef.current = true;
 
+  useEffect(() => {
+    return () => {
+      if (settleRaf.current) cancelAnimationFrame(settleRaf.current);
+    };
+  }, []);
+
   const snapFromPoint = (clientX: number, clientY: number) => {
     const grid = document.querySelector(".widget-grid") as HTMLElement | null;
     if (!grid) return null;
     const rect = grid.getBoundingClientRect();
-    const originX = clientX - grabOffset.current.x - rect.left - offsetX;
-    const originY = clientY - grabOffset.current.y - rect.top - offsetY;
+    const originX = clientX - width / 2 - rect.left - offsetX;
+    const originY = clientY - height / 2 - rect.top - offsetY;
     const col = Math.max(0, Math.min(GRID_COLS - dims.cols, Math.round(originX / cellW)));
     const row = Math.max(0, Math.min(GRID_ROWS - dims.rows, Math.round(originY / cellH)));
     return { col, row };
   };
 
+  const snapDeltaFor = (snap: { col: number; row: number } | null) => {
+    if (!snap) return { x: 0, y: 0 };
+    return {
+      x: (snap.col - widget.col) * cellW,
+      y: (snap.row - widget.row) * cellH,
+    };
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
-    if (expandedId) return;
+    if (expandedId || settlingRef.current) return;
     const target = e.target as HTMLElement;
+    if (target.closest(".widget-remove")) return;
     if (
+      !editMode &&
       target.closest(
-        "button, input, textarea, select, .toggle, .slider, .wx-slider, .icon-btn, .widget-remove, .widget-resize"
+        "button, input, textarea, select, .toggle, .slider, .wx-slider, .icon-btn"
       )
     ) {
       return;
@@ -83,14 +111,17 @@ export function WidgetContainer({
     pressStart.current = { x: e.clientX, y: e.clientY };
     movedEnough.current = false;
     draggingRef.current = false;
+    centeredRef.current = false;
     snapRef.current = null;
-    setSnapPreview(null);
     setDragDelta({ x: 0, y: 0 });
 
     const slot = e.currentTarget.parentElement as HTMLElement | null;
     if (slot) {
       const rect = slot.getBoundingClientRect();
-      grabOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      originCenter.current = {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      };
     }
 
     if (editMode || draggingId === widget.id) {
@@ -101,7 +132,7 @@ export function WidgetContainer({
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!pressStart.current) return;
+    if (!pressStart.current || settlingRef.current) return;
     const dx = e.clientX - pressStart.current.x;
     const dy = e.clientY - pressStart.current.y;
 
@@ -112,30 +143,76 @@ export function WidgetContainer({
       return;
     }
 
-    setDragDelta({ x: dx, y: dy });
-    const snap = snapFromPoint(e.clientX, e.clientY);
-    if (snap) {
-      const ok = canPlaceWidget(useLayoutStore.getState().widgets, widget.id, snap.col, snap.row);
-      snapRef.current = ok ? snap : null;
-      setSnapPreview(ok ? snap : null);
+    if (!centeredRef.current) {
+      if (Math.hypot(dx, dy) < 8) {
+        visualRef.current = { x: dx, y: dy };
+        setDragDelta({ x: dx, y: dy });
+        return;
+      }
+      centeredRef.current = true;
     }
+
+    const finger = {
+      x: e.clientX - originCenter.current.x,
+      y: e.clientY - originCenter.current.y,
+    };
+    const snap = snapFromPoint(e.clientX, e.clientY);
+    const ok =
+      snap && canPlaceWidget(useLayoutStore.getState().widgets, widget.id, snap.col, snap.row);
+    snapRef.current = ok ? snap : null;
+    const magnet = snapDeltaFor(ok ? snap : null);
+    const visual = ok
+      ? { x: lerp(finger.x, magnet.x, PULL), y: lerp(finger.y, magnet.y, PULL) }
+      : finger;
+    visualRef.current = visual;
+    setDragDelta(visual);
+  };
+
+  const finishDrag = (toSnap: { col: number; row: number } | null) => {
+    const from = visualRef.current;
+    const magnet = snapDeltaFor(toSnap);
+    if (toSnap && (toSnap.col !== widget.col || toSnap.row !== widget.row)) {
+      placeWidget(widget.id, toSnap.col, toSnap.row);
+    }
+    const leftover = { x: from.x - magnet.x, y: from.y - magnet.y };
+    settlingRef.current = true;
+    draggingRef.current = false;
+    setDragging(null);
+    visualRef.current = leftover;
+    setDragDelta(leftover);
+    snapRef.current = null;
+    pressStart.current = null;
+    if (Math.hypot(leftover.x, leftover.y) < 0.5) {
+      setDragDelta({ x: 0, y: 0 });
+      visualRef.current = { x: 0, y: 0 };
+      settlingRef.current = false;
+      return;
+    }
+    const started = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - started) / SETTLE_MS);
+      const k = easeOutCubic(t);
+      const next = { x: lerp(leftover.x, 0, k), y: lerp(leftover.y, 0, k) };
+      visualRef.current = next;
+      setDragDelta(next);
+      if (t < 1) {
+        settleRaf.current = requestAnimationFrame(tick);
+        return;
+      }
+      setDragDelta({ x: 0, y: 0 });
+      visualRef.current = { x: 0, y: 0 };
+      settlingRef.current = false;
+    };
+    settleRaf.current = requestAnimationFrame(tick);
   };
 
   const onPointerUp = () => {
-    const snap = snapRef.current;
-    if (
-      draggingRef.current &&
-      snap &&
-      (snap.col !== widget.col || snap.row !== widget.row)
-    ) {
-      placeWidget(widget.id, snap.col, snap.row);
+    if (settlingRef.current) return;
+    if (!draggingRef.current && useLayoutStore.getState().draggingId !== widget.id) {
+      pressStart.current = null;
+      return;
     }
-    draggingRef.current = false;
-    setDragging(null);
-    setDragDelta({ x: 0, y: 0 });
-    setSnapPreview(null);
-    snapRef.current = null;
-    pressStart.current = null;
+    finishDrag(snapRef.current);
   };
 
   const onClick = (e: React.MouseEvent) => {
@@ -160,8 +237,11 @@ export function WidgetContainer({
     padding: gap / 2,
     opacity: isHidden ? 0 : 1,
     pointerEvents: isHidden ? "none" : "auto",
-    zIndex: isDragging ? 40 : isPendingRemove ? 35 : 1,
-    transform: isDragging ? `translate3d(${dragDelta.x}px, ${dragDelta.y}px, 0)` : undefined,
+    zIndex: isDragging || settlingRef.current ? 40 : isPendingRemove ? 35 : 1,
+    transform:
+      isDragging || dragDelta.x !== 0 || dragDelta.y !== 0
+        ? `translate3d(${dragDelta.x}px, ${dragDelta.y}px, 0)`
+        : undefined,
   };
 
   const shellClass = [
@@ -173,10 +253,18 @@ export function WidgetContainer({
     .filter(Boolean)
     .join(" ");
 
-  const face = (
-    <>
-      {editMode && (
-        <>
+  return (
+    <div className="widget-slot" data-widget-id={widget.id} style={slotStyle}>
+      <div
+        className={shellClass}
+        style={editMode ? { animationDelay: `${(widget.order % 5) * 40}ms` } : undefined}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClick={onClick}
+      >
+        {editMode && (
           <button
             type="button"
             className="widget-remove"
@@ -196,70 +284,20 @@ export function WidgetContainer({
               />
             </svg>
           </button>
-          <button
-            type="button"
-            className="widget-resize"
-            aria-label="Resize widget"
-            onClick={(e) => {
-              e.stopPropagation();
-              resizeWidget(widget.id);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path
-                d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </>
-      )}
-      <div
-        className="widget-face"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: "flex",
-          flexDirection: "column",
-          animationDelay: editMode ? `${(widget.order % 5) * 40}ms` : undefined,
-        }}
-      >
-        <WidgetFace type={widget.type} size={widget.size} customId={widget.customId} />
-      </div>
-    </>
-  );
-
-  return (
-    <>
-      {isDragging && snapPreview && (snapPreview.col !== widget.col || snapPreview.row !== widget.row) && (
+        )}
         <div
-          className="widget-drop-ghost"
+          className="widget-face"
           style={{
-            left: offsetX + snapPreview.col * cellW + gap / 2,
-            top: offsetY + snapPreview.row * cellH + gap / 2,
-            width: width - gap,
-            height: height - gap,
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            animationDelay: editMode ? `${(widget.order % 5) * 40}ms` : undefined,
           }}
-          aria-hidden
-        />
-      )}
-      <div className="widget-slot" data-widget-id={widget.id} style={slotStyle}>
-        <div
-          className={shellClass}
-          style={editMode ? { animationDelay: `${(widget.order % 5) * 40}ms` } : undefined}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onClick={onClick}
         >
-          {face}
+          <WidgetFace type={widget.type} size={widget.size} customId={widget.customId} />
         </div>
       </div>
-    </>
+    </div>
   );
 }

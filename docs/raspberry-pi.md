@@ -28,8 +28,8 @@ Reboot after that. Close Chromium and other heavy apps.
 ## Install from GitHub (recommended)
 
 ```bash
-curl -LO https://github.com/fannsonetti/Judie/releases/latest/download/Judie_0.1.0_armhf.deb
-sudo apt install -y ./Judie_0.1.0_armhf.deb
+curl -LO https://github.com/fannsonetti/Judie/releases/latest/download/Judie_0.1.1_armhf.deb
+sudo apt install -y ./Judie_0.1.1_armhf.deb
 ```
 
 The `.deb` registers **one** autostart entry. After auto-login, Judie should open a single window.

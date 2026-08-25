@@ -184,6 +184,7 @@ export function SlopCanvas({
     last: SlopNode[];
     dirty: boolean;
     size: WidgetSize;
+    lastPoint: { x: number; y: number };
   } | null>(null);
 
   const storeNodes = nodesFor(def, size);
@@ -227,18 +228,20 @@ export function SlopCanvas({
     setDraft(null);
   }, [def.id, size]);
 
-  const snapNode = (node: SlopNode) => ({ ...node, ...snapBoxToGrid(node, canon) });
+  const snapNode = (node: SlopNode, snap: boolean) =>
+    snap ? { ...node, ...snapBoxToGrid(node, canon) } : node;
 
-  const onPointerMove = (e: PointerEvent) => {
+  const applyDrag = (clientX: number, clientY: number, snap: boolean) => {
     const face = faceRef.current;
     const d = drag.current;
     if (!face || !d) return;
-    const p = pctPoint(face, e.clientX, e.clientY);
+    d.lastPoint = { x: clientX, y: clientY };
+    const p = pctPoint(face, clientX, clientY);
     const dx = p.x - d.start.x;
     const dy = p.y - d.start.y;
     let next = d.origin;
     if (d.kind === "move") {
-      next = snapNode(moveNode(d.origin, dx, dy));
+      next = snapNode(moveNode(d.origin, dx, dy), snap);
     } else {
       const o = d.origin;
       let x = o.x;
@@ -262,13 +265,24 @@ export function SlopCanvas({
         w = o.w - dx;
         h = o.h - dy;
       }
-      next = snapNode(resizeNode(o, { x, y, w: Math.max(2, w), h: Math.max(1, h) }));
+      next = snapNode(resizeNode(o, { x, y, w: Math.max(2, w), h: Math.max(1, h) }), snap);
     }
-    setGuides(guidesFor(d.nodes, next));
+    setGuides(snap ? guidesFor(d.nodes, next) : []);
     const last = d.nodes.map((n) => (n.id === d.id ? next : n));
     d.last = last;
     d.dirty = true;
     setDraft(last);
+  };
+
+  const onPointerMove = (e: PointerEvent) => {
+    applyDrag(e.clientX, e.clientY, !e.shiftKey);
+  };
+
+  const onShiftToggle = (e: KeyboardEvent) => {
+    if (e.key !== "Shift") return;
+    const d = drag.current;
+    if (!d) return;
+    applyDrag(d.lastPoint.x, d.lastPoint.y, !e.shiftKey);
   };
 
   const endDrag = () => {
@@ -277,6 +291,8 @@ export function SlopCanvas({
     setGuides([]);
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", endDrag);
+    window.removeEventListener("keydown", onShiftToggle);
+    window.removeEventListener("keyup", onShiftToggle);
     if (!d?.dirty) {
       setDraft(null);
       return;
@@ -305,10 +321,13 @@ export function SlopCanvas({
       last: startNodes,
       dirty: false,
       size,
+      lastPoint: { x: e.clientX, y: e.clientY },
     };
     setDraft(startNodes);
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", endDrag);
+    window.addEventListener("keydown", onShiftToggle);
+    window.addEventListener("keyup", onShiftToggle);
   };
 
   const openMenu = (e: React.MouseEvent, nodeId: string | null) => {

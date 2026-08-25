@@ -212,11 +212,7 @@ export function SlopNodeView({
   if (node.kind === "chart") {
     return (
       <div className="slop-chart" style={common} {...hookProps}>
-        <Sparkline
-          values={chartSeries(node.text)}
-          color={node.accent ?? "#3dd68c"}
-          stroke={Math.max(1.2, 2 * scale)}
-        />
+        <Sparkline values={chartSeries(node.text)} color={node.accent ?? "#3dd68c"} />
       </div>
     );
   }

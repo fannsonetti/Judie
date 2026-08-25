@@ -29,7 +29,7 @@ export function QuickControlsWidget({ size = "1x2" }: Props) {
   const small = size === "1x1";
 
   return (
-    <div className="wx quick fill" onPointerDown={(e) => e.stopPropagation()}>
+    <div className="wx quick fill">
       <div className={`quick-grid grow ${small ? "tiny" : ""}`}>
         {ACTIONS.map((a) => {
           const active = a.id === "dnd" && doNotDisturb;

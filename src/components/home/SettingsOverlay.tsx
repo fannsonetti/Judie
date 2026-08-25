@@ -8,6 +8,7 @@ import { getConversationLogPath } from "../../lib/conversationLog";
 import { enterFullscreen, leaveFullscreen, minimizeJudie, quitJudie } from "../../lib/windowControls";
 import { overlayTransition } from "../../lib/performance";
 import {
+  generateUninstallChallenge,
   listInstallations,
   releaseLabel,
   switchInstallation,
@@ -40,6 +41,8 @@ export function SettingsOverlay() {
   const [releaseError, setReleaseError] = useState<string | null>(null);
   const [selectedTag, setSelectedTag] = useState("");
   const [confirmUninstall, setConfirmUninstall] = useState(false);
+  const [uninstallCode, setUninstallCode] = useState("");
+  const [uninstallTyped, setUninstallTyped] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,6 +50,8 @@ export function SettingsOverlay() {
     setTab("room");
     setBusy(null);
     setConfirmUninstall(false);
+    setUninstallCode("");
+    setUninstallTyped("");
     setActionError(null);
     void getConversationLogPath().then(setLogPath);
   }, [open]);
@@ -121,11 +126,20 @@ export function SettingsOverlay() {
     }
   };
 
+  const closeUninstall = () => {
+    setConfirmUninstall(false);
+    setUninstallCode("");
+    setUninstallTyped("");
+  };
+
+  const openUninstall = () => {
+    setConfirmUninstall(true);
+    setUninstallCode(generateUninstallChallenge());
+    setUninstallTyped("");
+  };
+
   const onUninstall = async () => {
-    if (!confirmUninstall) {
-      setConfirmUninstall(true);
-      return;
-    }
+    if (uninstallTyped !== uninstallCode) return;
     setBusy("uninstall");
     setActionError(null);
     try {
@@ -133,7 +147,7 @@ export function SettingsOverlay() {
     } catch (err) {
       setActionError(typeof err === "string" ? err : err instanceof Error ? err.message : "Could not uninstall");
       setBusy(null);
-      setConfirmUninstall(false);
+      closeUninstall();
     }
   };
 
@@ -498,7 +512,7 @@ export function SettingsOverlay() {
                     <button
                       type="button"
                       className="settings-power-card danger"
-                      onClick={() => void onUninstall()}
+                      onClick={openUninstall}
                       disabled={busy !== null}
                     >
                       <span className="settings-power-ico" aria-hidden>
@@ -506,18 +520,8 @@ export function SettingsOverlay() {
                           <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                         </svg>
                       </span>
-                      <strong>
-                        {busy === "uninstall"
-                          ? "Removing…"
-                          : confirmUninstall
-                            ? "Tap again to uninstall"
-                            : "Uninstall"}
-                      </strong>
-                      <span>
-                        {confirmUninstall
-                          ? "Removes Judie from this computer"
-                          : "Remove Judie from this computer"}
-                      </span>
+                      <strong>{busy === "uninstall" ? "Removing…" : "Uninstall"}</strong>
+                      <span>Remove Judie from this computer</span>
                     </button>
                   </div>
                   {actionError && <p className="settings-note">{actionError}</p>}
@@ -538,6 +542,60 @@ export function SettingsOverlay() {
               </button>
             </footer>
           </motion.div>
+          {confirmUninstall && (
+            <div
+              className="confirm-backdrop"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (busy === "uninstall") return;
+                closeUninstall();
+              }}
+            >
+              <div
+                className="confirm-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="confirm-uninstall-title"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 id="confirm-uninstall-title">Uninstall Judie?</h2>
+                <p>
+                  This removes Judie from this computer. Type the code below to confirm.
+                </p>
+                <div className="challenge-code" aria-live="polite">
+                  {uninstallCode}
+                </div>
+                <input
+                  className="settings-field-input challenge-input"
+                  value={uninstallTyped}
+                  onChange={(e) => setUninstallTyped(e.target.value)}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Type the code exactly"
+                  disabled={busy === "uninstall"}
+                />
+                <div className="confirm-actions">
+                  <button
+                    type="button"
+                    className="settings-btn"
+                    onClick={closeUninstall}
+                    disabled={busy === "uninstall"}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-btn danger"
+                    onClick={() => void onUninstall()}
+                    disabled={busy === "uninstall" || uninstallTyped !== uninstallCode}
+                  >
+                    {busy === "uninstall" ? "Removing…" : "Uninstall"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
     </AnimatePresence>

@@ -67,7 +67,7 @@ export function HomeScreen() {
   const ignoreHoldTarget = (target: HTMLElement) =>
     Boolean(
       target.closest(
-        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .widget-resize, .expanded-overlay, .confirm-backdrop"
+        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .expanded-overlay, .confirm-backdrop"
       )
     );
 

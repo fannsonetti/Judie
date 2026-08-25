@@ -14,8 +14,6 @@ export function SystemWidget({ size }: Props) {
   const { stats, available } = useHostStats(demo);
   const wide = size === "1x2";
   const large = size === "2x2";
-  /** 2x2 sparks render taller; keep the stroke optically similar to 1x1/1x2. */
-  const stroke = large ? 1.25 : 2;
 
   if (!available && stats.cpuHistory.length === 0) {
     return (
@@ -35,7 +33,6 @@ export function SystemWidget({ size }: Props) {
       value={cpu}
       values={stats.cpuHistory}
       color={CPU}
-      stroke={stroke}
     />
   );
   const memBlock = (
@@ -44,7 +41,6 @@ export function SystemWidget({ size }: Props) {
       value={mem}
       values={stats.memoryHistory}
       color={MEM}
-      stroke={stroke}
       detail={wide || large ? memDetail : undefined}
     />
   );
@@ -104,14 +100,12 @@ function MetricBlock({
   value,
   values,
   color,
-  stroke,
   detail,
 }: {
   label: string;
   value: number;
   values: number[];
   color: string;
-  stroke: number;
   detail?: string;
 }) {
   return (
@@ -119,7 +113,7 @@ function MetricBlock({
       <div className="tm-label">{label}</div>
       <div className="tm-value">{value}%</div>
       {detail && <div className="tm-detail">{detail}</div>}
-      <Sparkline values={values} color={color} stroke={stroke} />
+      <Sparkline values={values} color={color} />
     </div>
   );
 }

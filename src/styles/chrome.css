@@ -471,6 +471,27 @@ select.settings-input {
   gap: 10px;
 }
 
+.challenge-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 12px 10px;
+  margin: 0 0 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  user-select: all;
+}
+
+.challenge-input {
+  width: 100%;
+  margin: 0 0 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+}
+
 @media (max-width: 640px) {
   .settings-field-row {
     grid-template-columns: 1fr;
