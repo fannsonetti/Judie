@@ -5,8 +5,16 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { useRoomStore } from "../../store/roomStore";
 import { useLayoutStore } from "../../store/layoutStore";
 import { getConversationLogPath } from "../../lib/conversationLog";
-import { enterFullscreen, minimizeJudie, quitJudie } from "../../lib/windowControls";
+import { enterFullscreen, leaveFullscreen, minimizeJudie, quitJudie } from "../../lib/windowControls";
 import { overlayTransition } from "../../lib/performance";
+import {
+  listInstallations,
+  releaseLabel,
+  switchInstallation,
+  uninstallJudie,
+  type ReleaseInfo,
+} from "../../lib/install";
+import { JUDIE_VERSION } from "../../lib/version";
 
 type Tab = "room" | "voice" | "notices" | "routines" | "app";
 
@@ -27,14 +35,44 @@ export function SettingsOverlay() {
   const removeRoutine = useRoomStore((s) => s.removeRoutine);
   const [tab, setTab] = useState<Tab>("room");
   const [logPath, setLogPath] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"min" | "quit" | null>(null);
+  const [busy, setBusy] = useState<"min" | "quit" | "install" | "uninstall" | null>(null);
+  const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
+  const [releaseError, setReleaseError] = useState<string | null>(null);
+  const [selectedTag, setSelectedTag] = useState("");
+  const [confirmUninstall, setConfirmUninstall] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setTab("room");
     setBusy(null);
+    setConfirmUninstall(false);
+    setActionError(null);
     void getConversationLogPath().then(setLogPath);
   }, [open]);
+
+  useEffect(() => {
+    if (!open || tab !== "app") return;
+    let cancelled = false;
+    void listInstallations()
+      .then((list) => {
+        if (cancelled) return;
+        setReleases(list);
+        setReleaseError(null);
+        setSelectedTag((prev) => {
+          if (prev && list.some((r) => r.tag === prev)) return prev;
+          return list.find((r) => r.current)?.tag ?? list[0]?.tag ?? "";
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setReleases([]);
+        setReleaseError("Open the desktop app to see GitHub installations.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tab]);
 
   const close = () => setOpen(false);
 
@@ -54,12 +92,48 @@ export function SettingsOverlay() {
     setBusy(null);
   };
 
+  const onLeaveFullscreen = async () => {
+    try {
+      await leaveFullscreen();
+    } catch {
+      /* ignore */
+    }
+  };
+
   const onQuit = async () => {
     setBusy("quit");
     try {
       await quitJudie();
     } catch {
       setBusy(null);
+    }
+  };
+
+  const onSwitchInstall = async () => {
+    if (!selectedTag) return;
+    setBusy("install");
+    setActionError(null);
+    try {
+      await switchInstallation(selectedTag);
+    } catch (err) {
+      setActionError(typeof err === "string" ? err : err instanceof Error ? err.message : "Could not switch installation");
+      setBusy(null);
+    }
+  };
+
+  const onUninstall = async () => {
+    if (!confirmUninstall) {
+      setConfirmUninstall(true);
+      return;
+    }
+    setBusy("uninstall");
+    setActionError(null);
+    try {
+      await uninstallJudie();
+    } catch (err) {
+      setActionError(typeof err === "string" ? err : err instanceof Error ? err.message : "Could not uninstall");
+      setBusy(null);
+      setConfirmUninstall(false);
     }
   };
 
@@ -309,6 +383,47 @@ export function SettingsOverlay() {
 
               {tab === "app" && (
                 <>
+                  <p className="settings-kicker">Installation</p>
+                  <div className="settings-group">
+                    <div className="settings-field">
+                      <span className="settings-label">This copy</span>
+                      <div className="settings-switch-title">Judie {JUDIE_VERSION}</div>
+                    </div>
+                    <label className="settings-field">
+                      <span className="settings-label">Change installation</span>
+                      <select
+                        className="settings-input"
+                        value={selectedTag}
+                        disabled={busy !== null || !releases || releases.length === 0}
+                        onChange={(e) => setSelectedTag(e.target.value)}
+                      >
+                        {(releases ?? []).map((r) => (
+                          <option key={r.tag} value={r.tag} disabled={!r.installable}>
+                            {releaseLabel(r)}
+                            {r.installable ? "" : " (no package for this computer)"}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className="settings-btn"
+                      disabled={
+                        busy !== null
+                        || !selectedTag
+                        || !!releases?.find((r) => r.tag === selectedTag && r.current)
+                      }
+                      onClick={() => void onSwitchInstall()}
+                    >
+                      {busy === "install" ? "Installing…" : "Switch to this version"}
+                    </button>
+                    {releaseError && <p className="settings-note">{releaseError}</p>}
+                    <p className="settings-note">
+                      Picks a GitHub release for this computer and installs it. The app will close
+                      and reopen.
+                    </p>
+                  </div>
+
                   <p className="settings-kicker">Window</p>
                   <div className="settings-group">
                     <div className="settings-switch-row">
@@ -354,6 +469,20 @@ export function SettingsOverlay() {
                     </button>
                     <button
                       type="button"
+                      className="settings-power-card"
+                      onClick={() => void onLeaveFullscreen()}
+                      disabled={busy !== null}
+                    >
+                      <span className="settings-power-ico" aria-hidden>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+                        </svg>
+                      </span>
+                      <strong>Unfullscreen</strong>
+                      <span>Windowed, with the desktop around it</span>
+                    </button>
+                    <button
+                      type="button"
                       className="settings-power-card danger"
                       onClick={onQuit}
                       disabled={busy !== null}
@@ -366,10 +495,35 @@ export function SettingsOverlay() {
                       <strong>{busy === "quit" ? "Closing…" : "Close Judie"}</strong>
                       <span>Quit the app until you open it again</span>
                     </button>
+                    <button
+                      type="button"
+                      className="settings-power-card danger"
+                      onClick={() => void onUninstall()}
+                      disabled={busy !== null}
+                    >
+                      <span className="settings-power-ico" aria-hidden>
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                        </svg>
+                      </span>
+                      <strong>
+                        {busy === "uninstall"
+                          ? "Removing…"
+                          : confirmUninstall
+                            ? "Tap again to uninstall"
+                            : "Uninstall"}
+                      </strong>
+                      <span>
+                        {confirmUninstall
+                          ? "Removes Judie from this computer"
+                          : "Remove Judie from this computer"}
+                      </span>
+                    </button>
                   </div>
+                  {actionError && <p className="settings-note">{actionError}</p>}
                   <p className="settings-note">
-                    Because Judie runs fullscreen, these are the window controls. Minimize comes
-                    back fullscreen when you return. Autostart still opens Judie on the next login.
+                    Autostart opens one Judie window at login. Unfullscreen is remembered the next
+                    time you launch.
                   </p>
                 </>
               )}

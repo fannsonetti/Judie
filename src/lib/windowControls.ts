@@ -1,4 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { setKiosk } from "./install";
 
 let restoreFullscreen = false;
 
@@ -33,7 +34,35 @@ export async function quitJudie() {
 }
 
 export async function enterFullscreen() {
-  await (await win()).setFullscreen(true);
+  restoreFullscreen = false;
+  const w = await win();
+  try {
+    await w.setDecorations(false);
+  } catch {
+    /* ignore */
+  }
+  await w.setFullscreen(true);
+  try {
+    await setKiosk(true);
+  } catch {
+    /* vite */
+  }
+}
+
+export async function leaveFullscreen() {
+  restoreFullscreen = false;
+  const w = await win();
+  await w.setFullscreen(false);
+  try {
+    await w.setDecorations(true);
+  } catch {
+    /* ignore */
+  }
+  try {
+    await setKiosk(false);
+  } catch {
+    /* vite */
+  }
 }
 
 export function watchKioskFocus() {

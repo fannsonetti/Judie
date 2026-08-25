@@ -17,10 +17,10 @@ export function TimersWidget({ size }: Props) {
   const timers = demo ? DEMO_TIMERS : live;
 
   useEffect(() => {
-    if (demo) return;
+    if (demo || live.length === 0) return;
     const id = window.setInterval(() => setTick((n) => n + 1), 1000);
     return () => window.clearInterval(id);
-  }, [demo]);
+  }, [demo, live.length]);
 
   const ordered = demo ? timers : [...timers].sort((a, b) => a.fireAt - b.fireAt);
   const remaining = (t: (typeof ordered)[number]) =>

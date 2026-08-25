@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build Judie for Raspberry Pi (run this ON the Pi, or on Linux aarch64).
-# Pi 3: use 64-bit Raspberry Pi OS (Bookworm) — 32-bit is not supported by Tauri/WebKitGTK well.
+# Build Judie for Raspberry Pi (run this ON the Pi).
+# Pi 3 (1 GB): 32-bit Raspberry Pi OS (armhf / armv7). 64-bit OS still builds if that's what's installed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -8,14 +8,15 @@ cd "$ROOT"
 
 ARCH="$(uname -m)"
 case "$ARCH" in
-  aarch64|arm64) ;;
-  armv7l|armhf)
-    echo "Pi 3 32-bit OS is not supported for Tauri builds."
-    echo "Flash 64-bit Raspberry Pi OS (Bookworm) and re-run."
-    exit 1
+  armv7l|armhf|armv6l)
+    echo "==> Native 32-bit ARM (${ARCH})"
+    ;;
+  aarch64|arm64)
+    echo "==> Native 64-bit ARM (${ARCH})"
+    echo "    Pi 3 with 1 GB RAM: 32-bit Raspberry Pi OS uses less memory. Rebuild there for armhf."
     ;;
   *)
-    echo "Unexpected arch: $ARCH (need aarch64 for Pi 3 / Pi 4 / Pi 5)."
+    echo "Unexpected arch: $ARCH (need armv7l / armhf, or aarch64)."
     exit 1
     ;;
 esac
@@ -71,6 +72,10 @@ npx tauri build "${BUILD_ARGS[@]}"
 
 DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' 2>/dev/null | head -n1 || true)"
 APPIMAGE="$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' 2>/dev/null | head -n1 || true)"
+# Cross / --target builds land under target/<triple>/release/bundle
+if [[ -z "$DEB" ]]; then
+  DEB="$(find src-tauri/target -path '*/release/bundle/deb/*.deb' 2>/dev/null | head -n1 || true)"
+fi
 
 echo
 echo "Build complete."

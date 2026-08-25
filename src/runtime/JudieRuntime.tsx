@@ -13,7 +13,7 @@ export function JudieRuntime() {
   const notified = useRef(new Set<string>());
 
   useEffect(() => {
-    const tick = () => {
+    const tickTimersAndMedia = () => {
       const room = useRoomStore.getState();
       if (room.media.playing) tickProgress();
 
@@ -38,29 +38,52 @@ export function JudieRuntime() {
           void useAssistantStore.getState().execute(t.fireText, "timer", true);
         }
       }
+    };
 
+    const tickCalendar = () => {
+      const latest = useRoomStore.getState();
       const settings = useSettingsStore.getState();
-      if (settings.proactive.calendar && !latest.doNotDisturb) {
-        const now = new Date();
-        for (const ev of latest.events) {
-          if (ev.dayOffset) continue;
-          const [h, m] = ev.time.split(":").map(Number);
-          if (!Number.isFinite(h) || !Number.isFinite(m)) continue;
-          const mins = h * 60 + m - (now.getHours() * 60 + now.getMinutes());
-          const key = `cal-${ev.id}-${ev.time}`;
-          if (mins <= 10 && mins >= 0 && !notified.current.has(key)) {
-            notified.current.add(key);
-            useAssistantStore.getState().pushToast({
-              kind: "info",
-              title: ev.title,
-              body: `${ev.time}${ev.detail ? ` · ${ev.detail}` : ""}`,
-            });
-          }
+      if (!settings.proactive.calendar || latest.doNotDisturb) return;
+      const now = new Date();
+      for (const ev of latest.events) {
+        if (ev.dayOffset) continue;
+        const [h, m] = ev.time.split(":").map(Number);
+        if (!Number.isFinite(h) || !Number.isFinite(m)) continue;
+        const mins = h * 60 + m - (now.getHours() * 60 + now.getMinutes());
+        const key = `cal-${ev.id}-${ev.time}`;
+        if (mins <= 10 && mins >= 0 && !notified.current.has(key)) {
+          notified.current.add(key);
+          useAssistantStore.getState().pushToast({
+            kind: "info",
+            title: ev.title,
+            body: `${ev.time}${ev.detail ? ` · ${ev.detail}` : ""}`,
+          });
         }
       }
     };
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
+
+    let fast: number | null = null;
+    const syncFast = () => {
+      const room = useRoomStore.getState();
+      const need = room.media.playing || room.timers.length > 0;
+      if (need && fast == null) {
+        tickTimersAndMedia();
+        fast = window.setInterval(tickTimersAndMedia, 1000);
+      } else if (!need && fast != null) {
+        window.clearInterval(fast);
+        fast = null;
+      }
+    };
+
+    syncFast();
+    const unsub = useRoomStore.subscribe(syncFast);
+    tickCalendar();
+    const slow = window.setInterval(tickCalendar, 15_000);
+    return () => {
+      unsub();
+      if (fast != null) window.clearInterval(fast);
+      window.clearInterval(slow);
+    };
   }, [tickProgress]);
 
   useEffect(() => {

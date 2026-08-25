@@ -13,7 +13,10 @@ import { clampPct, snapPct, snapBoxToGrid, EDITOR_GRID_PX, CANONICAL, moveNode, 
 import { makeFromTemplate } from "../slopbox/templates";
 import { exportHookCode, parseWidgetFile, serializeWidget } from "../slopbox/export";
 import { sanitizeSvg } from "../slopbox/svg";
+import { overlayTransition } from "../lib/performance";
+import { isLinuxWebview } from "../lib/platform";
 import { monthCells } from "../components/widgets/chrome";
+import { releaseLabel, type ReleaseInfo } from "../lib/install";
 
 function snap(): RoomSnapshot {
   return {
@@ -596,6 +599,24 @@ test("calendar month fills adjacent-month days", () => {
   assert(cells.slice(0, 6).every((c) => c.outside), "Sunday-Friday before Saturday the 1st");
   assert(cells[6].day === 1 && !cells[6].outside, "the 1st sits on Saturday");
   assert(cells[cells.length - 1].outside, "trailing next-month days fill the last week");
+});
+
+test("linux motion helpers are inert in node", () => {
+  assert(!isLinuxWebview(), "node is not a linux webview");
+  assert(overlayTransition().duration === 0.18, "desktop overlay duration");
+});
+
+test("release labels mark the running copy", () => {
+  const rel: ReleaseInfo = {
+    tag: "v0.1.0",
+    name: "Judie 0.1.0",
+    publishedAt: "",
+    current: true,
+    installable: true,
+    assetName: "Judie_0.1.0_armhf.deb",
+    assetUrl: "",
+  };
+  assert(releaseLabel(rel).includes("this version"), releaseLabel(rel));
 });
 
 if (failed) {

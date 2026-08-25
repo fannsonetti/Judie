@@ -19,15 +19,15 @@ fn is_raspberry_pi() -> bool {
 
 /// VideoCore + WebKitGTK DMA-BUF often stalls the compositor: CPU idle, UI crawls.
 /// The `judie` process stays tiny because painting lives in WebKitWebProcess.
+///
+/// Only DMA-BUF is disabled. Turning off compositing / GPU raster forces every
+/// frame onto the CPU and is slower than GL without DMA-BUF.
 pub fn prepare() {
     if !is_raspberry_pi() {
         return;
     }
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-    }
-    if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
-        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     }
 }
 
@@ -38,8 +38,7 @@ pub fn tune<R: Runtime>(win: &WebviewWindow<R>) {
     let _ = win.with_webview(|platform| {
         let webview = platform.inner();
         if let Some(settings) = webview.settings() {
-            // CPU raster is slower per-frame but doesn't freeze waiting on VideoCore.
-            settings.set_hardware_acceleration_policy(HardwareAccelerationPolicy::Never);
+            settings.set_hardware_acceleration_policy(HardwareAccelerationPolicy::OnDemand);
             settings.set_enable_smooth_scrolling(false);
             settings.set_enable_webgl(false);
             settings.set_enable_page_cache(false);

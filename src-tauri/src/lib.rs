@@ -1,4 +1,5 @@
 mod host;
+mod install;
 #[cfg(target_os = "linux")]
 mod linux_webview;
 
@@ -113,6 +114,33 @@ fn get_host_stats() -> host::HostStats {
     host::snapshot()
 }
 
+#[tauri::command]
+fn list_releases() -> Result<Vec<install::ReleaseInfo>, String> {
+    install::list_releases()
+}
+
+#[tauri::command]
+fn install_release(app: AppHandle, tag: String) -> Result<(), String> {
+    install::install_release(app, tag)
+}
+
+#[tauri::command]
+fn uninstall_judie(app: AppHandle) -> Result<(), String> {
+    install::uninstall_judie(app)
+}
+
+#[tauri::command]
+fn get_kiosk(app: AppHandle) -> bool {
+    install::kiosk_enabled(&app)
+}
+
+#[tauri::command]
+fn set_kiosk(app: AppHandle, enabled: bool) -> Result<bool, String> {
+    install::set_kiosk(&app, enabled)?;
+    install::apply_kiosk(&app);
+    Ok(enabled)
+}
+
 fn pad_role(role: &str) -> String {
     match role.to_lowercase().as_str() {
         "you" | "user" => "YOU ".to_string(),
@@ -126,21 +154,34 @@ pub fn run() {
     START.get_or_init(Instant::now);
     #[cfg(target_os = "linux")]
     linux_webview::prepare();
-    host::warm();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::Builder::new().app_name("Judie").build())
         .setup(|app| {
-            use tauri_plugin_autostart::ManagerExt;
-            let _ = app.autolaunch().enable();
+            #[cfg(target_os = "linux")]
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                install::repair_linux_autostart();
+                let _ = app.autolaunch().disable();
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                let _ = app.autolaunch().enable();
+            }
+
+            install::apply_kiosk(app.handle());
 
             #[cfg(target_os = "linux")]
             if let Some(win) = app.get_webview_window("main") {
-                let _ = win.set_decorations(false);
-                let _ = win.set_fullscreen(true);
-                let _ = win.maximize();
                 linux_webview::tune(&win);
             }
 
@@ -154,7 +195,12 @@ pub fn run() {
             get_system_status,
             get_host_stats,
             append_conversation_log,
-            conversation_log_path
+            conversation_log_path,
+            list_releases,
+            install_release,
+            uninstall_judie,
+            get_kiosk,
+            set_kiosk
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

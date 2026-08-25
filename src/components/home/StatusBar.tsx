@@ -24,9 +24,19 @@ export function StatusBar() {
   const pointer = useRef<{ y: number; x: number } | null>(null);
 
   useEffect(() => {
+    let id = 0;
     const tick = () => setNow(new Date());
-    const t = window.setInterval(tick, 1000);
-    return () => window.clearInterval(t);
+    const schedule = () => {
+      const n = new Date();
+      const ms = (60 - n.getSeconds()) * 1000 - n.getMilliseconds();
+      id = window.setTimeout(() => {
+        tick();
+        schedule();
+      }, Math.max(250, ms));
+    };
+    tick();
+    schedule();
+    return () => window.clearTimeout(id);
   }, []);
 
   useEffect(() => {
