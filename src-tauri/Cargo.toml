@@ -11,34 +11,48 @@ name = "tauri_app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
+name = "judie"
+path = "src/main.rs"
+required-features = ["tauri-ui"]
+
+[[bin]]
 name = "judie-pi"
 path = "src/bin/judie-pi.rs"
 required-features = ["pi-native"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2", optional = true, features = [] }
 slint-build = { version = "1.9", optional = true }
 
 [features]
 default = ["tauri-ui"]
-tauri-ui = ["dep:webkit2gtk"]
-pi-native = ["slint", "chrono", "dep:slint-build"]
+tauri-ui = [
+    "dep:tauri",
+    "dep:tauri-build",
+    "dep:tauri-plugin-opener",
+    "dep:tauri-plugin-autostart",
+    "dep:tauri-plugin-process",
+    "dep:tauri-plugin-single-instance",
+    "dep:tauri-plugin-updater",
+    "dep:webkit2gtk",
+]
+pi-native = ["dep:slint", "dep:chrono", "dep:slint-build"]
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
-tauri-plugin-autostart = "2"
-tauri-plugin-process = "2"
-tauri-plugin-single-instance = "2"
+tauri = { version = "2", optional = true, features = [] }
+tauri-plugin-opener = { version = "2", optional = true }
+tauri-plugin-autostart = { version = "2", optional = true }
+tauri-plugin-process = { version = "2", optional = true }
+tauri-plugin-single-instance = { version = "2", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0.33"
 ureq = { version = "2.12", features = ["json"] }
-slint = { version = "1.9", optional = true, default-features = false, features = ["renderer-software", "backend-winit-x11"] }
+slint = { version = "1.9", optional = true, default-features = false, features = ["compat-1-2", "renderer-software", "backend-winit-x11"] }
 chrono = { version = "0.4", optional = true, default-features = false, features = ["clock", "std"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-updater = "2"
+tauri-plugin-updater = { version = "2", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", optional = true }

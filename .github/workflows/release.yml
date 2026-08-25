@@ -68,6 +68,7 @@ jobs:
           CXX_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-g++
           BINDGEN_EXTRA_CLANG_ARGS_armv7_unknown_linux_gnueabihf: --sysroot=/opt/armhf
           CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_RUSTFLAGS: -C link-arg=--sysroot=/opt/armhf
+          CARGO_TARGET: armv7-unknown-linux-gnueabihf
         run: |
           set -euo pipefail
           cd src-tauri

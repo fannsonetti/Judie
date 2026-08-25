@@ -17,7 +17,8 @@ if [[ ! -d "$SYSROOT/usr/lib/arm-linux-gnueabihf" ]]; then
 fi
 
 sudo chroot "$SYSROOT" apt-get update
-# Always install (idempotent) so new deps land even if the sysroot dir already exists.
+# X11/font headers only. The Pi binary is Slint (`pi-native`), so GTK/GLib/WebKit
+# must not be compiled — those crates look for glib-2.0.pc and fail this sysroot.
 sudo DEBIAN_FRONTEND=noninteractive chroot "$SYSROOT" apt-get install -y \
   libc6-dev \
   libx11-dev libxcb1-dev libxkbcommon-dev libfontconfig1-dev libfreetype6-dev \

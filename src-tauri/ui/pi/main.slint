@@ -1,3 +1,67 @@
+component MetricCard inherits Rectangle {
+    in property <string> title;
+    in property <string> value;
+    in property <string> detail: "";
+    in property <color> accent;
+    in property <float> level;
+
+    background: #14141c;
+    border-radius: 18px;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        padding: 18px;
+        spacing: 10px;
+
+        Text {
+            text: root.title;
+            color: #a1a1aa;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        Text {
+            text: root.value;
+            color: root.accent;
+            font-size: 42px;
+            font-weight: 700;
+        }
+        if root.detail != "": Text {
+            text: root.detail;
+            color: #71717a;
+            font-size: 12px;
+        }
+        Rectangle {
+            height: 8px;
+            border-radius: 4px;
+            background: #27272a;
+            Rectangle {
+                width: parent.width * clamp(root.level, 0, 1);
+                height: parent.height;
+                border-radius: 4px;
+                background: root.accent;
+            }
+        }
+    }
+}
+
+component InfoRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <string> value;
+    spacing: 8px;
+    Text {
+        text: root.label;
+        color: #71717a;
+        font-size: 12px;
+        min-width: 64px;
+    }
+    Text {
+        text: root.value;
+        color: #e4e4e7;
+        font-size: 13px;
+        horizontal-stretch: 1;
+    }
+}
+
 export component MainWindow inherits Window {
     title: "Judie";
     preferred-width: 1280px;
@@ -148,69 +212,5 @@ export component MainWindow inherits Window {
             }
         }
         }
-    }
-}
-
-component MetricCard inherits Rectangle {
-    in property <string> title;
-    in property <string> value;
-    in property <string> detail: "";
-    in property <color> accent;
-    in property <float> level;
-
-    background: #14141c;
-    border-radius: 18px;
-    horizontal-stretch: 1;
-
-    VerticalLayout {
-        padding: 18px;
-        spacing: 10px;
-
-        Text {
-            text: root.title;
-            color: #a1a1aa;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        Text {
-            text: root.value;
-            color: root.accent;
-            font-size: 42px;
-            font-weight: 700;
-        }
-        if root.detail != "": Text {
-            text: root.detail;
-            color: #71717a;
-            font-size: 12px;
-        }
-        Rectangle {
-            height: 8px;
-            border-radius: 4px;
-            background: #27272a;
-            Rectangle {
-                width: parent.width * clamp(root.level, 0, 1);
-                height: parent.height;
-                border-radius: 4px;
-                background: root.accent;
-            }
-        }
-    }
-}
-
-component InfoRow inherits HorizontalLayout {
-    in property <string> label;
-    in property <string> value;
-    spacing: 8px;
-    Text {
-        text: root.label;
-        color: #71717a;
-        font-size: 12px;
-        min-width: 64px;
-    }
-    Text {
-        text: root.value;
-        color: #e4e4e7;
-        font-size: 13px;
-        horizontal-stretch: 1;
     }
 }
