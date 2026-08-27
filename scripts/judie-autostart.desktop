@@ -1,3 +1,6 @@
+# Leftover PIXEL/LXDE autostart snippet. Raspberry Pi OS Lite kiosks use
+# systemd `judie.service` (see src-tauri/linux/judie.service). Do not install
+# this file; the armhf package no longer ships /etc/xdg/autostart.
 [Desktop Entry]
 Type=Application
 Name=Judie

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Desktop Tauri .deb only (GTK WebKit). The Pi armhf kiosk package is built by
+# scripts/package-armhf-deb.sh and must not go through this patcher.
 # Tauri always adds bare libgtk-3-0 to Debian packages. Trixie / Ubuntu 24.04+ only
 # ship libgtk-3-0t64 after the time_t transition, so apt cannot satisfy the dep.
 set -euo pipefail

@@ -103,6 +103,13 @@ Measured on a Pi 3B (920 MiB RAM, HDMI 1920×1200, Raspberry Pi OS Lite Trixie, 
 
 The native Pi UI is a single process (no WebKitWebProcess) on the Slint software renderer. Xorg at ~86 MiB is near the 80 MiB heuristic in the migration plan; a LinuxKMS/direct-DRM spike was **not** taken.
 
+## Leftover scripts (not used by Lite)
+
+- `scripts/judie-autostart.desktop` — old PIXEL/LXDE autostart. The armhf package uses `judie.service`, not `/etc/xdg/autostart`.
+- `scripts/patch-deb-depends.sh` — patches **Tauri GTK desktop** `.deb` Depends (`libgtk-3-0t64`). Do not run it on the Pi kiosk package.
+
+Linux desktop developers can run the Slint kiosk UI with `./scripts/run-pi-ui.sh` (needs `DISPLAY` or Wayland). That is not how the Pi boots.
+
 ## Runtime tips for Pi 3
 
 1. Use **32-bit Raspberry Pi OS Lite**
