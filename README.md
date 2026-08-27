@@ -18,7 +18,7 @@ npm test
 | Platform | How |
 | --- | --- |
 | Windows x64 | Double-click `build.bat` (or `npm run installer`) |
-| Raspberry Pi 3+ (32-bit OS) | On the Pi: `./scripts/build-pi.sh` — see [docs/raspberry-pi.md](docs/raspberry-pi.md) |
+| Raspberry Pi 3+ (32-bit Lite) | On the Pi: `curl -fsSL https://raw.githubusercontent.com/fannsonetti/Judie/main/scripts/install-pi.sh \| bash` — see [docs/raspberry-pi.md](docs/raspberry-pi.md) |
 
 `build-pi.bat` on Windows only prints instructions; the Pi `.deb` must be built on Linux ARM (32-bit armhf for the GitHub release).
 

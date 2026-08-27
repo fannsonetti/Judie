@@ -339,6 +339,7 @@ mod tests {
     #[test]
     fn linux_armhf_deb() {
         assert!(asset_matches_for("Judie_0.1.0_armhf.deb", "linux", "arm"));
+        assert!(asset_matches_for("judie_armhf.deb", "linux", "arm"));
         assert!(!asset_matches_for("Judie_0.1.0_arm64.deb", "linux", "arm"));
         assert!(asset_matches_for("Judie_0.1.0_aarch64.deb", "linux", "aarch64"));
         assert!(asset_matches_for("Judie_0.1.6_arm64.deb", "linux", "arm64"));

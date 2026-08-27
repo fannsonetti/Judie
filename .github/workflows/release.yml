@@ -75,6 +75,7 @@ jobs:
           cargo build --release --no-default-features --features pi-native --bin judie-pi --target armv7-unknown-linux-gnueabihf
           cd ..
           bash scripts/package-armhf-deb.sh
+          bash scripts/ci-check-armhf-deb.sh
 
       - name: Upload armhf .deb to release
         env:
@@ -87,9 +88,10 @@ jobs:
             echo "No armhf .deb found" >&2
             exit 1
           fi
+          cp "${files[0]}" /tmp/judie_armhf.deb
           for _ in $(seq 1 90); do
             if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-              gh release upload "${{ github.ref_name }}" "${files[@]}" --clobber
+              gh release upload "${{ github.ref_name }}" "${files[@]}" /tmp/judie_armhf.deb --clobber
               exit 0
             fi
             sleep 10

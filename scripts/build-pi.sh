@@ -26,6 +26,15 @@ if ! command -v rustc >/dev/null; then
   exit 1
 fi
 
+# CI cross-compile config points the linker at /opt/armhf. Native Pi builds use
+# the same rustc target triple, so that sysroot would break the link.
+if [[ ! -d /opt/armhf && -f "$ROOT/.cargo/config.toml" ]]; then
+  echo "==> Native build: ignoring .cargo/config.toml (no CI sysroot)"
+  mv "$ROOT/.cargo/config.toml" "$ROOT/.cargo/config.toml.ci-sysroot"
+  restore_cargo_config() { mv "$ROOT/.cargo/config.toml.ci-sysroot" "$ROOT/.cargo/config.toml" 2>/dev/null || true; }
+  trap restore_cargo_config EXIT
+fi
+
 echo "==> System packages (Slint / X11 — no WebKitGTK)"
 if command -v apt-get >/dev/null; then
   sudo apt-get update

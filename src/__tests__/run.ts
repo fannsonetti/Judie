@@ -613,7 +613,7 @@ test("release labels mark the running copy", () => {
     publishedAt: "",
     current: true,
     installable: true,
-    assetName: "Judie_0.1.2_armhf.deb",
+    assetName: "judie_0.1.2_armhf.deb",
     assetUrl: "",
   };
   assert(releaseLabel(rel).includes("this version"), releaseLabel(rel));

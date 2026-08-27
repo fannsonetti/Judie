@@ -1,93 +1,117 @@
-component MetricCard inherits Rectangle {
-    in property <string> title;
-    in property <string> value;
-    in property <string> detail: "";
-    in property <color> accent;
-    in property <float> level;
-
-    background: #14141c;
-    border-radius: 18px;
-    horizontal-stretch: 1;
-
-    VerticalLayout {
-        padding: 18px;
-        spacing: 10px;
-
-        Text {
-            text: root.title;
-            color: #a1a1aa;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        Text {
-            text: root.value;
-            color: root.accent;
-            font-size: 42px;
-            font-weight: 700;
-        }
-        if root.detail != "": Text {
-            text: root.detail;
-            color: #71717a;
-            font-size: 12px;
-        }
-        Rectangle {
-            height: 8px;
-            border-radius: 4px;
-            background: #27272a;
-            Rectangle {
-                width: parent.width * clamp(root.level, 0, 1);
-                height: parent.height;
-                border-radius: 4px;
-                background: root.accent;
-            }
-        }
-    }
-}
-
-component InfoRow inherits HorizontalLayout {
-    in property <string> label;
-    in property <string> value;
-    spacing: 8px;
-    Text {
-        text: root.label;
-        color: #71717a;
-        font-size: 12px;
-        min-width: 64px;
-    }
-    Text {
-        text: root.value;
-        color: #e4e4e7;
-        font-size: 13px;
-        horizontal-stretch: 1;
-    }
-}
+import { ScrollView, LineEdit, Slider, Button } from "std-widgets.slint";
+import { LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Card, Pill, Toggle, Swatch, IconBtn, Bar } from "cards.slint";
 
 export component MainWindow inherits Window {
     title: "Judie";
     preferred-width: 1280px;
     preferred-height: 800px;
-    background: #0a0a10;
+    background: #0c0d10;
     no-frame: true;
 
     in-out property <string> clock: "--:--";
     in-out property <string> date-text: "";
-    in-out property <float> cpu: 0;
-    in-out property <float> memory: 0;
-    in-out property <string> mem-detail: "";
-    in-out property <string> temp-text: "";
-    in-out property <string> uptime-text: "";
-    in-out property <string> load-text: "";
+    in-out property <string> version-text: "0.2.2";
+    in-out property <string> status-label: "";
+    in-out property <bool> dnd: false;
+    in-out property <int> page: 0;
+
     in-out property <bool> update-available: false;
     in-out property <string> update-label: "";
     in-out property <string> update-error: "";
     in-out property <bool> updating: false;
 
+    in-out property <string> weather-loc: "";
+    in-out property <string> weather-temp: "";
+    in-out property <string> weather-cond: "";
+    in-out property <string> weather-range: "";
+    in-out property <string> weather-feel: "";
+    in-out property <string> weather-note: "";
+    in-out property <[HourRow]> hours: [];
+
+    in-out property <bool> master-on: true;
+    in-out property <int> brightness: 70;
+    in-out property <string> scene: "Cozy";
+    in-out property <string> master-color: "#FFB366";
+    in-out property <[LightRow]> lights: [];
+
+    in-out property <bool> playing: false;
+    in-out property <string> track-title: "";
+    in-out property <string> track-artist: "";
+    in-out property <int> volume: 62;
+    in-out property <float> media-progress: 0.2;
+
+    in-out property <string> indoor: "";
+    in-out property <string> outdoor: "";
+    in-out property <string> humidity: "";
+    in-out property <string> comfort: "";
+    in-out property <[EventRow]> events: [];
+    in-out property <string> month-name: "";
+
+    in-out property <bool> purifier-on: true;
+    in-out property <string> purifier-mode: "Auto";
+    in-out property <string> purifier-aq: "Good";
+    in-out property <int> purifier-filter: 38;
+
+    in-out property <float> cpu: 0;
+    in-out property <float> memory: 0;
+    in-out property <string> mem-detail: "";
+    in-out property <string> temp-text: "";
+    in-out property <[ServiceRow]> services: [];
+    in-out property <[ActivityRow]> activity: [];
+    in-out property <[TimerRow]> timers: [];
+
+    in-out property <bool> settings-open: false;
+    in-out property <bool> palette-open: false;
+    in-out property <bool> gallery-open: false;
+    in-out property <bool> edit-mode: false;
+    in-out property <int> settings-tab: 0;
+    in-out property <string> room-name: "Room";
+    in-out property <string> assistant-url: "http://127.0.0.1:8742";
+    in-out property <bool> voice-enabled: true;
+    in-out property <bool> speak-replies: true;
+    in-out property <bool> units-metric: true;
+    in-out property <string> palette-query: "";
+    in-out property <string> palette-reply: "";
+    in-out property <string> expanded: "";
+
     callback update-now();
     callback dismiss-update();
+    callback toggle-master();
+    callback brightness-changed(int);
+    callback set-color(string);
+    callback set-scene(string);
+    callback toggle-light(string);
+    callback toggle-play();
+    callback next-track();
+    callback prev-track();
+    callback volume-changed(int);
+    callback quick(string);
+    callback toggle-purifier();
+    callback cycle-purifier();
+    callback open-settings();
+    callback close-overlay();
+    callback open-palette();
+    callback submit-palette();
+    callback palette-text(string);
+    callback set-tab(int);
+    callback toggle-voice();
+    callback toggle-speak();
+    callback toggle-units();
+    callback set-page(int);
+    callback expand(string);
+    callback collapse();
+    callback enter-edit();
+    callback exit-edit();
+    callback open-gallery();
+    callback close-gallery();
+    callback hold-home();
+
+    property <length> pad: 20px;
+    property <length> gap: 12px;
 
     VerticalLayout {
-        padding: 0px;
-        spacing: 0px;
+        padding: 0;
+        spacing: 0;
 
         if root.update-available: Rectangle {
             background: #2a2214;
@@ -107,110 +131,599 @@ export component MainWindow inherits Window {
                         wrap: word-wrap;
                         horizontal-stretch: 1;
                     }
-                    if !root.updating: Rectangle {
-                        width: 88px;
-                        height: 28px;
-                        border-radius: 14px;
-                        background: #f3d7a4;
-                        TouchArea {
-                            clicked => { root.update-now(); }
-                            Text {
-                                text: "Update";
-                                color: #1a1408;
-                                font-size: 12px;
-                                font-weight: 700;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
+                    if !root.updating: Pill {
+                        label: "Update";
+                        on: true;
+                        clicked => { root.update-now(); }
                     }
-                    Rectangle {
-                        width: 64px;
-                        height: 28px;
-                        border-radius: 14px;
-                        border-width: 1px;
-                        border-color: #f3d7a4;
-                        TouchArea {
-                            clicked => { root.dismiss-update(); }
-                            Text {
-                                text: "Later";
-                                color: #f3d7a4;
-                                font-size: 12px;
-                                font-weight: 600;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
+                    Pill {
+                        label: "Later";
+                        clicked => { root.dismiss-update(); }
                     }
                 }
-            }
-        }
-
-        VerticalLayout {
-            padding: 20px;
-            spacing: 16px;
-
-        HorizontalLayout {
-            spacing: 12px;
-            Text {
-                text: "Judie";
-                color: #f4f4f5;
-                font-size: 22px;
-                font-weight: 700;
-            }
-            Rectangle { horizontal-stretch: 1; }
-            Text {
-                text: root.date-text;
-                color: #a1a1aa;
-                font-size: 14px;
-                vertical-alignment: center;
-            }
-            Text {
-                text: root.clock;
-                color: #f4f4f5;
-                font-size: 28px;
-                font-weight: 600;
             }
         }
 
         Rectangle {
-            height: 1px;
-            background: #27272a;
-        }
-
-        HorizontalLayout {
-            spacing: 16px;
-            vertical-stretch: 1;
-
-            MetricCard {
-                title: "CPU";
-                value: round(root.cpu) + "%";
-                accent: #3dd68c;
-                level: root.cpu / 100;
-            }
-
-            MetricCard {
-                title: "Memory";
-                value: round(root.memory) + "%";
-                detail: root.mem-detail;
-                accent: #a78bfa;
-                level: root.memory / 100;
-            }
-
-            VerticalLayout {
+            height: 56px;
+            HorizontalLayout {
+                padding-left: root.pad;
+                padding-right: root.pad;
                 spacing: 10px;
-                min-width: 220px;
-                InfoRow { label: "Temp"; value: root.temp-text; }
-                InfoRow { label: "Load"; value: root.load-text; }
-                InfoRow { label: "Uptime"; value: root.uptime-text; }
-                Rectangle { vertical-stretch: 1; }
                 Text {
-                    text: "Native Pi UI";
-                    color: #52525b;
+                    text: root.version-text;
+                    color: #f4f5f7;
+                    opacity: 0.22;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                }
+                if root.status-label != "": Text {
+                    text: root.status-label;
+                    color: #8b909d;
                     font-size: 12px;
+                    vertical-alignment: center;
+                }
+                if root.dnd: Text {
+                    text: "DND";
+                    color: #ff5c5c;
+                    font-size: 11px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                TouchArea {
+                    clicked => { root.open-palette(); }
+                    VerticalLayout {
+                        Text {
+                            text: root.clock;
+                            color: #f4f5f7;
+                            font-size: 18px;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                        }
+                        Text {
+                            text: root.date-text;
+                            color: #8b909d;
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                TouchArea {
+                    clicked => { root.open-settings(); }
+                    Text {
+                        text: "Settings";
+                        color: #8b909d;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        horizontal-alignment: right;
+                    }
                 }
             }
         }
+
+        TouchArea {
+            double-clicked => { root.enter-edit(); }
+            vertical-stretch: 1;
+            Rectangle {
+                VerticalLayout {
+                    padding-left: root.pad;
+                    padding-right: root.pad;
+                    padding-bottom: 16px;
+                    spacing: 10px;
+
+                    if root.page == 0: GridLayout {
+                        spacing: root.gap;
+                        vertical-stretch: 1;
+
+                        Card {
+                            row: 0; col: 0; rowspan: 2; colspan: 2;
+                            kicker: "Weather";
+                            tapped => { root.expand("weather"); }
+                            Text { text: root.weather-loc; color: #8b909d; font-size: 12px; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: root.weather-temp; color: #f4f5f7; font-size: 42px; font-weight: 700; }
+                                VerticalLayout {
+                                    alignment: end;
+                                    Text { text: root.weather-cond; color: #f4f5f7; font-size: 14px; }
+                                    Text { text: root.weather-range; color: #8b909d; font-size: 12px; }
+                                }
+                            }
+                            Text { text: root.weather-feel; color: #8b909d; font-size: 12px; }
+                            HorizontalLayout {
+                                spacing: 10px;
+                                for h in root.hours: VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: h.hour; color: #5c6170; font-size: 10px; horizontal-alignment: center; }
+                                    Text { text: h.temp; color: #f4f5f7; font-size: 12px; font-weight: 600; horizontal-alignment: center; }
+                                    Text { text: h.precip; color: #8b909d; font-size: 10px; horizontal-alignment: center; }
+                                }
+                            }
+                        }
+
+                        Card {
+                            row: 0; col: 2; rowspan: 2; colspan: 2;
+                            tapped => { root.expand("lights"); }
+                            HorizontalLayout {
+                                Text { text: root.scene; color: #8b909d; font-size: 12px; vertical-alignment: center; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Toggle {
+                                    on: root.master-on;
+                                    toggled => { root.toggle-master(); }
+                                }
+                            }
+                            Text {
+                                text: root.master-on ? root.brightness + "%" : "Off";
+                                color: #f4f5f7;
+                                font-size: 28px;
+                                font-weight: 700;
+                            }
+                            Slider {
+                                minimum: 0;
+                                maximum: 100;
+                                value: root.brightness;
+                                changed(v) => { root.brightness-changed(round(v)); }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Swatch { swatch: #ff5a5a; on: root.master-color == "#FF5A5A"; clicked => { root.set-color("#FF5A5A"); } }
+                                Swatch { swatch: #ff8c42; on: root.master-color == "#FF8C42"; clicked => { root.set-color("#FF8C42"); } }
+                                Swatch { swatch: #ffd166; on: root.master-color == "#FFD166"; clicked => { root.set-color("#FFD166"); } }
+                                Swatch { swatch: #ffb366; on: root.master-color == "#FFB366"; clicked => { root.set-color("#FFB366"); } }
+                                Swatch { swatch: #2d7bff; on: root.master-color == "#2D7BFF"; clicked => { root.set-color("#2D7BFF"); } }
+                                Swatch { swatch: #7b61ff; on: root.master-color == "#7B61FF"; clicked => { root.set-color("#7B61FF"); } }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                for light in root.lights: Pill {
+                                    label: light.name;
+                                    on: light.on;
+                                    clicked => { root.toggle-light(light.id); }
+                                }
+                            }
+                        }
+
+                        Card {
+                            row: 0; col: 4; colspan: 2;
+                            tapped => { root.expand("media"); }
+                            Text { text: root.playing ? "Playing" : "Paused"; color: #8b909d; font-size: 12px; }
+                            Text { text: root.track-title; color: #f4f5f7; font-size: 16px; font-weight: 600; overflow: elide; }
+                            Text { text: root.track-artist; color: #8b909d; font-size: 12px; overflow: elide; }
+                            Bar { level: root.media-progress; fill: #f4f5f7; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                IconBtn { glyph: "⟨"; clicked => { root.prev-track(); } }
+                                IconBtn { glyph: root.playing ? "❚❚" : "▶"; primary: true; clicked => { root.toggle-play(); } }
+                                IconBtn { glyph: "⟩"; clicked => { root.next-track(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                                Text { text: root.volume + "%"; color: #8b909d; font-size: 11px; vertical-alignment: center; }
+                            }
+                        }
+
+                        Card {
+                            row: 1; col: 4;
+                            tapped => { root.expand("calendar"); }
+                            Text { text: root.month-name; color: #8b909d; font-size: 12px; }
+                            for ev in root.events: HorizontalLayout {
+                                spacing: 6px;
+                                Rectangle { width: 4px; height: 18px; border-radius: 2px; background: #2d7bff; }
+                                VerticalLayout {
+                                    Text { text: ev.title; color: #f4f5f7; font-size: 12px; font-weight: 600; overflow: elide; }
+                                    Text { text: ev.time; color: #8b909d; font-size: 10px; }
+                                }
+                            }
+                        }
+
+                        Card {
+                            row: 1; col: 5;
+                            Text { text: "Climate"; color: #8b909d; font-size: 12px; }
+                            Text { text: root.indoor; color: #5ac8fa; font-size: 28px; font-weight: 700; }
+                            Text { text: "Humidity " + root.humidity; color: #8b909d; font-size: 12px; }
+                            Text { text: "Out " + root.outdoor; color: #8b909d; font-size: 12px; }
+                            Text { text: root.comfort; color: #f4f5f7; font-size: 12px; font-weight: 600; }
+                        }
+
+                        Card {
+                            row: 2; col: 0;
+                            tapped => { root.expand("purifier"); }
+                            Text { text: "Air"; color: #8b909d; font-size: 12px; }
+                            Text { text: root.purifier-aq; color: #3dd68c; font-size: 22px; font-weight: 700; }
+                            Text { text: "PM2.5  7"; color: #f4f5f7; font-size: 12px; }
+                            Text { text: "Filter " + root.purifier-filter + "%"; color: #8b909d; font-size: 12px; }
+                            Bar { level: root.purifier-filter / 100; fill: #3dd68c; }
+                        }
+
+                        Card {
+                            row: 2; col: 1; colspan: 2;
+                            Text { text: "Quick Controls"; color: #8b909d; font-size: 12px; }
+                            GridLayout {
+                                spacing: 8px;
+                                Rectangle {
+                                    row: 0; col: 0;
+                                    border-radius: 14px;
+                                    background: #22252f;
+                                    TouchArea { clicked => { root.quick("goodNight"); } }
+                                    Text { text: "Good Night"; color: #f4f5f7; font-size: 13px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                Rectangle {
+                                    row: 0; col: 1;
+                                    border-radius: 14px;
+                                    background: #22252f;
+                                    TouchArea { clicked => { root.quick("lightsOff"); } }
+                                    Text { text: "Lights Off"; color: #f4f5f7; font-size: 13px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                Rectangle {
+                                    row: 1; col: 0;
+                                    border-radius: 14px;
+                                    background: root.dnd ? #3a1c1c : #22252f;
+                                    TouchArea { clicked => { root.quick("dnd"); } }
+                                    Text { text: "Do Not Disturb"; color: #f4f5f7; font-size: 13px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                                Rectangle {
+                                    row: 1; col: 1;
+                                    border-radius: 14px;
+                                    background: #22252f;
+                                    TouchArea { clicked => { root.quick("movie"); } }
+                                    Text { text: "Movie Mode"; color: #f4f5f7; font-size: 13px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+                                }
+                            }
+                        }
+
+                        Card {
+                            row: 2; col: 3;
+                            Text { text: "CPU"; color: #8b909d; font-size: 12px; }
+                            Text { text: round(root.cpu) + "%"; color: #3dd68c; font-size: 28px; font-weight: 700; }
+                            Bar { level: root.cpu / 100; fill: #3dd68c; }
+                            Text { text: "Mem " + round(root.memory) + "%"; color: #a78bfa; font-size: 12px; }
+                            Bar { level: root.memory / 100; fill: #a78bfa; }
+                        }
+
+                        Card {
+                            row: 2; col: 4; colspan: 2;
+                            Text { text: "Today"; color: #8b909d; font-size: 12px; }
+                            for t in root.timers: HorizontalLayout {
+                                Text { text: t.label; color: #f4f5f7; font-size: 13px; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Text { text: t.remain; color: #8b909d; font-size: 13px; }
+                            }
+                            Text { text: root.temp-text; color: #8b909d; font-size: 11px; }
+                        }
+                    }
+
+                    if root.page == 1: GridLayout {
+                        spacing: root.gap;
+                        vertical-stretch: 1;
+                        Card {
+                            row: 0; col: 0; colspan: 3; rowspan: 2;
+                            Text { text: "Activity"; color: #8b909d; font-size: 12px; }
+                            for a in root.activity: HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: a.source; color: #5c6170; font-size: 11px; min-width: 72px; }
+                                Text { text: a.title; color: #f4f5f7; font-size: 14px; }
+                            }
+                        }
+                        Card {
+                            row: 0; col: 3; colspan: 3; rowspan: 2;
+                            Text { text: "Server"; color: #8b909d; font-size: 12px; }
+                            for s in root.services: HorizontalLayout {
+                                Text { text: s.name; color: #f4f5f7; font-size: 14px; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Text { text: s.status; color: s.online ? #3dd68c : #ff5c5c; font-size: 13px; }
+                            }
+                        }
+                        Card {
+                            row: 2; col: 0; colspan: 2;
+                            Text { text: "System"; color: #8b909d; font-size: 12px; }
+                            Text { text: "CPU " + round(root.cpu) + "%"; color: #3dd68c; font-size: 18px; font-weight: 700; }
+                            Text { text: "Memory " + round(root.memory) + "%"; color: #a78bfa; font-size: 18px; font-weight: 700; }
+                            Text { text: root.mem-detail; color: #8b909d; font-size: 12px; }
+                            Text { text: root.temp-text; color: #8b909d; font-size: 12px; }
+                        }
+                        Card {
+                            row: 2; col: 2; colspan: 2;
+                            tapped => { root.expand("lights"); }
+                            Text { text: "Scenes"; color: #8b909d; font-size: 12px; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Pill { label: "Cozy"; on: root.scene == "Cozy"; clicked => { root.set-scene("Cozy"); } }
+                                Pill { label: "Movie"; on: root.scene == "Movie"; clicked => { root.set-scene("Movie"); } }
+                                Pill { label: "Night"; on: root.scene == "Night"; clicked => { root.set-scene("Night"); } }
+                                Pill { label: "Bright"; on: root.scene == "Bright"; clicked => { root.set-scene("Bright"); } }
+                            }
+                        }
+                        Card {
+                            row: 2; col: 4; colspan: 2;
+                            Text { text: "Ask Judie"; color: #8b909d; font-size: 12px; }
+                            Text { text: "Swipe down or tap the clock. Lights, weather, play, good night."; color: #f4f5f7; font-size: 14px; wrap: word-wrap; }
+                            Pill { label: "Open"; on: true; clicked => { root.open-palette(); } }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 8px;
+                        TouchArea {
+                            clicked => { root.set-page(0); }
+                            Rectangle {
+                                width: 8px; height: 8px; border-radius: 4px;
+                                background: root.page == 0 ? #f4f5f7 : #3a3d46;
+                            }
+                        }
+                        TouchArea {
+                            clicked => { root.set-page(1); }
+                            Rectangle {
+                                width: 8px; height: 8px; border-radius: 4px;
+                                background: root.page == 1 ? #f4f5f7 : #3a3d46;
+                            }
+                        }
+                    }
+
+                    if root.edit-mode: HorizontalLayout {
+                        spacing: 10px;
+                        alignment: center;
+                        Pill { label: "Add Widget"; on: true; clicked => { root.open-gallery(); } }
+                        Pill { label: "Done"; clicked => { root.exit-edit(); } }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.palette-open: Rectangle {
+        background: #000000aa;
+        TouchArea { clicked => { root.close-overlay(); } }
+        Rectangle {
+            x: parent.width * 0.18;
+            y: 80px;
+            width: parent.width * 0.64;
+            height: 420px;
+            border-radius: 28px;
+            background: #1a1c24;
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+                Text { text: "Judie"; color: #f4f5f7; font-size: 18px; font-weight: 700; }
+                LineEdit {
+                    placeholder-text: "Ask Judie…";
+                    text: root.palette-query;
+                    edited(t) => { root.palette-text(t); }
+                    accepted => { root.submit-palette(); }
+                }
+                Text {
+                    text: root.palette-reply == "" ? "Lights off · movie mode · good night · weather · play" : root.palette-reply;
+                    color: #8b909d;
+                    font-size: 14px;
+                    wrap: word-wrap;
+                    vertical-stretch: 1;
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Pill { label: "Ask"; on: true; clicked => { root.submit-palette(); } }
+                    Pill { label: "Close"; clicked => { root.close-overlay(); } }
+                }
+            }
+        }
+    }
+
+    if root.settings-open: Rectangle {
+        background: #000000aa;
+        TouchArea { clicked => { root.close-overlay(); } }
+        Rectangle {
+            x: parent.width * 0.12;
+            y: 40px;
+            width: parent.width * 0.76;
+            height: parent.height - 80px;
+            border-radius: 28px;
+            background: #14161c;
+            VerticalLayout {
+                padding: 20px;
+                spacing: 14px;
+                HorizontalLayout {
+                    Text { text: "Settings"; color: #f4f5f7; font-size: 22px; font-weight: 700; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Pill { label: "Close"; clicked => { root.close-overlay(); } }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Pill { label: "Room"; on: root.settings-tab == 0; clicked => { root.set-tab(0); } }
+                    Pill { label: "Voice"; on: root.settings-tab == 1; clicked => { root.set-tab(1); } }
+                    Pill { label: "Judie"; on: root.settings-tab == 2; clicked => { root.set-tab(2); } }
+                }
+                if root.settings-tab == 0: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: "Room  ·  " + root.room-name; color: #f4f5f7; font-size: 16px; }
+                    Text { text: "Location  ·  " + root.weather-loc; color: #8b909d; font-size: 14px; }
+                    Text { text: "Indoor climate stays local until hardware is connected."; color: #5c6170; font-size: 12px; wrap: word-wrap; }
+                }
+                if root.settings-tab == 1: VerticalLayout {
+                    spacing: 12px;
+                    HorizontalLayout {
+                        Text { text: "Voice"; color: #f4f5f7; font-size: 16px; vertical-alignment: center; }
+                        Rectangle { horizontal-stretch: 1; }
+                        Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } }
+                    }
+                    HorizontalLayout {
+                        Text { text: "Speak replies"; color: #f4f5f7; font-size: 16px; vertical-alignment: center; }
+                        Rectangle { horizontal-stretch: 1; }
+                        Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } }
+                    }
+                    HorizontalLayout {
+                        Text { text: "Metric units"; color: #f4f5f7; font-size: 16px; vertical-alignment: center; }
+                        Rectangle { horizontal-stretch: 1; }
+                        Toggle { on: root.units-metric; toggled => { root.toggle-units(); } }
+                    }
+                }
+                if root.settings-tab == 2: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: "Judie " + root.version-text; color: #f4f5f7; font-size: 16px; }
+                    Text { text: "Native Pi UI — no WebKit. Assistant URL:"; color: #8b909d; font-size: 13px; }
+                    Text { text: root.assistant-url; color: #5c6170; font-size: 12px; }
+                    Text { text: "On boot, Judie checks GitHub for a newer build and shows a bar if you are behind."; color: #8b909d; font-size: 13px; wrap: word-wrap; }
+                    if root.update-available: Pill { label: "Install update"; on: true; clicked => { root.update-now(); } }
+                }
+            }
+        }
+    }
+
+    if root.gallery-open: Rectangle {
+        background: #000000aa;
+        TouchArea { clicked => { root.close-gallery(); } }
+        Rectangle {
+            x: parent.width * 0.15;
+            y: 80px;
+            width: parent.width * 0.7;
+            height: 360px;
+            border-radius: 28px;
+            background: #1a1c24;
+            VerticalLayout {
+                padding: 20px;
+                spacing: 12px;
+                Text { text: "Add widget"; color: #f4f5f7; font-size: 18px; font-weight: 700; }
+                Text { text: "Home already includes weather, lights, media, calendar, climate, air, quick controls, system, timers, activity, and server. Custom widget creator stays on the Windows build."; color: #8b909d; font-size: 14px; wrap: word-wrap; }
+                Pill { label: "Done"; clicked => { root.close-gallery(); } }
+            }
+        }
+    }
+
+    if root.expanded == "weather": Rectangle {
+        background: #000000cc;
+        TouchArea { clicked => { root.collapse(); } }
+        Rectangle {
+            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+            border-radius: 28px; background: #14161c;
+            VerticalLayout {
+                padding: 24px; spacing: 12px;
+                HorizontalLayout {
+                    Text { text: root.weather-loc; color: #f4f5f7; font-size: 22px; font-weight: 700; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Pill { label: "Close"; clicked => { root.collapse(); } }
+                }
+                Text { text: root.weather-temp + "  " + root.weather-cond; color: #f4f5f7; font-size: 42px; font-weight: 700; }
+                Text { text: root.weather-range + "  ·  " + root.weather-feel; color: #8b909d; font-size: 16px; }
+                Text { text: root.weather-note; color: #f4f5f7; font-size: 16px; }
+                HorizontalLayout {
+                    spacing: 16px;
+                    for h in root.hours: VerticalLayout {
+                        spacing: 4px;
+                        Text { text: h.hour; color: #5c6170; font-size: 12px; horizontal-alignment: center; }
+                        Text { text: h.temp; color: #f4f5f7; font-size: 18px; font-weight: 700; horizontal-alignment: center; }
+                        Text { text: h.precip; color: #8b909d; font-size: 12px; horizontal-alignment: center; }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.expanded == "lights": Rectangle {
+        background: #000000cc;
+        TouchArea { clicked => { root.collapse(); } }
+        Rectangle {
+            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+            border-radius: 28px; background: #14161c;
+            VerticalLayout {
+                padding: 24px; spacing: 14px;
+                HorizontalLayout {
+                    Text { text: "Lights"; color: #f4f5f7; font-size: 22px; font-weight: 700; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Toggle { on: root.master-on; toggled => { root.toggle-master(); } }
+                    Pill { label: "Close"; clicked => { root.collapse(); } }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Pill { label: "Cozy"; on: root.scene == "Cozy"; clicked => { root.set-scene("Cozy"); } }
+                    Pill { label: "Movie"; on: root.scene == "Movie"; clicked => { root.set-scene("Movie"); } }
+                    Pill { label: "Night"; on: root.scene == "Night"; clicked => { root.set-scene("Night"); } }
+                    Pill { label: "Bright"; on: root.scene == "Bright"; clicked => { root.set-scene("Bright"); } }
+                    Pill { label: "Gaming"; on: root.scene == "Gaming"; clicked => { root.set-scene("Gaming"); } }
+                }
+                Text { text: root.brightness + "%"; color: #f4f5f7; font-size: 28px; font-weight: 700; }
+                Slider { minimum: 0; maximum: 100; value: root.brightness; changed(v) => { root.brightness-changed(round(v)); } }
+                for light in root.lights: HorizontalLayout {
+                    Text { text: light.name; color: #f4f5f7; font-size: 16px; vertical-alignment: center; }
+                    Text { text: light.brightness; color: #8b909d; font-size: 14px; vertical-alignment: center; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Pill { label: light.on ? "On" : "Off"; on: light.on; clicked => { root.toggle-light(light.id); } }
+                }
+            }
+        }
+    }
+
+    if root.expanded == "media": Rectangle {
+        background: #000000cc;
+        TouchArea { clicked => { root.collapse(); } }
+        Rectangle {
+            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+            border-radius: 28px; background: #14161c;
+            VerticalLayout {
+                padding: 24px; spacing: 14px;
+                HorizontalLayout {
+                    Text { text: "Now playing"; color: #f4f5f7; font-size: 22px; font-weight: 700; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Pill { label: "Close"; clicked => { root.collapse(); } }
+                }
+                Text { text: root.track-title; color: #f4f5f7; font-size: 32px; font-weight: 700; }
+                Text { text: root.track-artist; color: #8b909d; font-size: 16px; }
+                Bar { level: root.media-progress; fill: #f4f5f7; }
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: center;
+                    IconBtn { glyph: "⟨"; clicked => { root.prev-track(); } }
+                    IconBtn { glyph: root.playing ? "❚❚" : "▶"; primary: true; clicked => { root.toggle-play(); } }
+                    IconBtn { glyph: "⟩"; clicked => { root.next-track(); } }
+                }
+                Text { text: "Volume " + root.volume + "%"; color: #8b909d; font-size: 13px; }
+                Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
+            }
+        }
+    }
+
+    if root.expanded == "calendar": Rectangle {
+        background: #000000cc;
+        TouchArea { clicked => { root.collapse(); } }
+        Rectangle {
+            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+            border-radius: 28px; background: #14161c;
+            VerticalLayout {
+                padding: 24px; spacing: 12px;
+                HorizontalLayout {
+                    Text { text: root.month-name; color: #f4f5f7; font-size: 22px; font-weight: 700; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Pill { label: "Close"; clicked => { root.collapse(); } }
+                }
+                for ev in root.events: HorizontalLayout {
+                    spacing: 12px;
+                    Text { text: ev.time; color: #8b909d; font-size: 14px; min-width: 64px; }
+                    VerticalLayout {
+                        Text { text: ev.title; color: #f4f5f7; font-size: 16px; font-weight: 600; }
+                        Text { text: ev.detail; color: #8b909d; font-size: 12px; }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.expanded == "purifier": Rectangle {
+        background: #000000cc;
+        TouchArea { clicked => { root.collapse(); } }
+        Rectangle {
+            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+            border-radius: 28px; background: #14161c;
+            VerticalLayout {
+                padding: 24px; spacing: 14px;
+                HorizontalLayout {
+                    Text { text: "Air purifier"; color: #f4f5f7; font-size: 22px; font-weight: 700; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Toggle { on: root.purifier-on; toggled => { root.toggle-purifier(); } }
+                    Pill { label: "Close"; clicked => { root.collapse(); } }
+                }
+                Text { text: root.purifier-aq; color: #3dd68c; font-size: 36px; font-weight: 700; }
+                Text { text: "Mode  " + root.purifier-mode; color: #f4f5f7; font-size: 16px; }
+                Pill { label: "Cycle mode"; clicked => { root.cycle-purifier(); } }
+                Text { text: "Filter " + root.purifier-filter + "%"; color: #8b909d; font-size: 14px; }
+                Bar { level: root.purifier-filter / 100; fill: #3dd68c; }
+            }
         }
     }
 }

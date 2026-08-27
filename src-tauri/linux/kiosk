@@ -1,0 +1,10 @@
+#!/bin/sh
+# Start bare Xorg on tty1 and exec Judie. No display manager, no window manager.
+set -eu
+export DISPLAY="${DISPLAY:-:0}"
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
+mkdir -p "$XDG_RUNTIME_DIR"
+cd "${HOME:-/tmp}"
+exec xinit /usr/lib/judie/xinitrc -- /usr/bin/Xorg :0 vt1 -nolisten tcp -nocursor
