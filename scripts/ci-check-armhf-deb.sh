@@ -34,12 +34,11 @@ echo "$depends" | grep -qw 'libwayland-client0' && { echo "FAIL: Wayland still i
 
 mapfile -t entries < <(dpkg-deb -c "$DEB")
 for line in "${entries[@]:0:30}"; do
-  owner="$(echo "$line" | awk '{print $3}')"
-  group="$(echo "$line" | awk '{print $4}')"
+  user_group="$(echo "$line" | awk '{print $2}')"
   path="$(echo "$line" | awk '{print $6}')"
   [[ "$path" == "./" ]] && continue
-  if [[ "$owner" != "root" || "$group" != "root" ]]; then
-    echo "FAIL: $path owned by $owner:$group (want root:root)" >&2
+  if [[ "$user_group" != "root/root" ]]; then
+    echo "FAIL: $path owned by $user_group (want root/root)" >&2
     exit 1
   fi
 done
