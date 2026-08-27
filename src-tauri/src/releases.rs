@@ -318,7 +318,24 @@ pub fn install_latest() -> Result<String, String> {
 }
 
 #[cfg(target_os = "linux")]
+pub fn running_under_systemd() -> bool {
+    if std::env::var_os("INVOCATION_ID").is_some() {
+        return true;
+    }
+    Path::new("/run/systemd/system").is_dir()
+        && Command::new("systemctl")
+            .args(["is-active", "--quiet", "judie.service"])
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+}
+
+/// Under systemd kiosk, do not `exec judie` — Restart=always will respawn.
+#[cfg(target_os = "linux")]
 pub fn relaunch_linux() -> Result<(), String> {
+    if running_under_systemd() {
+        return Ok(());
+    }
     let mut relaunch = Command::new("sh");
     relaunch.args(["-c", "sleep 2; exec judie"]);
     spawn_detached(relaunch)

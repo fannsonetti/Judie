@@ -474,8 +474,6 @@ fn main() {
             let result = releases::install_latest();
             let _ = slint::invoke_from_event_loop(move || match result {
                 Ok(_) => {
-                    #[cfg(target_os = "linux")]
-                    let _ = releases::relaunch_linux();
                     std::process::exit(0);
                 }
                 Err(err) => {
