@@ -89,9 +89,19 @@ First build can take **20–45 minutes** on a Pi 3 (Rust + Slint, no npm/WebKit)
 
 ## Performance
 
-The native Pi UI is a single process (no WebKitWebProcess). It uses the Slint software renderer — do **not** raise `gpu_mem` for this build.
+Measured on a Pi 3B (920 MiB RAM, HDMI 1920×1200, Raspberry Pi OS Lite Trixie, Judie 0.2.4 kiosk):
 
-On Pi 3, 1920×1200 is supported; 1280×720 / 1280×800 uses less fill-rate if the panel allows it.
+| Metric | Value |
+| --- | --- |
+| Cold boot (`systemd-analyze`) | kernel 4.0 s + userspace 30.8 s = **34.8 s** |
+| `judie.service` active | **~28 s** after kernel start (`systemd-analyze critical-chain`) |
+| Judie RSS (idle) | **~33 MiB** |
+| Xorg RSS (`-nocursor`) | **~86–87 MiB** |
+| Memory available after UI up | **~670 MiB** of 920 MiB |
+| CPU idle | **~99% idle**; Judie ~0–2%, Xorg ~0% |
+| GPU split | `gpu_mem=76M` (stock); do **not** raise it for the software renderer |
+
+The native Pi UI is a single process (no WebKitWebProcess) on the Slint software renderer. Xorg at ~86 MiB is near the 80 MiB heuristic in the migration plan; a LinuxKMS/direct-DRM spike was **not** taken.
 
 ## Runtime tips for Pi 3
 
@@ -99,6 +109,8 @@ On Pi 3, 1920×1200 is supported; 1280×720 / 1280×800 uses less fill-rate if t
 2. Install the armhf `.deb` and reboot — `judie.service` owns tty1
 3. Debug from SSH: `sudo systemctl stop judie` then `DISPLAY=:0 judie`
 4. Logs: `journalctl -u judie -b`
+5. Crash recovery: systemd `Restart=always` (Judie or Xorg dying comes back in a few seconds)
+6. If start is rate-limited: `sudo systemctl reset-failed judie && sudo systemctl start judie`
 
 ## CI
 
