@@ -120,6 +120,7 @@ fn push_ui(ui: &MainWindow) {
     ui.set_date_text(now.format("%A %e %B").to_string().split_whitespace().collect::<Vec<_>>().join(" ").into());
     ui.set_month_name(now.format("%B").to_string().into());
     ui.set_version_text(env!("CARGO_PKG_VERSION").into());
+    ui.set_host_ip(pi_ctl::lan_addrs().into());
 
     let stats = host::snapshot();
     ui.set_cpu(stats.cpu);

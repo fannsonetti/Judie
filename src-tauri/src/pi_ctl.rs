@@ -46,6 +46,41 @@ fn sudo(bin: &str, args: &[&str]) -> Result<String, String> {
     Ok(stdout)
 }
 
+/// Global IPv4 addresses (ethernet + wifi), no sudo.
+pub fn lan_addrs() -> String {
+    let out = Command::new("hostname").arg("-I").output().ok();
+    if let Some(out) = out {
+        let ips: Vec<String> = String::from_utf8_lossy(&out.stdout)
+            .split_whitespace()
+            .filter(|a| a.contains('.') && !a.starts_with("127."))
+            .map(|a| a.to_string())
+            .collect();
+        if !ips.is_empty() {
+            return ips.join("  ");
+        }
+    }
+    let out = Command::new("ip")
+        .args(["-4", "-o", "addr", "show", "scope", "global"])
+        .output()
+        .ok();
+    if let Some(out) = out {
+        let mut ips = Vec::new();
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 4 {
+                let ip = parts[3].split('/').next().unwrap_or("");
+                if !ip.is_empty() && !ip.starts_with("127.") {
+                    ips.push(format!("{} {}", parts[1], ip));
+                }
+            }
+        }
+        if !ips.is_empty() {
+            return ips.join("  ");
+        }
+    }
+    "NO IP".into()
+}
+
 pub fn wifi_status() -> WifiStatus {
     match sudo("/usr/lib/judie/wifi", &["status"]) {
         Ok(line) => {
