@@ -5,6 +5,8 @@
 mod host;
 #[path = "../pi_room.rs"]
 mod pi_room;
+#[path = "../pi_ctl.rs"]
+mod pi_ctl;
 #[path = "../releases.rs"]
 mod releases;
 
@@ -381,6 +383,101 @@ fn push_ui(ui: &MainWindow) {
     });
 }
 
+fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
+    match field {
+        "room-name" => {
+            pi_room::with(|room| room.room_name = text.to_string());
+            ui.set_room_name(text.into());
+        }
+        "location" => {
+            pi_room::with(|room| room.weather_loc = text.to_string());
+            ui.set_weather_loc(text.into());
+        }
+        "latitude" => {
+            pi_room::with(|room| room.latitude = text.to_string());
+            ui.set_latitude(text.into());
+        }
+        "longitude" => {
+            pi_room::with(|room| room.longitude = text.to_string());
+            ui.set_longitude(text.into());
+        }
+        "assistant-url" => {
+            pi_room::with(|room| room.assistant_url = text.to_string());
+            ui.set_assistant_url(text.into());
+        }
+        "palette" => {
+            pi_room::with(|room| room.palette_query = text.to_string());
+            ui.set_palette_query(text.into());
+        }
+        "wifi-pass" => ui.set_wifi_pass(text.into()),
+        _ => {}
+    }
+}
+
+fn kb_seed(ui: &MainWindow, field: &str) -> String {
+    match field {
+        "room-name" => ui.get_room_name().to_string(),
+        "location" => ui.get_weather_loc().to_string(),
+        "latitude" => ui.get_latitude().to_string(),
+        "longitude" => ui.get_longitude().to_string(),
+        "assistant-url" => ui.get_assistant_url().to_string(),
+        "palette" => ui.get_palette_query().to_string(),
+        "wifi-pass" => ui.get_wifi_pass().to_string(),
+        _ => String::new(),
+    }
+}
+
+fn load_wifi_status(ui: &MainWindow) {
+    let st = pi_ctl::wifi_status();
+    ui.set_wifi_ssid(st.ssid.into());
+    ui.set_wifi_ip(st.ip.into());
+    ui.set_wifi_state(st.state.into());
+}
+
+fn load_releases(ui: &MainWindow) {
+    ui.set_release_status("Checking GitHub…".into());
+    let weak = ui.as_weak();
+    std::thread::spawn(move || {
+        let rows = pi_ctl::version_rows();
+        let latest = releases::check_latest().ok();
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            match rows {
+                Ok(rows) => {
+                    let current = rows.iter().find(|r| r.current).map(|r| r.tag.clone());
+                    if ui.get_selected_release().is_empty() {
+                        if let Some(tag) = current {
+                            ui.set_selected_release(tag.into());
+                        }
+                    }
+                    let model: Vec<ReleaseRow> = rows
+                        .into_iter()
+                        .map(|r| ReleaseRow {
+                            tag: r.tag.into(),
+                            name: r.name.into(),
+                            current: r.current,
+                            installable: r.installable,
+                        })
+                        .collect();
+                    ui.set_releases(ModelRc::new(VecModel::from(model)));
+                    if let Some(n) = latest {
+                        ui.set_update_available(n.outdated);
+                        ui.set_update_label(format!("Judie {} is available", n.latest).into());
+                        ui.set_release_status(if n.outdated {
+                            format!("Update available: {}", n.latest)
+                        } else {
+                            format!("Up to date ({})", n.current)
+                        }.into());
+                    } else {
+                        ui.set_release_status("Release list loaded.".into());
+                    }
+                }
+                Err(err) => ui.set_release_status(err.into()),
+            }
+        });
+    });
+}
+
 fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     let refresh = move || {
@@ -450,9 +547,14 @@ fn bind(ui: &MainWindow) {
         r();
     });
     let r = refresh.clone();
+    let weak = ui.as_weak();
     ui.on_open_settings(move || {
         pi_room::with(|room| room.overlay = Overlay::Settings);
         r();
+        if let Some(ui) = weak.upgrade() {
+            load_wifi_status(&ui);
+            load_releases(&ui);
+        }
     });
     let r = refresh.clone();
     ui.on_open_palette(move || {
@@ -460,8 +562,12 @@ fn bind(ui: &MainWindow) {
         r();
     });
     let r = refresh.clone();
+    let weak = ui.as_weak();
     ui.on_close_overlay(move || {
         pi_room::with(|room| room.overlay = Overlay::None);
+        if let Some(ui) = weak.upgrade() {
+            ui.set_kb_open(false);
+        }
         r();
     });
     let r = refresh.clone();
@@ -740,6 +846,182 @@ fn bind(ui: &MainWindow) {
     ui.on_remove_routine(move |id| {
         pi_room::with(|room| room.remove_routine(id.as_str()));
         r();
+    });
+
+    let weak = ui.as_weak();
+    ui.on_check_updates(move || {
+        if let Some(ui) = weak.upgrade() {
+            load_releases(&ui);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_pick_release(move |tag| {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_selected_release(tag);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_install_tag(move |tag| {
+        let Some(ui) = weak.upgrade() else { return };
+        if ui.get_updating() {
+            return;
+        }
+        let tag = tag.to_string();
+        if tag.is_empty() {
+            ui.set_release_status("Pick a version first.".into());
+            return;
+        }
+        ui.set_updating(true);
+        ui.set_release_status(format!("Installing {tag}…").into());
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let result = releases::install_tag(&tag);
+            let _ = slint::invoke_from_event_loop(move || match result {
+                Ok(()) => std::process::exit(0),
+                Err(err) => {
+                    if let Some(ui) = weak.upgrade() {
+                        ui.set_updating(false);
+                        ui.set_release_status(err.clone().into());
+                        ui.set_update_error(err.into());
+                    }
+                }
+            });
+        });
+    });
+    let weak = ui.as_weak();
+    ui.on_scan_wifi(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        ui.set_wifi_busy(true);
+        ui.set_wifi_status("Scanning…".into());
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let result = pi_ctl::wifi_scan();
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(ui) = weak.upgrade() else { return };
+                ui.set_wifi_busy(false);
+                load_wifi_status(&ui);
+                match result {
+                    Ok(nets) => {
+                        let model: Vec<WifiNet> = nets
+                            .into_iter()
+                            .map(|n| WifiNet {
+                                ssid: n.ssid.into(),
+                                signal: n.signal.to_string().into(),
+                                secured: n.secured,
+                            })
+                            .collect();
+                        ui.set_wifi_status(format!("{} networks", model.len()).into());
+                        ui.set_wifi_nets(ModelRc::new(VecModel::from(model)));
+                    }
+                    Err(err) => ui.set_wifi_status(err.into()),
+                }
+            });
+        });
+    });
+    let weak = ui.as_weak();
+    ui.on_pick_wifi(move |ssid| {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_wifi_pick(ssid);
+            ui.set_wifi_status("Network selected. Type the password if needed, then CONNECT.".into());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_connect_wifi(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let ssid = ui.get_wifi_pick().to_string();
+        let pass = ui.get_wifi_pass().to_string();
+        ui.set_wifi_busy(true);
+        ui.set_wifi_status(format!("Connecting to {ssid}…").into());
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let result = pi_ctl::wifi_connect(&ssid, &pass);
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(ui) = weak.upgrade() else { return };
+                ui.set_wifi_busy(false);
+                load_wifi_status(&ui);
+                ui.set_wifi_status(match result {
+                    Ok(()) => "Connected.".into(),
+                    Err(err) => err.into(),
+                });
+            });
+        });
+    });
+    let weak = ui.as_weak();
+    ui.on_disconnect_wifi(move || {
+        let weak = weak.clone();
+        std::thread::spawn(move || {
+            let result = pi_ctl::wifi_disconnect();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak.upgrade() {
+                    load_wifi_status(&ui);
+                    ui.set_wifi_status(match result {
+                        Ok(()) => "Disconnected.".into(),
+                        Err(err) => err.into(),
+                    });
+                }
+            });
+        });
+    });
+    ui.on_reboot_now(move || {
+        let _ = pi_ctl::power("reboot");
+    });
+    ui.on_shutdown_now(move || {
+        let _ = pi_ctl::power("poweroff");
+    });
+    let weak = ui.as_weak();
+    ui.on_open_keyboard(move |field| {
+        let Some(ui) = weak.upgrade() else { return };
+        let field_s = field.to_string();
+        let seed = kb_seed(&ui, &field_s);
+        ui.set_kb_field(field);
+        ui.set_kb_text(seed.into());
+        ui.set_kb_open(true);
+        ui.set_kb_symbols(false);
+    });
+    let weak = ui.as_weak();
+    ui.on_keyboard_key(move |ch| {
+        let Some(ui) = weak.upgrade() else { return };
+        let mut text = ui.get_kb_text().to_string();
+        let mut key = ch.to_string();
+        if key.len() == 1 && key.chars().all(|c| c.is_ascii_alphabetic()) && ui.get_kb_shift() {
+            key = key.to_uppercase();
+            ui.set_kb_shift(false);
+        }
+        text.push_str(&key);
+        ui.set_kb_text(text.clone().into());
+        apply_kb_field(&ui, ui.get_kb_field().as_str(), &text);
+    });
+    let weak = ui.as_weak();
+    ui.on_keyboard_back(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let mut text = ui.get_kb_text().to_string();
+        text.pop();
+        ui.set_kb_text(text.clone().into());
+        apply_kb_field(&ui, ui.get_kb_field().as_str(), &text);
+    });
+    let weak = ui.as_weak();
+    ui.on_keyboard_submit(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        apply_kb_field(&ui, ui.get_kb_field().as_str(), ui.get_kb_text().as_str());
+        ui.set_kb_open(false);
+    });
+    let weak = ui.as_weak();
+    ui.on_keyboard_close(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_kb_open(false);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_kb_toggle_shift(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_kb_shift(!ui.get_kb_shift());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_kb_toggle_symbols(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_kb_symbols(!ui.get_kb_symbols());
+        }
     });
 }
 

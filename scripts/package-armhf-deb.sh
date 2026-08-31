@@ -34,6 +34,8 @@ mkdir -p \
 
 install -m755 "$BIN" "$STAGING/usr/bin/judie"
 install -m755 "$ROOT/src-tauri/linux/apply-update" "$STAGING/usr/lib/judie/apply-update"
+install -m755 "$ROOT/src-tauri/linux/wifi" "$STAGING/usr/lib/judie/wifi"
+install -m755 "$ROOT/src-tauri/linux/power" "$STAGING/usr/lib/judie/power"
 install -m755 "$ROOT/src-tauri/linux/kiosk" "$STAGING/usr/lib/judie/kiosk"
 install -m755 "$ROOT/src-tauri/linux/xinitrc" "$STAGING/usr/lib/judie/xinitrc"
 install -m755 "$ROOT/src-tauri/linux/wait-display" "$STAGING/usr/lib/judie/wait-display"
@@ -51,7 +53,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: sudo, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6
+Depends: sudo, iw, wpasupplicant, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6
 Maintainer: Judie <judie@local>
 Description: Judie room control (native Pi kiosk)
  Native Slint UI for Raspberry Pi — no WebKit process. Boots via systemd + bare Xorg.
@@ -60,7 +62,7 @@ EOF
 cat >"$STAGING/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
-chmod 755 /usr/lib/judie/apply-update /usr/lib/judie/kiosk /usr/lib/judie/xinitrc /usr/lib/judie/wait-display 2>/dev/null || true
+chmod 755 /usr/lib/judie/apply-update /usr/lib/judie/wifi /usr/lib/judie/power /usr/lib/judie/kiosk /usr/lib/judie/xinitrc /usr/lib/judie/wait-display 2>/dev/null || true
 chmod 440 /etc/sudoers.d/judie-update 2>/dev/null || true
 
 KIOSK_USER=""

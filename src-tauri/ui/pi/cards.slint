@@ -87,6 +87,19 @@ export struct SlopNode {
     value: float,
 }
 
+export struct ReleaseRow {
+    tag: string,
+    name: string,
+    current: bool,
+    installable: bool,
+}
+
+export struct WifiNet {
+    ssid: string,
+    signal: string,
+    secured: bool,
+}
+
 // Dockyard tokens: black canvas, hairline panels, mono caps, data accents only.
 export global Dy {
     out property <color> canvas: #000000;
@@ -132,42 +145,44 @@ export component Pill inherits Rectangle {
     border-width: 1px;
     border-color: root.on ? Dy.cyan : Dy.border;
     background: root.on ? #0a1a1e : Dy.canvas;
-    height: 28px;
-    min-width: 64px;
+    height: 100px;
+    min-width: 100px;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.label;
         color: root.on ? Dy.cyan : Dy.text;
-        font-size: 11px;
+        font-size: 16px;
         font-weight: 600;
         font-family: Dy.mono;
         horizontal-alignment: center;
         vertical-alignment: center;
+        wrap: word-wrap;
     }
 }
 
 export component Toggle inherits Rectangle {
     in-out property <bool> on;
     callback toggled;
-    width: 40px;
-    height: 20px;
+    width: 100px;
+    height: 100px;
     border-radius: 0px;
     border-width: 1px;
     border-color: root.on ? Dy.cyan : Dy.border;
-    background: Dy.canvas;
+    background: root.on ? #0a1a1e : Dy.canvas;
     TouchArea {
         clicked => {
             root.on = !root.on;
             root.toggled();
         }
     }
-    Rectangle {
-        x: root.on ? parent.width - 16px : 3px;
-        y: 3px;
-        width: 14px;
-        height: 14px;
-        border-radius: 0px;
-        background: root.on ? Dy.cyan : Dy.muted;
+    Text {
+        text: root.on ? "ON" : "OFF";
+        color: root.on ? Dy.cyan : Dy.muted;
+        font-size: 18px;
+        font-weight: 700;
+        font-family: Dy.mono;
+        horizontal-alignment: center;
+        vertical-alignment: center;
     }
 }
 
@@ -188,8 +203,8 @@ export component IconBtn inherits Rectangle {
     in property <string> glyph;
     in property <bool> primary: false;
     callback clicked;
-    width: 36px;
-    height: 36px;
+    width: 100px;
+    height: 100px;
     border-radius: 0px;
     border-width: 1px;
     border-color: root.primary ? Dy.text : Dy.border;
@@ -198,7 +213,89 @@ export component IconBtn inherits Rectangle {
     Text {
         text: root.glyph;
         color: root.primary ? Dy.canvas : Dy.text;
-        font-size: 14px;
+        font-size: 28px;
+        font-weight: 700;
+        font-family: Dy.mono;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component HitBtn inherits Rectangle {
+    in property <string> label;
+    in property <string> kicker;
+    in property <bool> danger: false;
+    in property <bool> warn: false;
+    callback clicked;
+    min-width: 100px;
+    min-height: 100px;
+    border-radius: 0px;
+    border-width: 1px;
+    border-color: root.danger ? Dy.red : (root.warn ? Dy.amber : Dy.cyan);
+    background: Dy.canvas;
+    TouchArea { clicked => { root.clicked(); } }
+    VerticalLayout {
+        padding: 10px;
+        spacing: 6px;
+        alignment: center;
+        if root.kicker != "": Text {
+            text: root.kicker;
+            color: Dy.muted;
+            font-size: 12px;
+            font-family: Dy.mono;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: root.label;
+            color: root.danger ? Dy.red : (root.warn ? Dy.amber : Dy.cyan);
+            font-size: 18px;
+            font-weight: 700;
+            font-family: Dy.mono;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+export component FieldTap inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <bool> active: false;
+    callback tapped;
+    height: 100px;
+    border-width: 1px;
+    border-color: root.active ? Dy.cyan : Dy.border;
+    background: Dy.canvas;
+    TouchArea { clicked => { root.tapped(); } }
+    VerticalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        alignment: center;
+        Text { text: root.label; color: Dy.muted; font-size: 12px; font-family: Dy.mono; }
+        Text {
+            text: root.value == "" ? "TAP TO TYPE" : root.value;
+            color: Dy.text;
+            font-size: 18px;
+            font-family: Dy.mono;
+            overflow: elide;
+        }
+    }
+}
+
+export component KeyBtn inherits Rectangle {
+    in property <string> glyph;
+    in property <bool> wide: false;
+    callback clicked;
+    min-width: 100px;
+    height: 100px;
+    horizontal-stretch: root.wide ? 2 : 1;
+    border-width: 1px;
+    border-color: Dy.border;
+    background: Dy.canvas;
+    TouchArea { clicked => { root.clicked(); } }
+    Text {
+        text: root.glyph;
+        color: Dy.text;
+        font-size: 22px;
         font-weight: 700;
         font-family: Dy.mono;
         horizontal-alignment: center;
@@ -258,10 +355,10 @@ export component TileShell inherits Rectangle {
     }
 
     if root.editing: TouchArea {
-        x: parent.width - 28px;
+        x: parent.width - 108px;
         y: 6px;
-        width: 22px;
-        height: 22px;
+        width: 100px;
+        height: 100px;
         clicked => { root.remove(); }
         Rectangle {
             border-radius: 0px;
@@ -283,8 +380,8 @@ export component TileShell inherits Rectangle {
     if root.editing: TouchArea {
         x: 6px;
         y: 6px;
-        width: 44px;
-        height: 22px;
+        width: 100px;
+        height: 100px;
         clicked => { root.cycle-size(); }
         Rectangle {
             border-radius: 0px;

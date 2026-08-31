@@ -1,0 +1,15 @@
+#!/bin/sh
+# Passwordless helper: power reboot | poweroff
+set -e
+case "${1:-}" in
+  reboot)
+    /sbin/reboot
+    ;;
+  poweroff)
+    /sbin/poweroff
+    ;;
+  *)
+    echo "usage: power reboot|poweroff" >&2
+    exit 1
+    ;;
+esac

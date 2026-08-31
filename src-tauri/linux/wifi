@@ -1,0 +1,112 @@
+#!/bin/sh
+# Passwordless helper: wifi status | scan | connect <ssid> [psk] | disconnect
+set -e
+export LC_ALL=C
+CMD="${1:-}"
+
+iface() {
+  iw dev 2>/dev/null | awk '/Interface/{print $2; exit}'
+}
+
+IFACE="$(iface)"
+[ -n "$IFACE" ] || IFACE=wlan0
+
+safe_ssid() {
+  printf '%s' "$1" | tr -d '\n\r\t' | cut -c1-32
+}
+
+status() {
+  SSID=""
+  IP=""
+  STATE="$(cat "/sys/class/net/$IFACE/operstate" 2>/dev/null || echo down)"
+  if command -v nmcli >/dev/null 2>&1; then
+    SSID="$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')"
+    IP="$(nmcli -t -f IP4.ADDRESS device show "$IFACE" 2>/dev/null | head -1 | cut -d: -f2 | cut -d/ -f1)"
+  fi
+  if [ -z "$SSID" ]; then
+    SSID="$(iw dev "$IFACE" link 2>/dev/null | awk -F': ' '/SSID/{print $2; exit}')"
+  fi
+  if [ -z "$IP" ]; then
+    IP="$(ip -4 -o addr show "$IFACE" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+  fi
+  [ -n "$SSID" ] || SSID="—"
+  [ -n "$IP" ] || IP="—"
+  printf '%s\t%s\t%s\n' "$SSID" "$IP" "$STATE"
+}
+
+scan() {
+  rfkill unblock wifi >/dev/null 2>&1 || true
+  ip link set "$IFACE" up >/dev/null 2>&1 || true
+  if command -v nmcli >/dev/null 2>&1; then
+    nmcli device wifi rescan >/dev/null 2>&1 || true
+    nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null | awk -F: '
+      $1 != "" {
+        sec = ($3 == "" || $3 == "--") ? "open" : "psk"
+        printf "%s\t%s\t%s\n", $1, $2, sec
+      }
+    '
+    return 0
+  fi
+  iw dev "$IFACE" scan 2>/dev/null | awk '
+    /^BSS / {
+      if (ssid != "") printf "%s\t%s\t%s\n", ssid, sig, sec
+      ssid = ""; sig = 0; sec = "open"
+    }
+    /SSID: / {
+      sub(/^[[:space:]]*SSID: /, "")
+      ssid = $0
+    }
+    /signal: / { sig = int($2) }
+    /capability:.*Privacy/ { sec = "psk" }
+    /RSN:/ { sec = "psk" }
+    /WPA:/ { sec = "psk" }
+    END { if (ssid != "") printf "%s\t%s\t%s\n", ssid, sig, sec }
+  '
+}
+
+connect() {
+  SSID="$(safe_ssid "${2:-}")"
+  PSK="${3:-}"
+  [ -n "$SSID" ] || { echo "missing ssid" >&2; exit 1; }
+  rfkill unblock wifi >/dev/null 2>&1 || true
+  ip link set "$IFACE" up >/dev/null 2>&1 || true
+  if command -v nmcli >/dev/null 2>&1; then
+    if [ -n "$PSK" ]; then
+      nmcli device wifi connect "$SSID" password "$PSK"
+    else
+      nmcli device wifi connect "$SSID"
+    fi
+    return 0
+  fi
+  if ! command -v wpa_cli >/dev/null 2>&1; then
+    echo "no nmcli or wpa_cli" >&2
+    exit 1
+  fi
+  wpa_cli -i "$IFACE" remove_network all >/dev/null 2>&1 || true
+  ID="$(wpa_cli -i "$IFACE" add_network | tail -1)"
+  wpa_cli -i "$IFACE" set_network "$ID" ssid "\"$SSID\"" >/dev/null
+  if [ -n "$PSK" ]; then
+    wpa_cli -i "$IFACE" set_network "$ID" psk "\"$PSK\"" >/dev/null
+  else
+    wpa_cli -i "$IFACE" set_network "$ID" key_mgmt NONE >/dev/null
+  fi
+  wpa_cli -i "$IFACE" enable_network "$ID" >/dev/null
+  wpa_cli -i "$IFACE" save_config >/dev/null
+  wpa_cli -i "$IFACE" reassociate >/dev/null || true
+}
+
+disconnect() {
+  if command -v nmcli >/dev/null 2>&1; then
+    nmcli device disconnect "$IFACE" || true
+    return 0
+  fi
+  wpa_cli -i "$IFACE" disconnect >/dev/null 2>&1 || true
+}
+
+case "$CMD" in
+  status) status ;;
+  scan) scan ;;
+  connect) connect "$@" ;;
+  disconnect) disconnect ;;
+  *) echo "usage: wifi status|scan|connect|disconnect" >&2; exit 1 ;;
+esac

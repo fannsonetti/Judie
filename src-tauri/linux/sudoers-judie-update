@@ -1,2 +1,4 @@
-# Judie may apply a staged .deb without a password prompt.
+# Judie kiosk helpers — no password on the panel.
 ALL ALL=(root) NOPASSWD: /usr/lib/judie/apply-update
+ALL ALL=(root) NOPASSWD: /usr/lib/judie/wifi
+ALL ALL=(root) NOPASSWD: /usr/lib/judie/power
