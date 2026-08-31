@@ -42,6 +42,7 @@ install -m755 "$ROOT/src-tauri/linux/wait-display" "$STAGING/usr/lib/judie/wait-
 install -m644 "$ROOT/src-tauri/linux/Xwrapper.config" "$STAGING/usr/lib/judie/Xwrapper.config"
 install -m644 "$ROOT/src-tauri/linux/10-noscreenblank.conf" "$STAGING/usr/lib/judie/10-noscreenblank.conf"
 install -m644 "$ROOT/src-tauri/linux/20-pi-fbdev.conf" "$STAGING/usr/lib/judie/20-pi-fbdev.conf"
+install -m644 "$ROOT/src-tauri/linux/20-pi-modeset.conf" "$STAGING/usr/lib/judie/20-pi-modeset.conf"
 install -m644 "$ROOT/src-tauri/linux/judie.service" "$STAGING/lib/systemd/system/judie.service"
 install -m440 "$ROOT/src-tauri/linux/sudoers-judie-update" "$STAGING/etc/sudoers.d/judie-update"
 install -m644 "$ROOT/src-tauri/linux/judie.desktop" "$STAGING/usr/share/applications/judie.desktop"
@@ -98,10 +99,13 @@ mkdir -p /etc/X11/xorg.conf.d
 if [ -f /usr/lib/judie/10-noscreenblank.conf ]; then
   cp /usr/lib/judie/10-noscreenblank.conf /etc/X11/xorg.conf.d/10-noscreenblank.conf
 fi
-# Match the working Linux console path: vc4 DRM framebuffer, 16-bit.
-# modesetting/glamor has been presenting in X while the panel stayed dark.
-if [ -f /usr/lib/judie/20-pi-fbdev.conf ]; then
+# fbdev needs /dev/fb0. This Pi often only has DRM (card0); modesetting then.
+if [ -e /dev/fb0 ] && [ -f /usr/lib/judie/20-pi-fbdev.conf ]; then
   cp /usr/lib/judie/20-pi-fbdev.conf /etc/X11/xorg.conf.d/20-pi-fbdev.conf
+  rm -f /etc/X11/xorg.conf.d/20-pi-modeset.conf
+elif [ -f /usr/lib/judie/20-pi-modeset.conf ]; then
+  cp /usr/lib/judie/20-pi-modeset.conf /etc/X11/xorg.conf.d/20-pi-modeset.conf
+  rm -f /etc/X11/xorg.conf.d/20-pi-fbdev.conf
 fi
 
 if command -v update-desktop-database >/dev/null 2>&1; then
