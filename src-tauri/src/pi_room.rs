@@ -1,8 +1,11 @@
-//! Room state for the native Pi UI — same defaults as the web home screen.
+//! Room state for the native Pi UI — same defaults as the live Windows home screen.
 
+use chrono::Datelike;
+use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Light {
     pub id: String,
     pub name: String,
@@ -37,12 +40,394 @@ pub struct Hour {
 pub struct Activity {
     pub title: String,
     pub source: String,
+    pub time: String,
 }
 
 #[derive(Clone)]
 pub struct TimerItem {
     pub label: String,
     pub remain: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Slot {
+    pub id: String,
+    pub kind: String,
+    pub size: String,
+    pub col: i32,
+    pub row: i32,
+    #[serde(default)]
+    pub page: i32,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub custom_id: String,
+}
+
+#[derive(Clone)]
+pub struct CalCell {
+    pub label: String,
+    pub today: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SlopNode {
+    pub id: String,
+    pub kind: String,
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    #[serde(default)]
+    pub text: String,
+    #[serde(default = "default_color")]
+    pub color: String,
+    #[serde(default)]
+    pub value: f32,
+}
+
+fn default_color() -> String {
+    "#f4f5f7".into()
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CustomWidget {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub sizes: Vec<String>,
+    #[serde(default)]
+    pub layouts: std::collections::BTreeMap<String, Vec<SlopNode>>,
+}
+
+#[derive(Clone)]
+pub struct Routine {
+    pub id: String,
+    pub name: String,
+    pub phrases: Vec<String>,
+    pub builtin: bool,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct Persist {
+    #[serde(default)]
+    slots: Vec<Slot>,
+    #[serde(default)]
+    custom: Vec<CustomWidget>,
+}
+
+pub const GRID_COLS: i32 = 6;
+pub const GRID_ROWS: i32 = 4;
+pub const MAX_PAGES: i32 = 6;
+
+fn size_dims(size: &str) -> (i32, i32) {
+    match size {
+        "1x2" => (2, 1),
+        "2x2" => (2, 2),
+        _ => (1, 1),
+    }
+}
+
+fn slot(id: &str, kind: &str, size: &str, col: i32, row: i32) -> Slot {
+    Slot {
+        id: id.into(),
+        kind: kind.into(),
+        size: size.into(),
+        col,
+        row,
+        page: 0,
+        label: String::new(),
+        custom_id: String::new(),
+    }
+}
+
+/// Same 6×4 placement as the live Windows home (PID 24608).
+fn default_slots() -> Vec<Slot> {
+    vec![
+        slot("quick-1", "quickControls", "1x1", 0, 0),
+        slot("climate-1", "climate", "1x1", 1, 0),
+        slot("calendar-1", "calendar", "1x2", 2, 0),
+        slot("purifier-1", "purifier", "2x2", 4, 0),
+        slot("activity-1", "activity", "1x1", 0, 1),
+        slot("server-1", "server", "1x2", 1, 1),
+        slot("weather-1", "weather", "1x1", 3, 1),
+        slot("lights-1", "lights", "2x2", 0, 2),
+        slot("activity-2", "activity", "2x2", 2, 2),
+    ]
+}
+
+pub fn supported_sizes(kind: &str) -> &'static [&'static str] {
+    match kind {
+        "climate" | "quickControls" | "server" | "timers" => &["1x1", "1x2"],
+        _ => &["1x1", "1x2", "2x2"],
+    }
+}
+
+pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
+    &[
+        ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
+        ("calendar", "Calendar", "Upcoming events and the month at a glance."),
+        ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
+        ("lights", "Lights", "Toggles, brightness, and colour for the room."),
+        ("media", "Media", "Now playing, volume, and skip."),
+        ("purifier", "Air Purifier", "Air quality, filter, and purifier mode."),
+        ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
+        ("server", "Server Status", "Health and latency of local services."),
+        ("system", "System", "CPU, memory, and top processes."),
+        ("timers", "Timers", "Running timers and reminders."),
+        ("weather", "Weather", "Local conditions and the next few hours."),
+    ]
+}
+
+fn occupied_grid(slots: &[Slot], page: i32, skip: Option<&str>) -> Vec<Vec<bool>> {
+    let mut grid = vec![vec![false; GRID_COLS as usize]; GRID_ROWS as usize];
+    for s in slots {
+        if s.page != page {
+            continue;
+        }
+        if skip.is_some_and(|id| s.id == id) {
+            continue;
+        }
+        let (w, h) = size_dims(&s.size);
+        for r in s.row..s.row + h {
+            for c in s.col..s.col + w {
+                if r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS {
+                    grid[r as usize][c as usize] = true;
+                }
+            }
+        }
+    }
+    grid
+}
+
+fn first_free_on_page(slots: &[Slot], size: &str, page: i32) -> Option<(i32, i32)> {
+    let (w, h) = size_dims(size);
+    let grid = occupied_grid(slots, page, None);
+    for row in 0..=GRID_ROWS - h {
+        for col in 0..=GRID_COLS - w {
+            let mut ok = true;
+            'cells: for r in row..row + h {
+                for c in col..col + w {
+                    if grid[r as usize][c as usize] {
+                        ok = false;
+                        break 'cells;
+                    }
+                }
+            }
+            if ok {
+                return Some((col, row));
+            }
+        }
+    }
+    None
+}
+
+fn first_free(slots: &[Slot], size: &str, prefer_page: i32) -> Option<(i32, i32, i32)> {
+    let start = prefer_page.clamp(0, MAX_PAGES - 1);
+    for page in start..MAX_PAGES {
+        if let Some((col, row)) = first_free_on_page(slots, size, page) {
+            return Some((col, row, page));
+        }
+    }
+    for page in 0..start {
+        if let Some((col, row)) = first_free_on_page(slots, size, page) {
+            return Some((col, row, page));
+        }
+    }
+    None
+}
+
+fn can_place(slots: &[Slot], size: &str, page: i32, col: i32, row: i32, skip: Option<&str>) -> bool {
+    let (w, h) = size_dims(size);
+    if col < 0 || row < 0 || col + w > GRID_COLS || row + h > GRID_ROWS {
+        return false;
+    }
+    if page < 0 || page >= MAX_PAGES {
+        return false;
+    }
+    let grid = occupied_grid(slots, page, skip);
+    for r in row..row + h {
+        for c in col..col + w {
+            if grid[r as usize][c as usize] {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn month_cells() -> Vec<CalCell> {
+    let now = chrono::Local::now().date_naive();
+    let today = now.day();
+    let start = now.with_day(1).unwrap_or(now);
+    let weekday = start.weekday().num_days_from_sunday();
+    let days = days_in_month(now.year(), now.month());
+    let mut cells = Vec::new();
+    for _ in 0..weekday {
+        cells.push(CalCell {
+            label: String::new(),
+            today: false,
+        });
+    }
+    for d in 1..=days {
+        cells.push(CalCell {
+            label: d.to_string(),
+            today: d == today,
+        });
+    }
+    while cells.len() < 42 {
+        cells.push(CalCell {
+            label: String::new(),
+            today: false,
+        });
+    }
+    cells.truncate(42);
+    cells
+}
+
+fn days_in_month(year: i32, month: u32) -> u32 {
+    let next = if month == 12 {
+        chrono::NaiveDate::from_ymd_opt(year + 1, 1, 1)
+    } else {
+        chrono::NaiveDate::from_ymd_opt(year, month + 1, 1)
+    };
+    let this = chrono::NaiveDate::from_ymd_opt(year, month, 1);
+    match (this, next) {
+        (Some(a), Some(b)) => (b - a).num_days() as u32,
+        _ => 31,
+    }
+}
+
+fn data_dir() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/fannsonetti".into());
+    PathBuf::from(home).join(".local/share/judie")
+}
+
+fn persist_path() -> PathBuf {
+    data_dir().join("layout.json")
+}
+
+fn load_persist() -> Persist {
+    let path = persist_path();
+    std::fs::read_to_string(&path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_persist(slots: &[Slot], custom: &[CustomWidget]) {
+    let dir = data_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let persist = Persist {
+        slots: slots.to_vec(),
+        custom: custom.to_vec(),
+    };
+    if let Ok(json) = serde_json::to_string_pretty(&persist) {
+        let _ = std::fs::write(persist_path(), json);
+    }
+}
+
+fn parse_hex(color: &str) -> (i32, i32, i32) {
+    let s = color.trim().trim_start_matches('#');
+    if s.len() >= 6 {
+        let r = i32::from_str_radix(&s[0..2], 16).unwrap_or(244);
+        let g = i32::from_str_radix(&s[2..4], 16).unwrap_or(245);
+        let b = i32::from_str_radix(&s[4..6], 16).unwrap_or(247);
+        (r, g, b)
+    } else {
+        (244, 245, 247)
+    }
+}
+
+fn n(kind: &str, x: f32, y: f32, w: f32, h: f32, text: &str, color: &str) -> SlopNode {
+    SlopNode {
+        id: format!("{kind}-{}-{}", x as i32, y as i32),
+        kind: kind.into(),
+        x,
+        y,
+        w,
+        h,
+        text: text.into(),
+        color: color.into(),
+        value: 0.62,
+    }
+}
+
+fn template_nodes(template: &str, size: &str) -> Vec<SlopNode> {
+    match (template, size) {
+        ("stat", "1x2") => vec![
+            n("text", 5.0, 10.0, 30.0, 12.0, "INDOOR", "#8b909d"),
+            n("metric", 5.0, 32.0, 40.0, 40.0, "21°", "#f4f5f7"),
+            n("text", 50.0, 18.0, 45.0, 14.0, "Humidity 42%", "#8b909d"),
+            n("text", 50.0, 40.0, 45.0, 14.0, "Outdoor 9°", "#8b909d"),
+            n("text", 5.0, 78.0, 80.0, 14.0, "Comfortable", "#8b909d"),
+        ],
+        ("stat", "2x2") => vec![
+            n("text", 8.0, 8.0, 40.0, 10.0, "INDOOR", "#8b909d"),
+            n("metric", 8.0, 22.0, 50.0, 28.0, "21°", "#f4f5f7"),
+            n("text", 8.0, 54.0, 80.0, 10.0, "Comfortable", "#8b909d"),
+            n("bar", 8.0, 70.0, 84.0, 10.0, "", "#2d7bff"),
+            n("text", 8.0, 84.0, 80.0, 10.0, "Humidity 42%", "#8b909d"),
+        ],
+        ("status", _) => vec![
+            n("text", 8.0, 8.0, 70.0, 12.0, "STATUS", "#8b909d"),
+            n("chip", 8.0, 28.0, 36.0, 16.0, "Online", "#3dd68c"),
+            n("text", 8.0, 52.0, 80.0, 14.0, "Core 122 ms", "#f4f5f7"),
+            n("text", 8.0, 70.0, 80.0, 14.0, "4 / 5 up", "#8b909d"),
+        ],
+        ("controls", _) => vec![
+            n("text", 8.0, 8.0, 70.0, 12.0, "SCENE", "#8b909d"),
+            n("button", 8.0, 28.0, 40.0, 22.0, "Night", "#2d7bff"),
+            n("button", 52.0, 28.0, 40.0, 22.0, "Movie", "#22252f"),
+            n("toggle", 8.0, 60.0, 28.0, 16.0, "On", "#2d7bff"),
+            n("text", 40.0, 62.0, 50.0, 12.0, "Master", "#f4f5f7"),
+        ],
+        ("list", _) => vec![
+            n("text", 8.0, 8.0, 80.0, 12.0, "ACTIVITY", "#8b909d"),
+            n("list", 8.0, 24.0, 84.0, 68.0, "Do Not Disturb\nGood Night\nMovie Mode", "#f4f5f7"),
+        ],
+        ("blank", _) => vec![],
+        _ => vec![
+            n("text", 8.0, 8.0, 70.0, 10.0, "INDOOR", "#8b909d"),
+            n("metric", 8.0, 28.0, 84.0, 36.0, "21°", "#f4f5f7"),
+            n("text", 8.0, 72.0, 80.0, 12.0, "Comfortable", "#8b909d"),
+        ],
+    }
+}
+
+fn default_routines() -> Vec<Routine> {
+    vec![
+        Routine {
+            id: "goodNight".into(),
+            name: "Good Night".into(),
+            phrases: vec!["good night".into(), "bedtime".into()],
+            builtin: true,
+        },
+        Routine {
+            id: "movie".into(),
+            name: "Movie".into(),
+            phrases: vec!["movie mode".into(), "movie time".into()],
+            builtin: true,
+        },
+        Routine {
+            id: "away".into(),
+            name: "Away".into(),
+            phrases: vec!["away mode".into(), "i am leaving".into()],
+            builtin: true,
+        },
+        Routine {
+            id: "morning".into(),
+            name: "Morning".into(),
+            phrases: vec!["good morning".into(), "start the day".into()],
+            builtin: true,
+        },
+        Routine {
+            id: "home".into(),
+            name: "Home".into(),
+            phrases: vec!["i am home".into(), "i am back".into()],
+            builtin: true,
+        },
+    ]
 }
 
 pub struct Room {
@@ -71,17 +456,39 @@ pub struct Room {
     pub purifier_aq: String,
     pub purifier_filter: u8,
     pub room_name: String,
+    pub assistant_url: String,
+    pub latitude: String,
+    pub longitude: String,
     pub voice: bool,
     pub speak: bool,
     pub units_metric: bool,
+    pub notice_timers: bool,
+    pub notice_calendar: bool,
+    pub notice_weather: bool,
+    pub notice_air: bool,
+    pub notice_devices: bool,
     pub overlay: Overlay,
     pub settings_tab: i32,
     pub palette_query: String,
     pub palette_reply: String,
     pub edit_mode: bool,
     pub page: i32,
+    pub slots: Vec<Slot>,
+    pub custom: Vec<CustomWidget>,
+    pub gallery_kind: String,
+    pub gallery_size: String,
+    pub gallery_query: String,
+    pub gallery_custom_id: String,
+    pub creator_name: String,
+    pub creator_template: String,
+    pub creator_size: String,
+    pub creator_nodes: Vec<SlopNode>,
+    pub creator_selected: String,
+    pub pending_remove: String,
+    pub cal_cells: Vec<CalCell>,
     pub activity: Vec<Activity>,
     pub timers: Vec<TimerItem>,
+    pub routines: Vec<Routine>,
     pub expanded: Expanded,
 }
 
@@ -91,6 +498,7 @@ pub enum Overlay {
     Settings,
     Palette,
     Gallery,
+    Creator,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -105,15 +513,22 @@ pub enum Expanded {
 
 impl Default for Room {
     fn default() -> Self {
-        Self {
+        let persist = load_persist();
+        let slots = if persist.slots.is_empty() {
+            default_slots()
+        } else {
+            persist.slots
+        };
+        let custom = persist.custom;
+        let mut room = Self {
             lights: vec![
-                Light { id: "bed".into(), name: "Bed LEDs".into(), on: true, brightness: 72, color: "#FFB366".into() },
-                Light { id: "sofa".into(), name: "Sofa LEDs".into(), on: true, brightness: 65, color: "#FFB366".into() },
-                Light { id: "shelf".into(), name: "Shelf LEDs".into(), on: true, brightness: 55, color: "#FFC98A".into() },
-                Light { id: "ceiling".into(), name: "Ceiling Light".into(), on: true, brightness: 80, color: "#FFF0E0".into() },
-                Light { id: "desk".into(), name: "Desk Light".into(), on: false, brightness: 70, color: "#E8F0FF".into() },
+                Light { id: "bed".into(), name: "Bed LEDs".into(), on: true, brightness: 8, color: "#FF8C42".into() },
+                Light { id: "sofa".into(), name: "Sofa LEDs".into(), on: true, brightness: 8, color: "#2D7BFF".into() },
+                Light { id: "shelf".into(), name: "Shelf LEDs".into(), on: true, brightness: 8, color: "#FF8C42".into() },
+                Light { id: "ceiling".into(), name: "Ceiling Light".into(), on: true, brightness: 8, color: "#2D7BFF".into() },
+                Light { id: "desk".into(), name: "Desk Light".into(), on: true, brightness: 8, color: "#FF8C42".into() },
             ],
-            scene: "Cozy".into(),
+            scene: "Night".into(),
             dnd: false,
             playing: false,
             volume: 62,
@@ -128,22 +543,22 @@ impl Default for Room {
             ],
             progress: 0.22,
             indoor: 21.4,
-            outdoor: 11,
+            outdoor: 9,
             humidity: 42,
             weather_loc: "Hafnarfjörður".into(),
-            weather_temp: 11,
-            weather_cond: "Cloudy".into(),
-            weather_high: 13,
-            weather_low: 9,
-            weather_feel: "Cool and damp".into(),
-            weather_note: "Rain around 22:00".into(),
+            weather_temp: 9,
+            weather_cond: "Clear".into(),
+            weather_high: 11,
+            weather_low: 8,
+            weather_feel: "Cool and clear".into(),
+            weather_note: "Clear skies overnight".into(),
             hours: vec![
-                Hour { hour: "20".into(), temp: 11, precip: 20 },
-                Hour { hour: "21".into(), temp: 10, precip: 35 },
-                Hour { hour: "22".into(), temp: 9, precip: 70 },
-                Hour { hour: "23".into(), temp: 9, precip: 65 },
-                Hour { hour: "00".into(), temp: 8, precip: 40 },
-                Hour { hour: "01".into(), temp: 8, precip: 25 },
+                Hour { hour: "20".into(), temp: 10, precip: 5 },
+                Hour { hour: "21".into(), temp: 9, precip: 5 },
+                Hour { hour: "22".into(), temp: 9, precip: 8 },
+                Hour { hour: "23".into(), temp: 8, precip: 10 },
+                Hour { hour: "00".into(), temp: 8, precip: 8 },
+                Hour { hour: "01".into(), temp: 8, precip: 5 },
             ],
             events: vec![
                 Event { time: "09:00".into(), title: "Coffee & planning".into(), detail: "Kitchen".into(), day_offset: 0 },
@@ -155,31 +570,74 @@ impl Default for Room {
             purifier_on: true,
             purifier_mode: "Auto".into(),
             purifier_aq: "Good".into(),
-            purifier_filter: 38,
+            purifier_filter: 76,
             room_name: "Room".into(),
+            assistant_url: "http://127.0.0.1:8742".into(),
+            latitude: "64.07".into(),
+            longitude: "-21.95".into(),
             voice: true,
             speak: true,
             units_metric: true,
+            notice_timers: true,
+            notice_calendar: true,
+            notice_weather: true,
+            notice_air: true,
+            notice_devices: true,
             overlay: Overlay::None,
             settings_tab: 0,
             palette_query: String::new(),
             palette_reply: String::new(),
             edit_mode: false,
             page: 0,
+            slots,
+            custom,
+            gallery_kind: "activity".into(),
+            gallery_size: "1x1".into(),
+            gallery_query: String::new(),
+            gallery_custom_id: String::new(),
+            creator_name: "Untitled".into(),
+            creator_template: "stat".into(),
+            creator_size: "1x1".into(),
+            creator_nodes: template_nodes("stat", "1x1"),
+            creator_selected: String::new(),
+            pending_remove: String::new(),
+            cal_cells: month_cells(),
             activity: vec![
-                Activity { title: "Judie started".into(), source: "system".into() },
-                Activity { title: "Cozy scene".into(), source: "lights".into() },
+                Activity { title: "Do Not Disturb".into(), source: "Manual".into(), time: "17:24".into() },
+                Activity { title: "Good Night".into(), source: "Routine".into(), time: "17:24".into() },
+                Activity { title: "Good Night".into(), source: "Routine".into(), time: "22:03".into() },
+                Activity { title: "Movie Mode".into(), source: "Routine".into(), time: "22:03".into() },
             ],
             timers: vec![
                 TimerItem { label: "Tea".into(), remain: "3:20".into() },
                 TimerItem { label: "Laundry".into(), remain: "18:00".into() },
             ],
+            routines: default_routines(),
             expanded: Expanded::None,
-        }
+        };
+        room.import_json_files();
+        room
     }
 }
 
 impl Room {
+    fn persist(&self) {
+        save_persist(&self.slots, &self.custom);
+    }
+
+    pub fn used_page_count(&self) -> i32 {
+        self.slots.iter().map(|s| s.page).max().unwrap_or(0) + 1
+    }
+
+    pub fn visible_page_count(&self) -> i32 {
+        let used = self.used_page_count().max(1);
+        if self.edit_mode && used < MAX_PAGES {
+            used + 1
+        } else {
+            used
+        }
+    }
+
     pub fn master_on(&self) -> bool {
         self.lights.iter().any(|l| l.on)
     }
@@ -303,6 +761,14 @@ impl Room {
         };
     }
 
+    pub fn set_purifier_mode(&mut self, mode: &str) {
+        self.purifier_mode = match mode.to_lowercase().as_str() {
+            "sleep" => "Sleep".into(),
+            "manual" | "boost" => "Manual".into(),
+            _ => "Auto".into(),
+        };
+    }
+
     pub fn quick(&mut self, action: &str) {
         match action {
             "dnd" => self.toggle_dnd(),
@@ -318,6 +784,24 @@ impl Room {
                 self.set_scene("Movie");
                 self.volume = 35;
                 self.push("Routine", "Movie");
+            }
+            "away" => {
+                self.set_master_power(false);
+                self.playing = false;
+                self.set_purifier_mode("auto");
+                self.push("Routine", "Away");
+            }
+            "morning" => {
+                self.set_scene("Bright");
+                self.dnd = false;
+                self.set_purifier_mode("auto");
+                self.push("Routine", "Morning");
+            }
+            "home" => {
+                self.set_master_power(true);
+                self.dnd = false;
+                self.set_purifier_mode("auto");
+                self.push("Routine", "Home");
             }
             _ => {}
         }
@@ -341,6 +825,7 @@ impl Room {
             Activity {
                 title: title.into(),
                 source: source.into(),
+                time: chrono::Local::now().format("%H:%M").to_string(),
             },
         );
         self.activity.truncate(8);
@@ -360,13 +845,24 @@ impl Room {
             return "Movie scene.".into();
         }
         if q.contains("good morning") || q.contains("morning") {
-            self.set_scene("Bright");
-            self.dnd = false;
+            self.quick("morning");
             return "Bright scene. DND off.".into();
+        }
+        if q.contains("away") || q.contains("leaving") {
+            self.quick("away");
+            return "Away: lights off, playback paused.".into();
+        }
+        if q.contains("i am home") || q.contains("i'm home") || q == "home" {
+            self.quick("home");
+            return "Welcome home.".into();
         }
         if q.contains("dnd") || q.contains("do not disturb") {
             self.toggle_dnd();
-            return if self.dnd { "Do not disturb on.".into() } else { "Do not disturb off.".into() };
+            return if self.dnd {
+                "Do not disturb on.".into()
+            } else {
+                "Do not disturb off.".into()
+            };
         }
         if (q.contains("light") || q.contains("lights")) && (q.contains("off") || q.contains("kill")) {
             self.set_master_power(false);
@@ -412,10 +908,452 @@ impl Room {
             self.set_scene("Night");
             return "Night scene.".into();
         }
+        if q.contains("creator") {
+            self.overlay = Overlay::Creator;
+            self.apply_template();
+            return "Opened Widget Creator.".into();
+        }
+        if q.starts_with("add ") {
+            let kind = q.trim_start_matches("add ").trim();
+            let map = [
+                ("weather", "weather"),
+                ("lights", "lights"),
+                ("media", "media"),
+                ("activity", "activity"),
+                ("timers", "timers"),
+                ("system", "system"),
+                ("calendar", "calendar"),
+                ("climate", "climate"),
+                ("purifier", "purifier"),
+            ];
+            if let Some((_, kind)) = map.iter().find(|(k, _)| kind.contains(k)) {
+                match self.add_widget(kind, "1x1") {
+                    Ok(()) => return format!("Added {kind}."),
+                    Err(e) => return e,
+                }
+            }
+        }
+        if q.contains("page 1") || q.contains("page one") || q.contains("go to page 1") {
+            self.page = 0;
+            return "Page 1.".into();
+        }
+        if q.contains("page 2") || q.contains("go to page 2") {
+            self.page = 1.min(self.visible_page_count() - 1);
+            return "Page 2.".into();
+        }
         if q.contains("help") || q.contains("what can") {
             return "Try: lights off, movie mode, good night, play, weather, DND.".into();
         }
         format!("I heard “{}”. Try lights, weather, play, or good night.", raw.trim())
+    }
+
+    pub fn palette_hits(&self) -> Vec<(String, String, String)> {
+        let n = self.palette_query.trim().to_lowercase();
+        let mut items: Vec<(String, String, String)> = Vec::new();
+        let ask = if self.palette_query.trim().is_empty() {
+            "Type a command…".into()
+        } else {
+            format!("Ask Judie: {}", self.palette_query.trim())
+        };
+        items.push(("ask".into(), ask, "Enter".into()));
+        for l in &self.lights {
+            let title = if l.on {
+                format!("Turn off {}", l.name.replace(" LEDs", "").replace(" Light", ""))
+            } else {
+                format!("Turn on {}", l.name.replace(" LEDs", "").replace(" Light", ""))
+            };
+            items.push((format!("light-{}", l.id), title, "Light".into()));
+        }
+        for scene in ["Cozy", "Movie", "Night", "Bright", "Gaming"] {
+            items.push((format!("scene-{scene}"), format!("{scene} scene"), "Scene".into()));
+        }
+        for r in &self.routines {
+            items.push((format!("routine-{}", r.id), r.name.clone(), "Routine".into()));
+        }
+        items.push(("undo".into(), "Undo last action".into(), "Undo".into()));
+        for (kind, label, _) in gallery_kinds() {
+            if matches!(*kind, "weather" | "lights" | "media" | "activity" | "timers" | "system") {
+                items.push((format!("add-{kind}"), format!("Add {label} widget"), "Widget".into()));
+            }
+        }
+        items.push(("page-0".into(), "Go to page 1".into(), "Nav".into()));
+        items.push(("creator".into(), "Open Widget Creator".into(), "Widget".into()));
+        if n.is_empty() {
+            items.truncate(8);
+            return items;
+        }
+        items
+            .into_iter()
+            .filter(|(id, title, hint)| {
+                title.to_lowercase().contains(&n) || hint.to_lowercase().contains(&n) || id.contains(&n)
+            })
+            .collect()
+    }
+
+    pub fn run_palette_hit(&mut self, id: &str) {
+        if id == "ask" {
+            let q = self.palette_query.clone();
+            self.palette_reply = self.run_command(&q);
+            return;
+        }
+        if let Some(light_id) = id.strip_prefix("light-") {
+            self.toggle_light(light_id);
+            self.overlay = Overlay::None;
+            return;
+        }
+        if let Some(scene) = id.strip_prefix("scene-") {
+            self.set_scene(scene);
+            self.overlay = Overlay::None;
+            return;
+        }
+        if let Some(rid) = id.strip_prefix("routine-") {
+            self.quick(rid);
+            self.overlay = Overlay::None;
+            return;
+        }
+        if let Some(kind) = id.strip_prefix("add-") {
+            let _ = self.add_widget(kind, "1x1");
+            self.overlay = Overlay::None;
+            return;
+        }
+        if id == "page-0" {
+            self.page = 0;
+            self.overlay = Overlay::None;
+            return;
+        }
+        if id == "creator" {
+            self.overlay = Overlay::Creator;
+            self.apply_template();
+            return;
+        }
+        if id == "undo" {
+            self.palette_reply = "Nothing to undo.".into();
+        }
+    }
+
+    pub fn add_widget(&mut self, kind: &str, size: &str) -> Result<(), String> {
+        self.add_widget_on(kind, size, self.page, "")
+    }
+
+    fn add_widget_on(&mut self, kind: &str, size: &str, page: i32, custom_id: &str) -> Result<(), String> {
+        let sizes = if kind == "custom" {
+            &["1x1", "1x2", "2x2"][..]
+        } else {
+            supported_sizes(kind)
+        };
+        let size = if sizes.contains(&size) { size } else { sizes[0] };
+        let Some((col, row, page)) = first_free(&self.slots, size, page) else {
+            return Err("No space on this page".into());
+        };
+        let id = format!("{kind}-{}", self.slots.len() + 1);
+        let label = if kind == "custom" {
+            self.custom
+                .iter()
+                .find(|c| c.id == custom_id)
+                .map(|c| c.name.clone())
+                .unwrap_or_else(|| "Custom".into())
+        } else {
+            String::new()
+        };
+        self.slots.push(Slot {
+            id,
+            kind: kind.into(),
+            size: size.into(),
+            col,
+            row,
+            page,
+            label,
+            custom_id: custom_id.into(),
+        });
+        self.page = page;
+        self.overlay = Overlay::None;
+        self.persist();
+        Ok(())
+    }
+
+    pub fn request_remove(&mut self, id: &str) {
+        self.pending_remove = id.into();
+    }
+
+    pub fn confirm_remove(&mut self) {
+        let id = std::mem::take(&mut self.pending_remove);
+        if !id.is_empty() {
+            self.slots.retain(|s| s.id != id);
+            self.persist();
+        }
+    }
+
+    pub fn cancel_remove(&mut self) {
+        self.pending_remove.clear();
+    }
+
+    pub fn remove_slot(&mut self, id: &str) {
+        self.request_remove(id);
+    }
+
+    pub fn cycle_slot_size(&mut self, id: &str) {
+        let Some(idx) = self.slots.iter().position(|s| s.id == id) else {
+            return;
+        };
+        let kind = self.slots[idx].kind.clone();
+        let custom_id = self.slots[idx].custom_id.clone();
+        let current = self.slots[idx].size.clone();
+        let sizes: Vec<String> = if kind == "custom" {
+            self.custom
+                .iter()
+                .find(|c| c.id == custom_id)
+                .map(|c| {
+                    if c.sizes.is_empty() {
+                        vec!["1x1".into(), "1x2".into(), "2x2".into()]
+                    } else {
+                        c.sizes.clone()
+                    }
+                })
+                .unwrap_or_else(|| vec!["1x1".into(), "1x2".into(), "2x2".into()])
+        } else {
+            supported_sizes(&kind).iter().map(|s| (*s).to_string()).collect()
+        };
+        if sizes.len() <= 1 {
+            return;
+        }
+        let i = sizes.iter().position(|s| *s == current).unwrap_or(0);
+        let next = sizes[(i + 1) % sizes.len()].clone();
+        let page = self.slots[idx].page;
+        let col = self.slots[idx].col;
+        let row = self.slots[idx].row;
+        if can_place(&self.slots, &next, page, col, row, Some(id)) {
+            self.slots[idx].size = next;
+            self.persist();
+            return;
+        }
+        let others: Vec<Slot> = self.slots.iter().filter(|s| s.id != id).cloned().collect();
+        if let Some((c, r)) = first_free_on_page(&others, &next, page) {
+            self.slots[idx].size = next;
+            self.slots[idx].col = c;
+            self.slots[idx].row = r;
+            self.persist();
+        }
+    }
+
+    pub fn place_slot(&mut self, id: &str, col: i32, row: i32) {
+        let Some(idx) = self.slots.iter().position(|s| s.id == id) else {
+            return;
+        };
+        let size = self.slots[idx].size.clone();
+        let page = self.slots[idx].page;
+        let (w, h) = size_dims(&size);
+        let col = col.clamp(0, GRID_COLS - w);
+        let row = row.clamp(0, GRID_ROWS - h);
+        if can_place(&self.slots, &size, page, col, row, Some(id)) {
+            self.slots[idx].col = col;
+            self.slots[idx].row = row;
+            self.persist();
+        }
+    }
+
+    pub fn apply_template(&mut self) {
+        self.creator_nodes = template_nodes(&self.creator_template, &self.creator_size);
+        self.creator_selected = self.creator_nodes.first().map(|n| n.id.clone()).unwrap_or_default();
+    }
+
+    pub fn add_creator_kind(&mut self, kind: &str) {
+        let id = format!("{kind}-{}", self.creator_nodes.len() + 1);
+        self.creator_nodes.push(SlopNode {
+            id: id.clone(),
+            kind: kind.into(),
+            x: 8.0,
+            y: 8.0 + (self.creator_nodes.len() as f32 * 8.0).min(60.0),
+            w: if kind == "metric" { 50.0 } else { 40.0 },
+            h: if kind == "metric" { 22.0 } else { 14.0 },
+            text: match kind {
+                "metric" => "42".into(),
+                "button" => "Action".into(),
+                "chip" => "Chip".into(),
+                "toggle" => "On".into(),
+                _ => kind.to_uppercase(),
+            },
+            color: if kind == "metric" { "#f4f5f7".into() } else { "#8b909d".into() },
+            value: 0.5,
+        });
+        self.creator_selected = id;
+    }
+
+    pub fn select_creator_node(&mut self, id: &str) {
+        self.creator_selected = id.into();
+    }
+
+    pub fn set_creator_node_text(&mut self, text: &str) {
+        if let Some(n) = self.creator_nodes.iter_mut().find(|n| n.id == self.creator_selected) {
+            n.text = text.into();
+        }
+    }
+
+    pub fn delete_creator_node(&mut self) {
+        let id = self.creator_selected.clone();
+        self.creator_nodes.retain(|n| n.id != id);
+        self.creator_selected = self.creator_nodes.first().map(|n| n.id.clone()).unwrap_or_default();
+    }
+
+    pub fn save_creator(&mut self) -> Result<(), String> {
+        let mut name = self.creator_name.trim().to_string();
+        if name.is_empty() {
+            name = "Untitled".into();
+        }
+        let size = if ["1x1", "1x2", "2x2"].contains(&self.creator_size.as_str()) {
+            self.creator_size.clone()
+        } else {
+            "1x1".into()
+        };
+        let page = self.page;
+        let template = self.creator_template.clone();
+        let nodes = self.creator_nodes.clone();
+        let id = format!("slop-{}", chrono::Local::now().timestamp_millis());
+        let mut layouts = std::collections::BTreeMap::new();
+        layouts.insert(size.clone(), nodes);
+        if size != "1x1" {
+            layouts.entry("1x1".into()).or_insert_with(|| template_nodes(&template, "1x1"));
+        }
+        self.custom.push(CustomWidget {
+            id: id.clone(),
+            name,
+            sizes: vec!["1x1".into(), "1x2".into(), "2x2".into()],
+            layouts,
+        });
+        self.add_widget_on("custom", &size, page, &id)?;
+        self.edit_mode = true;
+        self.persist();
+        Ok(())
+    }
+
+    pub fn cycle_gallery_size(&mut self, dir: i32) {
+        let sizes = if self.gallery_kind == "custom" {
+            &["1x1", "1x2", "2x2"][..]
+        } else {
+            supported_sizes(&self.gallery_kind)
+        };
+        if sizes.is_empty() {
+            return;
+        }
+        let i = sizes
+            .iter()
+            .position(|s| *s == self.gallery_size)
+            .unwrap_or(0) as i32;
+        let n = sizes.len() as i32;
+        let next = (i + dir).rem_euclid(n) as usize;
+        self.gallery_size = sizes[next].to_string();
+    }
+
+    pub fn gallery_add_selected(&mut self) -> Result<(), String> {
+        if self.gallery_kind == "custom" {
+            let id = self.gallery_custom_id.clone();
+            self.add_widget_on("custom", &self.gallery_size.clone(), self.page, &id)
+        } else {
+            let kind = self.gallery_kind.clone();
+            let size = self.gallery_size.clone();
+            self.add_widget(&kind, &size)
+        }
+    }
+
+    pub fn filtered_gallery(&self) -> Vec<(String, String, bool, String)> {
+        let q = self.gallery_query.trim().to_lowercase();
+        let mut out = Vec::new();
+        for (k, label, _) in gallery_kinds() {
+            if q.is_empty() || label.to_lowercase().contains(&q) || k.contains(&q) {
+                out.push(((*k).into(), (*label).into(), false, String::new()));
+            }
+        }
+        for c in &self.custom {
+            if q.is_empty() || c.name.to_lowercase().contains(&q) {
+                out.push(("custom".into(), c.name.clone(), true, c.id.clone()));
+            }
+        }
+        out
+    }
+
+    pub fn import_json_files(&mut self) {
+        for dir in [data_dir().join("import"), data_dir().join("widgets")] {
+            let Ok(entries) = std::fs::read_dir(dir) else { continue };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                    continue;
+                }
+                self.import_widget_file(&path);
+            }
+        }
+    }
+
+    fn import_widget_file(&mut self, path: &Path) {
+        let Ok(text) = std::fs::read_to_string(path) else { return };
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return };
+        let name = v
+            .get("name")
+            .and_then(|x| x.as_str())
+            .unwrap_or("Imported")
+            .to_string();
+        let id = v
+            .get("id")
+            .and_then(|x| x.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("import-{}", path.file_stem().and_then(|s| s.to_str()).unwrap_or("w")));
+        if self.custom.iter().any(|c| c.id == id) {
+            return;
+        }
+        let mut layouts = std::collections::BTreeMap::new();
+        if let Some(obj) = v.get("layouts").and_then(|x| x.as_object()) {
+            for (size, nodes) in obj {
+                if let Ok(parsed) = serde_json::from_value::<Vec<SlopNode>>(nodes.clone()) {
+                    layouts.insert(size.clone(), parsed);
+                }
+            }
+        }
+        if layouts.is_empty() {
+            layouts.insert("1x1".into(), template_nodes("stat", "1x1"));
+        }
+        self.custom.push(CustomWidget {
+            id,
+            name,
+            sizes: layouts.keys().cloned().collect(),
+            layouts,
+        });
+        self.persist();
+    }
+
+    pub fn home_slop_nodes(&self) -> Vec<(String, SlopNode)> {
+        let mut out = Vec::new();
+        for s in &self.slots {
+            if s.kind != "custom" {
+                continue;
+            }
+            if let Some(def) = self.custom.iter().find(|c| c.id == s.custom_id) {
+                let nodes = def
+                    .layouts
+                    .get(&s.size)
+                    .or_else(|| def.layouts.values().next())
+                    .cloned()
+                    .unwrap_or_default();
+                for n in nodes {
+                    out.push((s.id.clone(), n));
+                }
+            }
+        }
+        out
+    }
+
+    pub fn node_rgb(node: &SlopNode) -> (i32, i32, i32) {
+        parse_hex(&node.color)
+    }
+
+    pub fn selected_creator_text(&self) -> String {
+        self.creator_nodes
+            .iter()
+            .find(|n| n.id == self.creator_selected)
+            .map(|n| n.text.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn remove_routine(&mut self, id: &str) {
+        self.routines.retain(|r| r.builtin || r.id != id);
     }
 }
 

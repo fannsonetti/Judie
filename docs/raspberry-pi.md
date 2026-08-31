@@ -63,7 +63,7 @@ curl -fsSL -o /tmp/judie.deb https://github.com/fannsonetti/Judie/releases/lates
 sudo apt install -y /tmp/judie.deb
 ```
 
-After that, later versions apply from the bar with no prompt. On the kiosk, Judie then exits `0` so `Restart=always` starts the new binary; the updater does not `exec judie` a second time.
+After that, later versions apply from the bar with no prompt. The helper installs the `.deb`, then **reboots the Pi**. Judie does not start on the old session. After the machine is back, `judie.service` waits for the display and launches the new binary.
 
 ## Kiosk
 

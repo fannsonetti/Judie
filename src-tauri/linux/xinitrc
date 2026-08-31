@@ -2,6 +2,13 @@
 # Client side of xinit. Bare Xorg has no WM, so EWMH fullscreen is a no-op.
 # Resize to the active output once the window maps (xdotool). The binary also
 # sizes itself from /sys/class/graphics/fb0/virtual_size when rebuilt.
+#
+# Default Xorg blanks the HDMI after 10 minutes (screensaver + DPMS). A kiosk
+# with -nocursor then looks fully dead. Keep the panel awake.
+xset s off
+xset s noblank
+xset dpms 0 0 0
+xset -dpms
 (
   i=0
   while [ "$i" -lt 20 ]; do

@@ -8,6 +8,7 @@ StartLimitIntervalSec=60
 
 [Service]
 Type=simple
+ExecStartPre=/usr/lib/judie/wait-display
 ExecStart=/usr/lib/judie/kiosk
 Restart=always
 RestartSec=2

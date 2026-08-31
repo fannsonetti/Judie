@@ -27,7 +27,7 @@ echo "$INFO"
 echo "$INFO" | grep -qi 'libgtk-3' && { echo "FAIL: GTK must not be in the Pi package" >&2; exit 1; }
 
 depends="$(echo "$INFO" | awk -F': ' '/^ Depends:/{print $2}')"
-for pkg in xserver-xorg xinit fonts-dejavu-core libx11-6 libfontconfig1; do
+for pkg in xserver-xorg xinit xserver-xorg-video-fbdev fonts-dejavu-core libx11-6 libfontconfig1; do
   echo "$depends" | grep -qw "$pkg" || { echo "FAIL: Depends missing $pkg" >&2; exit 1; }
 done
 echo "$depends" | grep -qw 'libwayland-client0' && { echo "FAIL: Wayland still in Depends" >&2; exit 1; }

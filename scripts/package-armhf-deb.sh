@@ -36,7 +36,10 @@ install -m755 "$BIN" "$STAGING/usr/bin/judie"
 install -m755 "$ROOT/src-tauri/linux/apply-update" "$STAGING/usr/lib/judie/apply-update"
 install -m755 "$ROOT/src-tauri/linux/kiosk" "$STAGING/usr/lib/judie/kiosk"
 install -m755 "$ROOT/src-tauri/linux/xinitrc" "$STAGING/usr/lib/judie/xinitrc"
+install -m755 "$ROOT/src-tauri/linux/wait-display" "$STAGING/usr/lib/judie/wait-display"
 install -m644 "$ROOT/src-tauri/linux/Xwrapper.config" "$STAGING/usr/lib/judie/Xwrapper.config"
+install -m644 "$ROOT/src-tauri/linux/10-noscreenblank.conf" "$STAGING/usr/lib/judie/10-noscreenblank.conf"
+install -m644 "$ROOT/src-tauri/linux/20-pi-fbdev.conf" "$STAGING/usr/lib/judie/20-pi-fbdev.conf"
 install -m644 "$ROOT/src-tauri/linux/judie.service" "$STAGING/lib/systemd/system/judie.service"
 install -m440 "$ROOT/src-tauri/linux/sudoers-judie-update" "$STAGING/etc/sudoers.d/judie-update"
 install -m644 "$ROOT/src-tauri/linux/judie.desktop" "$STAGING/usr/share/applications/judie.desktop"
@@ -48,7 +51,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: sudo, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6
+Depends: sudo, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6
 Maintainer: Judie <judie@local>
 Description: Judie room control (native Pi kiosk)
  Native Slint UI for Raspberry Pi — no WebKit process. Boots via systemd + bare Xorg.
@@ -57,7 +60,7 @@ EOF
 cat >"$STAGING/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
-chmod 755 /usr/lib/judie/apply-update /usr/lib/judie/kiosk /usr/lib/judie/xinitrc 2>/dev/null || true
+chmod 755 /usr/lib/judie/apply-update /usr/lib/judie/kiosk /usr/lib/judie/xinitrc /usr/lib/judie/wait-display 2>/dev/null || true
 chmod 440 /etc/sudoers.d/judie-update 2>/dev/null || true
 
 KIOSK_USER=""
@@ -89,6 +92,15 @@ fi
 if [ -f /usr/lib/judie/Xwrapper.config ]; then
   cp /usr/lib/judie/Xwrapper.config /etc/X11/Xwrapper.config
 fi
+mkdir -p /etc/X11/xorg.conf.d
+if [ -f /usr/lib/judie/10-noscreenblank.conf ]; then
+  cp /usr/lib/judie/10-noscreenblank.conf /etc/X11/xorg.conf.d/10-noscreenblank.conf
+fi
+# Match the working Linux console path: vc4 DRM framebuffer, 16-bit.
+# modesetting/glamor has been presenting in X while the panel stayed dark.
+if [ -f /usr/lib/judie/20-pi-fbdev.conf ]; then
+  cp /usr/lib/judie/20-pi-fbdev.conf /etc/X11/xorg.conf.d/20-pi-fbdev.conf
+fi
 
 if command -v update-desktop-database >/dev/null 2>&1; then
   update-desktop-database /usr/share/applications || true
@@ -97,7 +109,7 @@ fi
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
   systemctl daemon-reload || true
   systemctl enable judie.service >/dev/null 2>&1 || true
-  systemctl restart judie.service >/dev/null 2>&1 || systemctl start judie.service >/dev/null 2>&1 || true
+  # Never start here. apply-update reboots; judie.service starts after boot.
 fi
 EOF
 chmod 755 "$STAGING/DEBIAN/postinst"

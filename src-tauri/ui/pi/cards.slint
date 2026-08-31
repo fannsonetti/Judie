@@ -26,6 +26,7 @@ export struct ServiceRow {
 export struct ActivityRow {
     title: string,
     source: string,
+    time: string,
 }
 
 export struct TimerRow {
@@ -33,12 +34,83 @@ export struct TimerRow {
     remain: string,
 }
 
+export struct Slot {
+    id: string,
+    kind: string,
+    size: string,
+    col: int,
+    row: int,
+    cols: int,
+    rows: int,
+    page: int,
+    label: string,
+    custom-id: string,
+}
+
+export struct GalleryItem {
+    kind: string,
+    label: string,
+    custom: bool,
+    id: string,
+}
+
+export struct CalCell {
+    label: string,
+    today: bool,
+}
+
+export struct PaletteHit {
+    id: string,
+    title: string,
+    hint: string,
+}
+
+export struct RoutineRow {
+    id: string,
+    name: string,
+    hint: string,
+    builtin: bool,
+}
+
+export struct SlopNode {
+    widget-id: string,
+    id: string,
+    kind: string,
+    x: float,
+    y: float,
+    w: float,
+    h: float,
+    text: string,
+    r: int,
+    g: int,
+    b: int,
+    value: float,
+}
+
+// Dockyard tokens: black canvas, hairline panels, mono caps, data accents only.
+export global Dy {
+    out property <color> canvas: #000000;
+    out property <color> border: #3d3d3d;
+    out property <color> border-hi: #6a6a6a;
+    out property <color> text: #e6e6e6;
+    out property <color> muted: #7a7a7a;
+    out property <color> dim: #4a4a4a;
+    out property <color> cyan: #5ce1ff;
+    out property <color> green: #3dd68c;
+    out property <color> amber: #f0a030;
+    out property <color> red: #ff5c5c;
+    out property <color> purple: #b794f6;
+    out property <string> mono: "DejaVu Sans Mono";
+}
+
 export component Card inherits Rectangle {
     in property <string> kicker;
     in property <bool> expandable: false;
     callback tapped;
-    background: #14161c;
-    border-radius: 22px;
+    background: Dy.canvas;
+    border-width: 1px;
+    border-color: Dy.border;
+    border-radius: 0px;
     clip: true;
 
     TouchArea {
@@ -56,16 +128,19 @@ export component Pill inherits Rectangle {
     in property <string> label;
     in property <bool> on: false;
     callback clicked;
-    border-radius: 12px;
-    background: root.on ? #2d7bff : #22252f;
+    border-radius: 0px;
+    border-width: 1px;
+    border-color: root.on ? Dy.cyan : Dy.border;
+    background: root.on ? #0a1a1e : Dy.canvas;
     height: 28px;
     min-width: 64px;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.label;
-        color: #f4f5f7;
+        color: root.on ? Dy.cyan : Dy.text;
         font-size: 11px;
         font-weight: 600;
+        font-family: Dy.mono;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -74,10 +149,12 @@ export component Pill inherits Rectangle {
 export component Toggle inherits Rectangle {
     in-out property <bool> on;
     callback toggled;
-    width: 44px;
-    height: 26px;
-    border-radius: 13px;
-    background: root.on ? #2d7bff : #2a2e3a;
+    width: 40px;
+    height: 20px;
+    border-radius: 0px;
+    border-width: 1px;
+    border-color: root.on ? Dy.cyan : Dy.border;
+    background: Dy.canvas;
     TouchArea {
         clicked => {
             root.on = !root.on;
@@ -85,12 +162,12 @@ export component Toggle inherits Rectangle {
         }
     }
     Rectangle {
-        x: root.on ? parent.width - 22px : 2px;
-        y: 2px;
-        width: 22px;
-        height: 22px;
-        border-radius: 11px;
-        background: #f4f5f7;
+        x: root.on ? parent.width - 16px : 3px;
+        y: 3px;
+        width: 14px;
+        height: 14px;
+        border-radius: 0px;
+        background: root.on ? Dy.cyan : Dy.muted;
     }
 }
 
@@ -98,12 +175,12 @@ export component Swatch inherits Rectangle {
     in property <color> swatch;
     in property <bool> on;
     callback clicked;
-    width: 18px;
-    height: 18px;
-    border-radius: 9px;
+    width: 16px;
+    height: 16px;
+    border-radius: 0px;
     background: root.swatch;
-    border-width: root.on ? 2px : 0px;
-    border-color: #f4f5f7;
+    border-width: root.on ? 1px : 1px;
+    border-color: root.on ? Dy.text : Dy.border;
     TouchArea { clicked => { root.clicked(); } }
 }
 
@@ -113,14 +190,17 @@ export component IconBtn inherits Rectangle {
     callback clicked;
     width: 36px;
     height: 36px;
-    border-radius: 18px;
-    background: root.primary ? #f4f5f7 : #22252f;
+    border-radius: 0px;
+    border-width: 1px;
+    border-color: root.primary ? Dy.text : Dy.border;
+    background: root.primary ? Dy.text : Dy.canvas;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.glyph;
-        color: root.primary ? #0c0d10 : #f4f5f7;
+        color: root.primary ? Dy.canvas : Dy.text;
         font-size: 14px;
         font-weight: 700;
+        font-family: Dy.mono;
         horizontal-alignment: center;
         vertical-alignment: center;
     }
@@ -128,14 +208,98 @@ export component IconBtn inherits Rectangle {
 
 export component Bar inherits Rectangle {
     in property <float> level;
-    in property <color> fill: #2d7bff;
-    height: 6px;
-    border-radius: 3px;
-    background: #27272a;
+    in property <color> fill: #5ce1ff;
+    height: 4px;
+    border-radius: 0px;
+    background: #1a1a1a;
+    border-width: 1px;
+    border-color: Dy.border;
     Rectangle {
         width: parent.width * clamp(root.level, 0, 1);
         height: 100%;
-        border-radius: 3px;
+        border-radius: 0px;
         background: root.fill;
+    }
+}
+
+export component TileShell inherits Rectangle {
+    in property <bool> editing: false;
+    in property <bool> pending: false;
+    in property <string> size-label: "";
+    callback tapped;
+    callback held;
+    callback remove;
+    callback cycle-size;
+    callback drag-to(length, length);
+    background: Dy.canvas;
+    border-radius: 0px;
+    border-width: 1px;
+    border-color: root.pending ? Dy.red : Dy.border;
+    clip: true;
+
+    ta := TouchArea {
+        clicked => { if !root.editing { root.tapped(); } }
+        moved => {
+            if root.editing && self.pressed {
+                root.drag-to(self.mouse-x, self.mouse-y);
+            }
+        }
+    }
+    Timer {
+        interval: 450ms;
+        running: ta.pressed && !root.editing;
+        triggered => { root.held(); }
+    }
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 6px;
+        @children
+    }
+
+    if root.editing: TouchArea {
+        x: parent.width - 28px;
+        y: 6px;
+        width: 22px;
+        height: 22px;
+        clicked => { root.remove(); }
+        Rectangle {
+            border-radius: 0px;
+            border-width: 1px;
+            border-color: Dy.red;
+            background: Dy.canvas;
+            Text {
+                text: "×";
+                color: Dy.red;
+                font-size: 14px;
+                font-weight: 700;
+                font-family: Dy.mono;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    if root.editing: TouchArea {
+        x: 6px;
+        y: 6px;
+        width: 44px;
+        height: 22px;
+        clicked => { root.cycle-size(); }
+        Rectangle {
+            border-radius: 0px;
+            border-width: 1px;
+            border-color: Dy.cyan;
+            background: #0a1a1e;
+            Text {
+                text: root.size-label;
+                color: Dy.cyan;
+                font-size: 10px;
+                font-weight: 700;
+                font-family: Dy.mono;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
     }
 }

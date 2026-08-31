@@ -1,5 +1,7 @@
 #!/bin/sh
 # Passwordless helper: only installs a Judie .deb staged in /tmp/judie-update.
+# After install, reboot. The new binary must not start on the old X session;
+# judie.service launches it once the Pi has finished coming back up.
 set -e
 DEB="${1:-}"
 [ -n "$DEB" ] || { echo "usage: apply-update <deb>" >&2; exit 1; }
@@ -21,5 +23,24 @@ if [ -n "${SUDO_UID:-}" ]; then
   [ "$owner" = "$SUDO_UID" ] || { echo "refused owner" >&2; exit 1; }
 fi
 
+# Stop the kiosk first so postinst does not start the new binary on this boot.
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+  systemctl stop judie.service >/dev/null 2>&1 || true
+fi
+
 export DEBIAN_FRONTEND=noninteractive
+export JUDIE_POSTINST_NOSTART=1
 apt-get install -y --reinstall "$DEB"
+sync
+
+if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
+  systemctl enable judie.service >/dev/null 2>&1 || true
+  # Reboot after dpkg has released the lock. Kiosk starts on the next boot.
+  if command -v systemd-run >/dev/null 2>&1; then
+    systemd-run --quiet --collect --on-active=2s /bin/systemctl reboot >/dev/null 2>&1 || /sbin/reboot
+  else
+    nohup /bin/sh -c 'sleep 2; /sbin/reboot' >/dev/null 2>&1 &
+  fi
+else
+  nohup /bin/sh -c 'sleep 2; /sbin/reboot' >/dev/null 2>&1 &
+fi

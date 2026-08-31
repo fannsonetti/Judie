@@ -330,7 +330,7 @@ pub fn running_under_systemd() -> bool {
             .unwrap_or(false)
 }
 
-/// Under systemd kiosk, do not `exec judie` — Restart=always will respawn.
+/// After a kiosk `.deb` update the helper reboots; do not `exec judie` on the old X session.
 #[cfg(target_os = "linux")]
 pub fn relaunch_linux() -> Result<(), String> {
     if running_under_systemd() {

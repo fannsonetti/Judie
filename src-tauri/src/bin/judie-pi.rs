@@ -73,12 +73,31 @@ fn ensure_display() {
     std::process::exit(1);
 }
 
-fn overlay_name(o: Overlay) -> (&'static str, bool, bool, bool) {
+fn overlay_name(o: Overlay) -> (bool, bool, bool, bool) {
     match o {
-        Overlay::None => ("", false, false, false),
-        Overlay::Settings => ("settings", true, false, false),
-        Overlay::Palette => ("palette", false, true, false),
-        Overlay::Gallery => ("gallery", false, false, true),
+        Overlay::None => (false, false, false, false),
+        Overlay::Settings => (true, false, false, false),
+        Overlay::Palette => (false, true, false, false),
+        Overlay::Gallery => (false, false, true, false),
+        Overlay::Creator => (false, false, false, true),
+    }
+}
+
+fn slop_ui(widget_id: &str, n: &pi_room::SlopNode) -> SlopNode {
+    let (r, g, b) = pi_room::Room::node_rgb(n);
+    SlopNode {
+        widget_id: widget_id.into(),
+        id: n.id.clone().into(),
+        kind: n.kind.clone().into(),
+        x: n.x,
+        y: n.y,
+        w: n.w,
+        h: n.h,
+        text: n.text.clone().into(),
+        r,
+        g,
+        b,
+        value: n.value,
     }
 }
 
@@ -96,7 +115,7 @@ fn expanded_name(e: Expanded) -> SharedString {
 fn push_ui(ui: &MainWindow) {
     let now = chrono::Local::now();
     ui.set_clock(now.format("%H:%M").to_string().into());
-    ui.set_date_text(now.format("%a %d %b").to_string().into());
+    ui.set_date_text(now.format("%A %e %B").to_string().split_whitespace().collect::<Vec<_>>().join(" ").into());
     ui.set_month_name(now.format("%B").to_string().into());
     ui.set_version_text(env!("CARGO_PKG_VERSION").into());
 
@@ -154,11 +173,56 @@ fn push_ui(ui: &MainWindow) {
         ui.set_palette_query(room.palette_query.clone().into());
         ui.set_palette_reply(room.palette_reply.clone().into());
         ui.set_edit_mode(room.edit_mode);
+        ui.set_page_count(room.visible_page_count());
+        ui.set_assistant_url(room.assistant_url.clone().into());
+        ui.set_latitude(room.latitude.clone().into());
+        ui.set_longitude(room.longitude.clone().into());
+        ui.set_notice_timers(room.notice_timers);
+        ui.set_notice_calendar(room.notice_calendar);
+        ui.set_notice_weather(room.notice_weather);
+        ui.set_notice_air(room.notice_air);
+        ui.set_notice_devices(room.notice_devices);
+        ui.set_gallery_query(room.gallery_query.clone().into());
+        ui.set_gallery_custom(room.gallery_kind == "custom");
+        ui.set_gallery_custom_id(room.gallery_custom_id.clone().into());
+        ui.set_pending_remove(room.pending_remove.clone().into());
+        ui.set_pending_label(
+            room.slots
+                .iter()
+                .find(|s| s.id == room.pending_remove)
+                .map(|s| {
+                    if s.kind == "custom" {
+                        s.label.clone()
+                    } else {
+                        s.kind.clone()
+                    }
+                })
+                .unwrap_or_default()
+                .into(),
+        );
         ui.set_expanded(expanded_name(room.expanded));
-        let (_, settings, palette, gallery) = overlay_name(room.overlay);
+        let (settings, palette, gallery, creator) = overlay_name(room.overlay);
         ui.set_settings_open(settings);
         ui.set_palette_open(palette);
         ui.set_gallery_open(gallery);
+        ui.set_creator_open(creator);
+        ui.set_gallery_kind(room.gallery_kind.clone().into());
+        ui.set_gallery_size(room.gallery_size.clone().into());
+        ui.set_creator_name(room.creator_name.clone().into());
+        ui.set_creator_template(room.creator_template.clone().into());
+        ui.set_creator_size(room.creator_size.clone().into());
+        ui.set_creator_selected(room.creator_selected.clone().into());
+        ui.set_creator_node_text(room.selected_creator_text().into());
+        let desc = if room.gallery_kind == "custom" {
+            "A widget from Widget Creator."
+        } else {
+            pi_room::gallery_kinds()
+                .iter()
+                .find(|(k, _, _)| *k == room.gallery_kind)
+                .map(|(_, _, d)| *d)
+                .unwrap_or("")
+        };
+        ui.set_gallery_desc(desc.into());
 
         let hours: Vec<HourRow> = room
             .hours
@@ -176,7 +240,7 @@ fn push_ui(ui: &MainWindow) {
             .iter()
             .map(|l| LightRow {
                 id: l.id.clone().into(),
-                name: l.name.clone().into(),
+                name: l.name.replace(" LEDs", "").replace(" Light", "").into(),
                 on: l.on,
                 brightness: format!("{}%", l.brightness).into(),
             })
@@ -202,6 +266,7 @@ fn push_ui(ui: &MainWindow) {
             .map(|a| ActivityRow {
                 title: a.title.clone().into(),
                 source: a.source.clone().into(),
+                time: a.time.clone().into(),
             })
             .collect();
         ui.set_activity(ModelRc::new(VecModel::from(activity)));
@@ -217,23 +282,102 @@ fn push_ui(ui: &MainWindow) {
         ui.set_timers(ModelRc::new(VecModel::from(timers)));
 
         let services = vec![
-            ServiceRow {
-                name: "Core".into(),
-                status: "online".into(),
-                online: true,
-            },
-            ServiceRow {
-                name: "Assistant".into(),
-                status: "local".into(),
-                online: true,
-            },
-            ServiceRow {
-                name: "Weather".into(),
-                status: "Open-Meteo".into(),
-                online: true,
-            },
+            ServiceRow { name: "Core".into(), status: "124 ms".into(), online: true },
+            ServiceRow { name: "Lights".into(), status: "6 ms".into(), online: true },
+            ServiceRow { name: "Media".into(), status: "9 ms".into(), online: true },
+            ServiceRow { name: "Weather".into(), status: "1 ms".into(), online: true },
+            ServiceRow { name: "Assistant".into(), status: "Down".into(), online: false },
         ];
         ui.set_services(ModelRc::new(VecModel::from(services)));
+
+        let slots: Vec<Slot> = room
+            .slots
+            .iter()
+            .map(|s| {
+                let (cols, rows) = match s.size.as_str() {
+                    "1x2" => (2, 1),
+                    "2x2" => (2, 2),
+                    _ => (1, 1),
+                };
+                Slot {
+                    id: s.id.clone().into(),
+                    kind: s.kind.clone().into(),
+                    size: s.size.clone().into(),
+                    col: s.col,
+                    row: s.row,
+                    cols,
+                    rows,
+                    page: s.page,
+                    label: s.label.clone().into(),
+                    custom_id: s.custom_id.clone().into(),
+                }
+            })
+            .collect();
+        ui.set_slots(ModelRc::new(VecModel::from(slots)));
+
+        let gallery: Vec<GalleryItem> = room
+            .filtered_gallery()
+            .into_iter()
+            .map(|(kind, label, custom, id)| GalleryItem {
+                kind: kind.into(),
+                label: label.into(),
+                custom,
+                id: id.into(),
+            })
+            .collect();
+        ui.set_gallery_items(ModelRc::new(VecModel::from(gallery)));
+
+        let hits: Vec<PaletteHit> = room
+            .palette_hits()
+            .into_iter()
+            .map(|(id, title, hint)| PaletteHit {
+                id: id.into(),
+                title: title.into(),
+                hint: hint.into(),
+            })
+            .collect();
+        ui.set_palette_hits(ModelRc::new(VecModel::from(hits)));
+
+        let routines: Vec<RoutineRow> = room
+            .routines
+            .iter()
+            .map(|r| RoutineRow {
+                id: r.id.clone().into(),
+                name: r.name.clone().into(),
+                hint: format!(
+                    "{}{}",
+                    r.phrases.join(", "),
+                    if r.builtin { " · built-in" } else { "" }
+                )
+                .into(),
+                builtin: r.builtin,
+            })
+            .collect();
+        ui.set_routines(ModelRc::new(VecModel::from(routines)));
+
+        let slop: Vec<SlopNode> = room
+            .home_slop_nodes()
+            .iter()
+            .map(|(wid, n)| slop_ui(wid, n))
+            .collect();
+        ui.set_slop_nodes(ModelRc::new(VecModel::from(slop)));
+
+        let creator: Vec<SlopNode> = room
+            .creator_nodes
+            .iter()
+            .map(|n| slop_ui("", n))
+            .collect();
+        ui.set_creator_nodes(ModelRc::new(VecModel::from(creator)));
+
+        let cells: Vec<CalCell> = room
+            .cal_cells
+            .iter()
+            .map(|c| CalCell {
+                label: c.label.clone().into(),
+                today: c.today,
+            })
+            .collect();
+        ui.set_cal_cells(ModelRc::new(VecModel::from(cells)));
     });
 }
 
@@ -342,12 +486,18 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_set_page(move |p| {
-        pi_room::with(|room| room.page = p.clamp(0, 1));
+        pi_room::with(|room| {
+            let max = (room.visible_page_count() - 1).max(0);
+            room.page = p.clamp(0, max);
+        });
         r();
     });
     let r = refresh.clone();
     ui.on_expand(move |kind| {
         pi_room::with(|room| {
+            if room.edit_mode {
+                return;
+            }
             room.expanded = match kind.as_str() {
                 "weather" => Expanded::Weather,
                 "lights" => Expanded::Lights,
@@ -373,7 +523,12 @@ fn bind(ui: &MainWindow) {
     ui.on_exit_edit(move || {
         pi_room::with(|room| {
             room.edit_mode = false;
+            room.pending_remove.clear();
             room.overlay = Overlay::None;
+            let max = (room.visible_page_count() - 1).max(0);
+            if room.page > max {
+                room.page = max;
+            }
         });
         r();
     });
@@ -392,8 +547,149 @@ fn bind(ui: &MainWindow) {
         pi_room::with(|room| room.edit_mode = true);
         r();
     });
+    let r = refresh.clone();
+    ui.on_request_remove(move |id| {
+        pi_room::with(|room| room.request_remove(id.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_confirm_remove(move || {
+        pi_room::with(|room| room.confirm_remove());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_cancel_remove(move || {
+        pi_room::with(|room| room.cancel_remove());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_cycle_slot(move |id| {
+        pi_room::with(|room| room.cycle_slot_size(id.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_place_slot(move |id, col, row| {
+        pi_room::with(|room| room.place_slot(id.as_str(), col, row));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_pick(move |kind| {
+        pi_room::with(|room| {
+            room.gallery_kind = kind.to_string();
+            room.gallery_custom_id.clear();
+            room.gallery_size = pi_room::supported_sizes(kind.as_str())
+                .first()
+                .copied()
+                .unwrap_or("1x1")
+                .into();
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_pick_custom(move |id| {
+        pi_room::with(|room| {
+            room.gallery_kind = "custom".into();
+            room.gallery_custom_id = id.to_string();
+            room.gallery_size = "1x1".into();
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_add(move || {
+        pi_room::with(|room| {
+            let _ = room.gallery_add_selected();
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_search(move |t| {
+        pi_room::with(|room| room.gallery_query = t.to_string());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_import(move || {
+        pi_room::with(|room| room.import_json_files());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_size_next(move || {
+        pi_room::with(|room| room.cycle_gallery_size(1));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_size_prev(move || {
+        pi_room::with(|room| room.cycle_gallery_size(-1));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_open_creator(move || {
+        pi_room::with(|room| {
+            room.overlay = Overlay::Creator;
+            room.apply_template();
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_close_creator(move || {
+        pi_room::with(|room| {
+            room.overlay = if room.edit_mode {
+                Overlay::Gallery
+            } else {
+                Overlay::None
+            };
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_save_creator(move || {
+        pi_room::with(|room| {
+            let _ = room.save_creator();
+        });
+        r();
+    });
+    ui.on_creator_name_changed(move |t| {
+        pi_room::with(|room| room.creator_name = t.to_string());
+    });
+    let r = refresh.clone();
+    ui.on_set_creator_size(move |s| {
+        pi_room::with(|room| {
+            room.creator_size = s.to_string();
+            room.apply_template();
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_creator_template(move |s| {
+        pi_room::with(|room| {
+            room.creator_template = s.to_string();
+            room.apply_template();
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_add_creator_kind(move |k| {
+        pi_room::with(|room| room.add_creator_kind(k.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_select_creator_node(move |id| {
+        pi_room::with(|room| room.select_creator_node(id.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_creator_node_text_changed(move |t| {
+        pi_room::with(|room| room.set_creator_node_text(t.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_delete_creator_node(move || {
+        pi_room::with(|room| room.delete_creator_node());
+        r();
+    });
+    let r = refresh.clone();
     ui.on_palette_text(move |t| {
         pi_room::with(|room| room.palette_query = t.to_string());
+        r();
     });
     let r = refresh.clone();
     ui.on_submit_palette(move || {
@@ -401,6 +697,48 @@ fn bind(ui: &MainWindow) {
             let q = room.palette_query.clone();
             room.palette_reply = room.run_command(&q);
         });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_run_palette_hit(move |id| {
+        pi_room::with(|room| room.run_palette_hit(id.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_purifier_mode(move |m| {
+        pi_room::with(|room| room.set_purifier_mode(m.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_toggle_notice(move |key| {
+        pi_room::with(|room| match key.as_str() {
+            "timers" => room.notice_timers = !room.notice_timers,
+            "calendar" => room.notice_calendar = !room.notice_calendar,
+            "weather" => room.notice_weather = !room.notice_weather,
+            "air" => room.notice_air = !room.notice_air,
+            "devices" => room.notice_devices = !room.notice_devices,
+            _ => {}
+        });
+        r();
+    });
+    ui.on_set_room_name(move |t| {
+        pi_room::with(|room| room.room_name = t.to_string());
+    });
+    ui.on_set_location(move |t| {
+        pi_room::with(|room| room.weather_loc = t.to_string());
+    });
+    ui.on_set_latitude(move |t| {
+        pi_room::with(|room| room.latitude = t.to_string());
+    });
+    ui.on_set_longitude(move |t| {
+        pi_room::with(|room| room.longitude = t.to_string());
+    });
+    ui.on_set_assistant_url(move |t| {
+        pi_room::with(|room| room.assistant_url = t.to_string());
+    });
+    let r = refresh.clone();
+    ui.on_remove_routine(move |id| {
+        pi_room::with(|room| room.remove_routine(id.as_str()));
         r();
     });
 }
@@ -474,6 +812,7 @@ fn main() {
             let result = releases::install_latest();
             let _ = slint::invoke_from_event_loop(move || match result {
                 Ok(_) => {
+                    // apply-update reboots; this process dies with the old session.
                     std::process::exit(0);
                 }
                 Err(err) => {
