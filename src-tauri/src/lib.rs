@@ -1,4 +1,6 @@
 #[cfg(feature = "tauri-ui")]
+mod net;
+#[cfg(feature = "tauri-ui")]
 pub mod host;
 #[cfg(feature = "tauri-ui")]
 mod releases;
@@ -11,6 +13,7 @@ mod linux_webview;
 mod desktop {
     use super::host;
     use super::install;
+    use super::net;
     #[cfg(target_os = "linux")]
     use super::linux_webview;
 
@@ -162,6 +165,36 @@ mod desktop {
         Ok(enabled)
     }
 
+    #[tauri::command]
+    fn network_link() -> net::LinkStatus {
+        net::link_status()
+    }
+
+    #[tauri::command]
+    fn wifi_scan() -> Result<Vec<net::WifiNet>, String> {
+        net::wifi_scan()
+    }
+
+    #[tauri::command]
+    fn wifi_connect(ssid: String, password: String) -> Result<(), String> {
+        net::wifi_connect(&ssid, &password)
+    }
+
+    #[tauri::command]
+    fn wifi_disconnect() -> Result<(), String> {
+        net::wifi_disconnect()
+    }
+
+    #[tauri::command]
+    fn network_reconnect(preferred: String) -> Result<(), String> {
+        net::reconnect(&preferred)
+    }
+
+    #[tauri::command]
+    fn network_set_dhcp(on: bool) -> Result<(), String> {
+        net::set_dhcp(on)
+    }
+
     fn pad_role(role: &str) -> String {
         match role.to_lowercase().as_str() {
             "you" | "user" => "YOU ".to_string(),
@@ -223,7 +256,13 @@ mod desktop {
                 install_latest_update,
                 uninstall_judie,
                 get_kiosk,
-                set_kiosk
+                set_kiosk,
+                network_link,
+                wifi_scan,
+                wifi_connect,
+                wifi_disconnect,
+                network_reconnect,
+                network_set_dhcp
             ])
             .run(tauri::generate_context!())
             .expect("error while running tauri application");

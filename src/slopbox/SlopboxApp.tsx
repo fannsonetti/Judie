@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { WidgetSize } from "../types/widgets";
+import { SIZE_LABELS, WidgetSize } from "../types/widgets";
 import {
   ALL_WIDGET_SIZES,
   CANONICAL,
@@ -30,12 +30,12 @@ import { SlopDropMenu } from "./DropMenu";
 import { SlopSidebar } from "./Sidebar";
 import {
   downloadText,
-  exportHookCode,
   parseWidgetFile,
   serializeWidget,
   slugName,
 } from "./export";
 import { useCustomWidgetStore } from "../store/customWidgetStore";
+import { ConfirmSheet } from "../components/chrome/ConfirmSheet";
 
 interface Props {
   onClose?: () => void;
@@ -54,6 +54,7 @@ export function WidgetCreatorApp({ onClose }: Props) {
   const clip = useRef<SlopNode | null>(null);
   const [canPaste, setCanPaste] = useState(false);
   const [publishedFlash, setPublishedFlash] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const current = widgets.find((w) => w.id === selectedId) ?? widgets[0] ?? null;
 
@@ -211,19 +212,10 @@ export function WidgetCreatorApp({ onClose }: Props) {
     );
   };
 
-  const exportCode = () => {
-    if (!current) return;
-    downloadText(
-      `${slugName(current.name)}.widget.ts`,
-      exportHookCode(current),
-      "text/plain"
-    );
-  };
-
   const saveToJudie = () => {
     if (!current) return;
     if (!filledSizes(current).length) {
-      window.alert("Lay out at least one size before saving to Judie.");
+      setNotice("Lay out at least one size before saving to Judie.");
       return;
     }
     publish(current);
@@ -238,7 +230,7 @@ export function WidgetCreatorApp({ onClose }: Props) {
       const id = importOne(def);
       select(id);
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Could not import that file.");
+      setNotice(err instanceof Error ? err.message : "Could not import that file.");
     }
   };
 
@@ -264,6 +256,7 @@ export function WidgetCreatorApp({ onClose }: Props) {
           setNodeId(null);
         }}
         onImport={() => fileRef.current?.click()}
+        onExport={exportJson}
         onClose={onClose}
       />
 
@@ -279,7 +272,7 @@ export function WidgetCreatorApp({ onClose }: Props) {
                   className={`${s === size ? "on" : ""} ${filled ? "" : "empty"}`.trim()}
                   onClick={() => setSize(s)}
                 >
-                  {s}
+                  {SIZE_LABELS[s]}
                 </button>
               );
             })}
@@ -354,23 +347,9 @@ export function WidgetCreatorApp({ onClose }: Props) {
                 ))}
               </div>
             </SlopDropMenu>
-            <SlopDropMenu
-              label="Save"
-              primary
-              disabled={!current}
-              items={[
-                { id: "judie", label: "Save to Judie" },
-                { id: "json", label: "Export JSON" },
-                { id: "code", label: "Export code" },
-                { id: "import", label: "Import JSON" },
-              ]}
-              onPick={(id) => {
-                if (id === "judie") saveToJudie();
-                if (id === "json") exportJson();
-                if (id === "code") exportCode();
-                if (id === "import") fileRef.current?.click();
-              }}
-            />
+            <button type="button" className="primary" onClick={saveToJudie} disabled={!current}>
+              Save
+            </button>
           </div>
         </header>
 
@@ -485,6 +464,16 @@ export function WidgetCreatorApp({ onClose }: Props) {
             }
           }}
           preview={preview}
+        />
+      )}
+      {notice && (
+        <ConfirmSheet
+          title="Widget Creator"
+          body={notice}
+          primary="OK"
+          secondary="Close"
+          onAccept={() => setNotice(null)}
+          onDismiss={() => setNotice(null)}
         />
       )}
     </div>

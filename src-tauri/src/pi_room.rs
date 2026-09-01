@@ -100,12 +100,14 @@ pub struct CustomWidget {
     pub layouts: std::collections::BTreeMap<String, Vec<SlopNode>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Routine {
     pub id: String,
     pub name: String,
     pub phrases: Vec<String>,
     pub builtin: bool,
+    #[serde(default)]
+    pub command: String,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -130,6 +132,8 @@ struct Persist {
     voice: Option<bool>,
     #[serde(default)]
     speak: Option<bool>,
+    #[serde(default)]
+    routines: Vec<Routine>,
 }
 
 pub const GRID_COLS: i32 = 6;
@@ -345,6 +349,7 @@ fn save_persist(room: &Room) {
         distance_unit: room.distance_unit.clone(),
         voice: Some(room.voice),
         speak: Some(room.speak),
+        routines: room.routines.iter().filter(|r| !r.builtin).cloned().collect(),
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
@@ -377,6 +382,25 @@ fn n(kind: &str, x: f32, y: f32, w: f32, h: f32, text: &str, color: &str) -> Slo
     }
 }
 
+fn creator_kind_label(kind: &str) -> &'static str {
+    match kind {
+        "text" => "Text",
+        "metric" => "Value",
+        "icon" => "Icon",
+        "bar" => "Bar",
+        "gauge" => "Status",
+        "button" => "Button",
+        "chip" => "Chip",
+        "list" => "List",
+        "pair" => "Pair",
+        "toggle" => "Control",
+        "chart" => "Graph",
+        "divider" => "Divider",
+        "box" => "Container",
+        _ => "Part",
+    }
+}
+
 fn template_nodes(template: &str, size: &str) -> Vec<SlopNode> {
     match (template, size) {
         ("stat", "1x2") => vec![
@@ -390,20 +414,20 @@ fn template_nodes(template: &str, size: &str) -> Vec<SlopNode> {
             n("text", 8.0, 8.0, 40.0, 10.0, "INDOOR", "#8b909d"),
             n("metric", 8.0, 22.0, 50.0, 28.0, "21°", "#f4f5f7"),
             n("text", 8.0, 54.0, 80.0, 10.0, "Comfortable", "#8b909d"),
-            n("bar", 8.0, 70.0, 84.0, 10.0, "", "#2d7bff"),
+            n("bar", 8.0, 70.0, 84.0, 10.0, "", "#ffffff"),
             n("text", 8.0, 84.0, 80.0, 10.0, "Humidity 42%", "#8b909d"),
         ],
         ("status", _) => vec![
             n("text", 8.0, 8.0, 70.0, 12.0, "STATUS", "#8b909d"),
-            n("chip", 8.0, 28.0, 36.0, 16.0, "Online", "#3dd68c"),
+            n("chip", 8.0, 28.0, 36.0, 16.0, "Online", "#ffffff"),
             n("text", 8.0, 52.0, 80.0, 14.0, "Core 122 ms", "#f4f5f7"),
             n("text", 8.0, 70.0, 80.0, 14.0, "4 / 5 up", "#8b909d"),
         ],
         ("controls", _) => vec![
             n("text", 8.0, 8.0, 70.0, 12.0, "SCENE", "#8b909d"),
-            n("button", 8.0, 28.0, 40.0, 22.0, "Night", "#2d7bff"),
+            n("button", 8.0, 28.0, 40.0, 22.0, "Night", "#ffffff"),
             n("button", 52.0, 28.0, 40.0, 22.0, "Movie", "#22252f"),
-            n("toggle", 8.0, 60.0, 28.0, 16.0, "On", "#2d7bff"),
+            n("toggle", 8.0, 60.0, 28.0, 16.0, "On", "#ffffff"),
             n("text", 40.0, 62.0, 50.0, 12.0, "Master", "#f4f5f7"),
         ],
         ("list", _) => vec![
@@ -426,30 +450,35 @@ fn default_routines() -> Vec<Routine> {
             name: "Good Night".into(),
             phrases: vec!["good night".into(), "bedtime".into()],
             builtin: true,
+            command: String::new(),
         },
         Routine {
             id: "movie".into(),
             name: "Movie".into(),
             phrases: vec!["movie mode".into(), "movie time".into()],
             builtin: true,
+            command: String::new(),
         },
         Routine {
             id: "away".into(),
             name: "Away".into(),
             phrases: vec!["away mode".into(), "i am leaving".into()],
             builtin: true,
+            command: String::new(),
         },
         Routine {
             id: "morning".into(),
             name: "Morning".into(),
             phrases: vec!["good morning".into(), "start the day".into()],
             builtin: true,
+            command: String::new(),
         },
         Routine {
             id: "home".into(),
             name: "Home".into(),
             phrases: vec!["i am home".into(), "i am back".into()],
             builtin: true,
+            command: String::new(),
         },
     ]
 }
@@ -640,7 +669,15 @@ impl Default for Room {
                 TimerItem { label: "Tea".into(), remain: "3:20".into() },
                 TimerItem { label: "Laundry".into(), remain: "18:00".into() },
             ],
-            routines: default_routines(),
+            routines: {
+                let mut list = default_routines();
+                for r in persist.routines {
+                    if !r.builtin && !list.iter().any(|x| x.id == r.id) {
+                        list.push(r);
+                    }
+                }
+                list
+            },
             expanded: Expanded::None,
         };
         room.import_json_files();
@@ -976,6 +1013,27 @@ impl Room {
         if q.contains("help") || q.contains("what can") {
             return "Try: lights off, movie mode, good night, play, weather, DND.".into();
         }
+        let custom: Vec<Routine> = self
+            .routines
+            .iter()
+            .filter(|r| !r.builtin)
+            .cloned()
+            .collect();
+        for r in custom {
+            if r.phrases.iter().any(|p| {
+                let p = p.to_lowercase();
+                !p.is_empty() && (q == p || q.contains(&p))
+            }) {
+                let cmd = r.command.trim().to_string();
+                if cmd.is_empty() {
+                    return format!("{} has no command yet.", r.name);
+                }
+                if cmd.to_lowercase() == q {
+                    return format!("Running {}.", r.name);
+                }
+                return self.run_command(&cmd);
+            }
+        }
         format!("I heard “{}”. Try lights, weather, play, or good night.", raw.trim())
     }
 
@@ -1039,7 +1097,7 @@ impl Room {
             return;
         }
         if let Some(rid) = id.strip_prefix("routine-") {
-            self.quick(rid);
+            self.run_routine(rid);
             self.overlay = Overlay::None;
             return;
         }
@@ -1412,8 +1470,72 @@ impl Room {
             .unwrap_or_default()
     }
 
+    pub fn selected_creator_kind_label(&self) -> String {
+        let kind = self
+            .creator_nodes
+            .iter()
+            .find(|n| n.id == self.creator_selected)
+            .map(|n| n.kind.as_str())
+            .unwrap_or("");
+        creator_kind_label(kind).into()
+    }
+
+    pub fn run_routine(&mut self, id: &str) {
+        let Some(r) = self.routines.iter().find(|r| r.id == id).cloned() else {
+            return;
+        };
+        if r.builtin {
+            self.quick(&r.id);
+            return;
+        }
+        if !r.command.is_empty() {
+            let reply = self.run_command(&r.command);
+            self.palette_reply = reply;
+            self.push("Routine", &r.name);
+        }
+    }
+
+    pub fn add_routine(&mut self, name: &str, phrase: &str, command: &str) {
+        let phrase = phrase.trim();
+        let command = command.trim();
+        if phrase.is_empty() || command.is_empty() {
+            return;
+        }
+        let name = name.trim();
+        let name = if name.is_empty() { phrase } else { name };
+        let id = format!("r-{}", chrono::Local::now().timestamp_millis());
+        self.routines.push(Routine {
+            id,
+            name: name.into(),
+            phrases: vec![phrase.to_lowercase()],
+            builtin: false,
+            command: command.into(),
+        });
+        self.persist();
+    }
+
     pub fn remove_routine(&mut self, id: &str) {
         self.routines.retain(|r| r.builtin || r.id != id);
+        self.persist();
+    }
+
+    pub fn gallery_preview_nodes(&self) -> Vec<(String, SlopNode)> {
+        if self.gallery_kind != "custom" {
+            return Vec::new();
+        }
+        let Some(def) = self.custom.iter().find(|c| c.id == self.gallery_custom_id) else {
+            return Vec::new();
+        };
+        let nodes = def
+            .layouts
+            .get(&self.gallery_size)
+            .or_else(|| def.layouts.values().next())
+            .cloned()
+            .unwrap_or_default();
+        nodes
+            .into_iter()
+            .map(|n| (self.gallery_custom_id.clone(), n))
+            .collect()
     }
 }
 

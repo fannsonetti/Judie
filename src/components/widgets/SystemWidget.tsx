@@ -6,8 +6,8 @@ interface Props {
   size: string;
 }
 
-const CPU = "#3dd68c";
-const MEM = "#a78bfa";
+const CPU = "#ffffff";
+const MEM = "#c8c8c8";
 
 export function SystemWidget({ size }: Props) {
   const demo = useWidgetDemo();

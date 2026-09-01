@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   WidgetType,
-  WidgetSize,
   WIDGET_LABELS,
   WIDGET_SUPPORTED_SIZES,
+  SIZE_LABELS,
 } from "../../types/widgets";
 import { useLayoutStore } from "../../store/layoutStore";
 import { useCustomWidgetStore } from "../../store/customWidgetStore";
@@ -15,6 +15,11 @@ import { overlayTransition } from "../../lib/performance";
 import { liveFrame, liveShellSize } from "../../lib/widgetGrid";
 import { WidgetFace } from "../widgets/WidgetFace";
 import { WidgetDemoProvider } from "../widgets/demo";
+import { FieldTap } from "../chrome/FieldTap";
+import { ConfirmSheet } from "../chrome/ConfirmSheet";
+import { useChromeStore } from "../../store/chromeStore";
+
+const PREVIEW_SOURCE: "live" | "image" = "live";
 
 const DESCRIPTIONS: Record<Exclude<WidgetType, "custom">, string> = {
   activity: "See a live feed of what Judie and your automations have been doing.",
@@ -28,12 +33,6 @@ const DESCRIPTIONS: Record<Exclude<WidgetType, "custom">, string> = {
   timers: "View and manage running timers, alarms, and reminders.",
   system: "Live CPU and memory from this computer, plus the processes using the most.",
   weather: "Stay ahead of the forecast with real-time local weather conditions and upcoming predictions.",
-};
-
-const SIZE_LABEL: Record<WidgetSize, string> = {
-  "1x1": "Small",
-  "1x2": "Medium",
-  "2x2": "Large",
 };
 
 type Sel = { kind: "builtin"; type: Exclude<WidgetType, "custom"> } | { kind: "custom"; id: string };
@@ -61,6 +60,7 @@ export function WidgetGallery() {
   const [sizeIndex, setSizeIndex] = useState(0);
   const [query, setQuery] = useState("");
   const [frame, setFrame] = useState(() => liveFrame());
+  const [notice, setNotice] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
 
   const visible = types.filter((t) => WIDGET_LABELS[t].toLowerCase().includes(q));
@@ -98,7 +98,13 @@ export function WidgetGallery() {
   }, [selKey]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setNotice(null);
+      if (useChromeStore.getState().kbField === "gallery-query") {
+        useChromeStore.getState().closeKeyboard();
+      }
+      return;
+    }
     const sync = () => setFrame(liveFrame());
     sync();
     window.addEventListener("resize", sync);
@@ -112,7 +118,7 @@ export function WidgetGallery() {
       const id = importOne(def);
       setSelected({ kind: "custom", id });
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Could not import that file.");
+      setNotice(err instanceof Error ? err.message : "Could not import that file.");
     }
   };
 
@@ -196,15 +202,7 @@ export function WidgetGallery() {
             />
             <div className="wg-sidebar">
               <h2 className="wg-title">Add Widget</h2>
-              <div className="wg-search-box">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search"
-                  aria-label="Search widgets"
-                />
-              </div>
+              <FieldTap label="Search" field="gallery-query" value={query} onCommit={setQuery} live />
               <div className="wg-list">
                 <button
                   type="button"
@@ -302,13 +300,21 @@ export function WidgetGallery() {
                               }}
                             >
                               <div className="widget-face">
-                                <WidgetDemoProvider>
-                                  <WidgetFace
-                                    type={current.kind === "custom" ? "custom" : current.type}
-                                    size={s}
-                                    customId={current.kind === "custom" ? current.id : undefined}
+                                {PREVIEW_SOURCE === "live" ? (
+                                  <WidgetDemoProvider>
+                                    <WidgetFace
+                                      type={current.kind === "custom" ? "custom" : current.type}
+                                      size={s}
+                                      customId={current.kind === "custom" ? current.id : undefined}
+                                    />
+                                  </WidgetDemoProvider>
+                                ) : (
+                                  <img
+                                    className="wg-thumb"
+                                    alt=""
+                                    src={`/previews/${current.kind === "custom" ? current.id : current.type}-${s}.png`}
                                   />
-                                </WidgetDemoProvider>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -329,7 +335,7 @@ export function WidgetGallery() {
                       />
                     ))}
                   </div>
-                  <p className="wg-size-caption">{activeSize ? SIZE_LABEL[activeSize] : ""}</p>
+                  <p className="wg-size-caption">{activeSize ? SIZE_LABELS[activeSize] : ""}</p>
                   <button type="button" className="wg-add" onClick={addCurrent}>
                     Add to Home
                   </button>
@@ -348,6 +354,16 @@ export function WidgetGallery() {
             </div>
           </motion.div>
         </motion.div>
+      )}
+      {notice && (
+        <ConfirmSheet
+          title="Could not import"
+          body={notice}
+          primary="OK"
+          secondary="Close"
+          onAccept={() => setNotice(null)}
+          onDismiss={() => setNotice(null)}
+        />
       )}
     </AnimatePresence>
   );

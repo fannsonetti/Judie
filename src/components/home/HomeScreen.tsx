@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLayoutStore } from "../../store/layoutStore";
 import { useAssistantStore } from "../../store/assistantStore";
 import { visiblePageCount } from "../../lib/layout";
-import { StatusBar } from "./StatusBar";
-import { UpdateBar } from "./UpdateBar";
+import { StatusBar, useNetworkLink } from "./StatusBar";
 import { HomePage } from "./HomePage";
 import { PageIndicator } from "./PageIndicator";
 import { EditModeControls } from "./EditModeControls";
@@ -16,6 +15,8 @@ import { RemoveConfirm } from "./RemoveConfirm";
 import { Toasts } from "./Toasts";
 import { DebugPanel } from "./DebugPanel";
 import { JudieRuntime } from "../../runtime/JudieRuntime";
+import { WifiMenu } from "../chrome/WifiMenu";
+import { AnsiKeyboard } from "../chrome/AnsiKeyboard";
 
 const TRIPLE_MS = 480;
 
@@ -68,7 +69,7 @@ export function HomeScreen() {
   const ignoreHoldTarget = (target: HTMLElement) =>
     Boolean(
       target.closest(
-        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .expanded-overlay, .confirm-backdrop, .update-bar"
+        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .expanded-overlay, .confirm-backdrop, .wifi-menu, .osk"
       )
     );
 
@@ -182,6 +183,7 @@ export function HomeScreen() {
   }, []);
 
   const pageWidthPct = `${100 / pageCount}%`;
+  const link = useNetworkLink();
 
   return (
     <div
@@ -192,8 +194,7 @@ export function HomeScreen() {
       onPointerCancel={() => endDrag()}
     >
       <JudieRuntime />
-      <StatusBar />
-      <UpdateBar />
+      <StatusBar link={link} />
       <div
         className={`home-viewport${pageCount > 1 ? " multi" : ""}`}
         ref={viewportRef}
@@ -233,6 +234,8 @@ export function HomeScreen() {
       <WidgetCreatorOverlay />
       <CommandPalette />
       <SettingsOverlay />
+      <WifiMenu link={link} />
+      <AnsiKeyboard />
       <RemoveConfirm />
       <Toasts />
       <DebugPanel />

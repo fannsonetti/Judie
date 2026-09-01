@@ -1,6 +1,7 @@
-import { ScrollView, LineEdit, Slider, Button } from "std-widgets.slint";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, KeyBtn, Bar, TileShell, QuickTask, NetGlyph, ConfirmSheet } from "cards.slint";
+import { ScrollView, Slider, Button } from "std-widgets.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, KeyBtn, Bar, TileShell, QuickTask, NetGlyph, ConfirmSheet } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
+import { WidgetFace } from "faces.slint";
 
 export component MainWindow inherits Window {
     title: "Judie";
@@ -101,6 +102,7 @@ export component MainWindow inherits Window {
     in-out property <[SlopNode]> slop-nodes: [];
     in-out property <[SlopNode]> creator-nodes: [];
     in-out property <string> creator-selected: "";
+    in-out property <string> creator-selected-kind: "";
     in-out property <string> creator-node-text: "";
     in-out property <string> pending-remove: "";
     in-out property <string> pending-label: "";
@@ -139,6 +141,22 @@ export component MainWindow inherits Window {
     in-out property <bool> version-menu-open: false;
     in-out property <string> preview-source: "live";
     in-out property <string> wifi-detail: "";
+    in-out property <[SlopNode]> gallery-nodes: [];
+    in-out property <string> routine-draft: "";
+    in-out property <string> routine-phrase: "";
+    in-out property <string> routine-command: "";
+    property <[PartKind]> part-kinds: [
+        { id: "text", label: "Text" },
+        { id: "label", label: "Label" },
+        { id: "icon", label: "Icon" },
+        { id: "value", label: "Value" },
+        { id: "button", label: "Button" },
+        { id: "graph", label: "Graph" },
+        { id: "status", label: "Status" },
+        { id: "image", label: "Image" },
+        { id: "control", label: "Control" },
+        { id: "box", label: "Container" },
+    ];
 
     callback update-now();
     callback dismiss-update();
@@ -234,6 +252,7 @@ export component MainWindow inherits Window {
     callback pick-version(string);
     callback gallery-set-index(int);
     callback drag-drop(string, int, int);
+    callback save-routine();
 
     property <length> pad: 20px;
     property <length> gap: 12px;
@@ -471,306 +490,59 @@ export component MainWindow inherits Window {
                         }
                     }
 
-                    if w.kind == "quickControls": GridLayout {
-                        spacing: 8px;
-                        QuickTask {
-                            row: 0; col: 0;
-                            glyph: "☾";
-                            label: "Good Night";
-                            clicked => { root.quick("goodNight"); }
-                        }
-                        QuickTask {
-                            row: 0; col: 1;
-                            glyph: "○";
-                            label: "Lights Off";
-                            clicked => { root.quick("lightsOff"); }
-                        }
-                        QuickTask {
-                            row: 1; col: 0;
-                            glyph: "⊘";
-                            label: "Do Not Disturb";
-                            on: root.dnd;
-                            clicked => { root.quick("dnd"); }
-                        }
-                        QuickTask {
-                            row: 1; col: 1;
-                            glyph: "▶";
-                            label: "Movie Mode";
-                            clicked => { root.quick("movie"); }
-                        }
-                    }
-
-                    if w.kind == "climate": HorizontalLayout {
-                        spacing: 10px;
-                        Rectangle {
-                            width: 72px; height: 72px; border-radius: 0px;
-                            border-width: 2px; border-color: #5ce1ff; background: #000000;
-                            VerticalLayout {
-                                alignment: center;
-                                Text { text: root.indoor; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
-                                Text { text: "NOW"; color: #7a7a7a; font-size: 10px; font-family: Dy.mono; horizontal-alignment: center; }
-                            }
-                        }
-                        VerticalLayout {
-                            alignment: center; spacing: 6px;
-                            Text { text: "HUMIDITY"; color: #7a7a7a; font-size: 10px; font-family: Dy.mono; }
-                            Text { text: root.humidity; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                            Text { text: "OUTDOOR"; color: #7a7a7a; font-size: 10px; font-family: Dy.mono; }
-                            Text { text: root.outdoor; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                            if w.size == "1x2": Text { text: root.comfort; color: #7a7a7a; font-size: 12px; font-family: Dy.mono; }
-                        }
-                    }
-
-                    if w.kind == "calendar": HorizontalLayout {
-                        spacing: 10px;
-                        if w.size != "1x1": VerticalLayout {
-                            spacing: 4px; horizontal-stretch: 1;
-                            Text { text: "Today"; color: #7a7a7a; font-size: 12px; }
-                            for ev in root.events: HorizontalLayout {
-                                spacing: 6px;
-                                Rectangle { width: 4px; height: 18px; border-radius: 0px; background: #5ce1ff; }
-                                VerticalLayout {
-                                    Text { text: ev.title; color: #e6e6e6; font-size: 12px; font-weight: 600; overflow: elide; }
-                                    Text { text: ev.time + (ev.detail == "" ? "" : " · " + ev.detail); color: #7a7a7a; font-size: 10px; overflow: elide; }
-                                }
-                            }
-                        }
-                        VerticalLayout {
-                            spacing: 4px; horizontal-stretch: 1;
-                            Text { text: root.month-name; color: #7a7a7a; font-size: 12px; }
-                            HorizontalLayout {
-                                spacing: 0;
-                                for d in ["S", "M", "T", "W", "T", "F", "S"]: Text {
-                                    text: d; color: #555555; font-size: 9px; horizontal-alignment: center; horizontal-stretch: 1;
-                                }
-                            }
-                            GridLayout {
-                                spacing: 2px;
-                                for cell[i] in root.cal-cells: Rectangle {
-                                    row: floor(i / 7); col: mod(i, 7);
-                                    height: 16px;
-                                    border-radius: 0px;
-                                    border-width: cell.today ? 1px : 0px;
-                                    border-color: #5ce1ff;
-                                    background: #00000000;
-                                    Text {
-                                        text: cell.label;
-                                        color: cell.today ? #5ce1ff : #e6e6e6;
-                                        font-size: 10px;
-                                        font-family: Dy.mono;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if w.kind == "purifier": VerticalLayout {
-                        spacing: 8px;
-                        if w.size != "1x1": HorizontalLayout {
-                            spacing: 10px;
-                            Rectangle {
-                                width: 88px; height: 88px; border-radius: 0px;
-                                border-width: 2px; border-color: #3dd68c; background: #000000;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Text { text: root.purifier-aq; color: #3dd68c; font-size: 16px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
-                                    Text { text: "AIR QUALITY"; color: #7a7a7a; font-size: 9px; font-family: Dy.mono; horizontal-alignment: center; }
-                                }
-                            }
-                            VerticalLayout {
-                                spacing: 6px;
-                                Rectangle {
-                                    border-radius: 0px; background: #000000;
-                                    border-width: 1px; border-color: #3d3d3d;
-                                    VerticalLayout {
-                                        padding: 8px;
-                                        Text { text: "PM2.5"; color: #7a7a7a; font-size: 10px; font-family: Dy.mono; }
-                                        Text { text: "7 µg/m³"; color: #e6e6e6; font-size: 14px; font-weight: 700; font-family: Dy.mono; }
-                                        Text { text: "Fine particles"; color: #555555; font-size: 10px; font-family: Dy.mono; }
-                                    }
-                                }
-                                Rectangle {
-                                    border-radius: 0px; background: #000000;
-                                    border-width: 1px; border-color: #3d3d3d;
-                                    VerticalLayout {
-                                        padding: 8px;
-                                        Text { text: "ALLERGENS"; color: #7a7a7a; font-size: 10px; font-family: Dy.mono; }
-                                        Text { text: "4/12"; color: #e6e6e6; font-size: 14px; font-weight: 700; font-family: Dy.mono; }
-                                        Text { text: "Allergen level"; color: #555555; font-size: 10px; font-family: Dy.mono; }
-                                    }
-                                }
-                            }
-                        }
-                        if w.size == "1x1": VerticalLayout {
-                            Text { text: "7"; color: #e6e6e6; font-size: 28px; font-weight: 700; }
-                            Text { text: "PM2.5 · " + root.purifier-aq; color: #7a7a7a; font-size: 12px; }
-                        }
-                        if w.size == "2x2": Text { text: "Filter: Clean soon. Dust can cut performance. Clean the filter for the best air."; color: #7a7a7a; font-size: 11px; wrap: word-wrap; }
-                        Text { text: "Filter"; color: #7a7a7a; font-size: 11px; }
-                        Bar { level: root.purifier-filter / 100; fill: #3dd68c; }
-                        Text { text: root.purifier-filter + "%"; color: #e6e6e6; font-size: 12px; }
-                        if w.size == "2x2": HorizontalLayout {
-                            spacing: 8px;
-                            Pill { label: "Auto"; on: root.purifier-mode == "Auto"; clicked => { root.set-purifier-mode("Auto"); } }
-                            Pill { label: "Sleep"; on: root.purifier-mode == "Sleep"; clicked => { root.set-purifier-mode("Sleep"); } }
-                            Pill { label: "Boost"; on: root.purifier-mode == "Manual"; clicked => { root.set-purifier-mode("Manual"); } }
-                        }
-                    }
-
-                    if w.kind == "activity": VerticalLayout {
-                        for a in root.activity: HorizontalLayout {
-                            spacing: 8px;
-                            if w.size == "2x2": Text { text: a.time; color: #7a7a7a; font-size: 12px; min-width: 44px; }
-                            Text { text: a.title; color: #e6e6e6; font-size: 13px; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
-                            if w.size == "2x2": Text { text: a.source; color: #7a7a7a; font-size: 11px; }
-                        }
-                    }
-
-                    if w.kind == "server": VerticalLayout {
-                        spacing: 4px;
-                        Text { text: "122 ms"; color: #e6e6e6; font-size: 28px; font-weight: 700; }
-                        Text { text: "4/5 up"; color: #7a7a7a; font-size: 12px; }
-                        if w.size != "1x1": VerticalLayout {
-                            spacing: 4px;
-                            for s in root.services: HorizontalLayout {
-                            spacing: 8px;
-                            Rectangle { width: 8px; height: 8px; border-radius: 0px; background: s.online ? #3dd68c : #ff5c5c; y: 4px; }
-                            Text { text: s.name; color: #e6e6e6; font-size: 13px; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Text { text: s.status; color: s.online ? #7a7a7a : #ff5c5c; font-size: 12px; }
-                            }
-                        }
-                    }
-
-                    if w.kind == "weather": VerticalLayout {
-                        HorizontalLayout {
-                            Text { text: root.weather-loc; color: #7a7a7a; font-size: 12px; overflow: elide; horizontal-stretch: 1; }
-                            if w.size != "1x1": Text { text: root.weather-feel; color: #7a7a7a; font-size: 11px; }
-                        }
-                        HorizontalLayout {
-                            VerticalLayout {
-                                Text { text: root.weather-temp; color: #e6e6e6; font-size: 32px; font-weight: 700; }
-                                Text { text: root.weather-cond; color: #e6e6e6; font-size: 14px; }
-                                Text { text: root.weather-range; color: #7a7a7a; font-size: 12px; }
-                            }
-                            Rectangle { horizontal-stretch: 1; }
-                            Rectangle {
-                                width: 36px; height: 36px; border-radius: 0px; background: #000000; y: 8px;
-                                border-width: 1px; border-color: #f0a030;
-                                Text { text: "*"; color: #f0a030; font-size: 18px; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
-                            }
-                        }
-                        if w.size == "2x2": Text { text: root.weather-note; color: #e6e6e6; font-size: 12px; wrap: word-wrap; }
-                        if w.size != "1x1": HorizontalLayout {
-                            spacing: 8px;
-                            for h in root.hours: VerticalLayout {
-                                Text { text: h.hour; color: #555555; font-size: 10px; horizontal-alignment: center; }
-                                Text { text: h.temp; color: #e6e6e6; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-                                Text { text: h.precip; color: #7a7a7a; font-size: 10px; horizontal-alignment: center; }
-                            }
-                        }
-                    }
-
-                    if w.kind == "lights": VerticalLayout {
-                        spacing: 6px;
-                        HorizontalLayout {
-                            Text { text: root.scene; color: #7a7a7a; font-size: 12px; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.master-on; toggled => { root.toggle-master(); } }
-                        }
-                        Text { text: root.master-on ? root.brightness + "%" : "Off"; color: #e6e6e6; font-size: 28px; font-weight: 700; }
-                        Slider { minimum: 0; maximum: 100; value: root.brightness; changed(v) => { root.brightness-changed(round(v)); } }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            Swatch { swatch: #ff5a5a; on: root.master-color == "#FF5A5A"; clicked => { root.set-color("#FF5A5A"); } }
-                            Swatch { swatch: #ff8c42; on: root.master-color == "#FF8C42"; clicked => { root.set-color("#FF8C42"); } }
-                            Swatch { swatch: #ffd166; on: root.master-color == "#FFD166"; clicked => { root.set-color("#FFD166"); } }
-                            Swatch { swatch: #7cf29c; on: root.master-color == "#7CF29C"; clicked => { root.set-color("#7CF29C"); } }
-                            Swatch { swatch: #5ce1ff; on: root.master-color == "#2D7BFF"; clicked => { root.set-color("#2D7BFF"); } }
-                            if w.size != "1x1": Swatch { swatch: #7b61ff; on: root.master-color == "#7B61FF"; clicked => { root.set-color("#7B61FF"); } }
-                            if w.size != "1x1": Swatch { swatch: #ff6bcb; on: root.master-color == "#FF6BCB"; clicked => { root.set-color("#FF6BCB"); } }
-                            if w.size != "1x1": Swatch { swatch: #ffffff; on: root.master-color == "#FFFFFF"; clicked => { root.set-color("#FFFFFF"); } }
-                        }
-                        if w.size == "2x2": GridLayout {
-                            spacing: 8px;
-                            for light[i] in root.lights: Rectangle {
-                                row: floor(i / 2); col: mod(i, 2);
-                                border-radius: 0px; background: #000000; height: 44px;
-                                border-width: 1px; border-color: #3d3d3d;
-                                HorizontalLayout {
-                                    spacing: 0px;
-                                    Rectangle { width: 3px; background: light.on ? #f0a030 : #3d3d3d; }
-                                    TouchArea {
-                                        clicked => { root.toggle-light(light.id); }
-                                        VerticalLayout {
-                                            padding: 6px;
-                                            Text { text: light.name; color: #e6e6e6; font-size: 11px; font-family: Dy.mono; overflow: elide; }
-                                            Text { text: light.brightness; color: #7a7a7a; font-size: 11px; font-family: Dy.mono; }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if w.kind == "media": VerticalLayout {
-                        Text { text: root.playing ? "Playing" : "Paused"; color: #7a7a7a; font-size: 12px; }
-                        Text { text: root.track-title; color: #e6e6e6; font-size: 16px; font-weight: 600; overflow: elide; }
-                        if w.size != "1x1": Text { text: root.track-artist; color: #7a7a7a; font-size: 12px; overflow: elide; }
-                        if w.size != "1x1": Bar { level: root.media-progress; fill: #e6e6e6; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            if w.size != "1x1": IconBtn { glyph: "⟨"; clicked => { root.prev-track(); } }
-                            IconBtn { glyph: root.playing ? "❚❚" : "▶"; primary: true; clicked => { root.toggle-play(); } }
-                            if w.size != "1x1": IconBtn { glyph: "⟩"; clicked => { root.next-track(); } }
-                            if w.size == "2x2": Rectangle { horizontal-stretch: 1; }
-                            if w.size == "2x2": Text { text: root.volume + "%"; color: #7a7a7a; font-size: 12px; vertical-alignment: center; }
-                        }
-                        if w.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
-                    }
-
-                    if w.kind == "system": VerticalLayout {
-                        Text { text: "CPU"; color: #7a7a7a; font-size: 12px; }
-                        Text { text: round(root.cpu) + "%"; color: #3dd68c; font-size: 24px; font-weight: 700; }
-                        Bar { level: root.cpu / 100; fill: #3dd68c; }
-                        if w.size != "1x1": Text { text: "Memory"; color: #7a7a7a; font-size: 12px; }
-                        if w.size != "1x1": Text { text: round(root.memory) + "%"; color: #b794f6; font-size: 24px; font-weight: 700; }
-                        if w.size != "1x1": Bar { level: root.memory / 100; fill: #b794f6; }
-                        if w.size == "2x2": Text { text: root.mem-detail; color: #7a7a7a; font-size: 12px; }
-                        if w.size == "2x2": Text { text: root.temp-text; color: #7a7a7a; font-size: 12px; }
-                    }
-
-                    if w.kind == "timers": VerticalLayout {
-                        for t in root.timers: HorizontalLayout {
-                            Text { text: t.label; color: #e6e6e6; font-size: 13px; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Text { text: t.remain; color: #7a7a7a; font-size: 13px; }
-                        }
-                    }
-
-                    if w.kind == "custom": Rectangle {
-                        vertical-stretch: 1;
-                        horizontal-stretch: 1;
-                        for n in root.slop-nodes: Rectangle {
-                            x: parent.width * n.x / 100;
-                            y: parent.height * n.y / 100;
-                            width: parent.width * n.w / 100;
-                            height: parent.height * n.h / 100;
-                            visible: n.widget-id == w.id;
-                            background: (n.kind == "button" || n.kind == "chip" || n.kind == "bar" || n.kind == "toggle") ? rgb(n.r, n.g, n.b) : #00000000;
-                            border-radius: n.kind == "chip" || n.kind == "button" || n.kind == "toggle" ? 8px : 0px;
-                            opacity: (n.kind == "bar" || n.kind == "gauge") ? 0.85 : 1;
-                            Text {
-                                text: n.text;
-                                color: rgb(n.r, n.g, n.b);
-                                font-size: n.kind == "metric" ? 28px : 12px;
-                                font-weight: n.kind == "metric" ? 700 : 500;
-                                overflow: elide;
-                                vertical-alignment: center;
-                            }
-                        }
+                    WidgetFace {
+                        kind: w.kind;
+                        size: w.size;
+                        sample: false;
+                        source: "live";
+                        widget-id: w.id;
+                        weather-loc: root.weather-loc;
+                        weather-temp: root.weather-temp;
+                        weather-cond: root.weather-cond;
+                        weather-range: root.weather-range;
+                        weather-feel: root.weather-feel;
+                        weather-note: root.weather-note;
+                        hours: root.hours;
+                        master-on: root.master-on;
+                        brightness: root.brightness;
+                        scene: root.scene;
+                        master-color: root.master-color;
+                        lights: root.lights;
+                        playing: root.playing;
+                        track-title: root.track-title;
+                        track-artist: root.track-artist;
+                        volume: root.volume;
+                        media-progress: root.media-progress;
+                        indoor: root.indoor;
+                        outdoor: root.outdoor;
+                        humidity: root.humidity;
+                        comfort: root.comfort;
+                        events: root.events;
+                        month-name: root.month-name;
+                        cal-cells: root.cal-cells;
+                        purifier-on: root.purifier-on;
+                        purifier-mode: root.purifier-mode;
+                        purifier-aq: root.purifier-aq;
+                        purifier-filter: root.purifier-filter;
+                        cpu: root.cpu;
+                        memory: root.memory;
+                        mem-detail: root.mem-detail;
+                        temp-text: root.temp-text;
+                        services: root.services;
+                        activity: root.activity;
+                        timers: root.timers;
+                        slop-nodes: root.slop-nodes;
+                        dnd: root.dnd;
+                        toggle-master => { root.toggle-master(); }
+                        brightness-changed(v) => { root.brightness-changed(v); }
+                        set-color(c) => { root.set-color(c); }
+                        toggle-light(id) => { root.toggle-light(id); }
+                        toggle-play => { root.toggle-play(); }
+                        next-track => { root.next-track(); }
+                        prev-track => { root.prev-track(); }
+                        volume-changed(v) => { root.volume-changed(v); }
+                        quick(id) => { root.quick(id); }
+                        set-purifier-mode(m) => { root.set-purifier-mode(m); }
                     }
                 }
 
@@ -1024,6 +796,10 @@ export component MainWindow inherits Window {
                             Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } }
                         }
                         Text { text: "Routines"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        FieldTap { label: "Name"; value: root.routine-draft; active: root.kb-field == "routine-name"; tapped => { root.open-keyboard("routine-name"); } }
+                        FieldTap { label: "When you say"; value: root.routine-phrase; active: root.kb-field == "routine-phrase"; tapped => { root.open-keyboard("routine-phrase"); } }
+                        FieldTap { label: "Judie should"; value: root.routine-command; active: root.kb-field == "routine-command"; tapped => { root.open-keyboard("routine-command"); } }
+                        Pill { label: "Save routine"; on: true; clicked => { root.save-routine(); } }
                         for r in root.routines: HorizontalLayout {
                             spacing: 10px;
                             height: 48px;
@@ -1234,27 +1010,9 @@ export component MainWindow inherits Window {
                     width: 260px;
                     spacing: 8px;
                     Text { text: "ADD WIDGET"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                    LineEdit {
-                        placeholder-text: "Search widgets";
-                        text: root.gallery-query;
-                        edited(t) => { root.gallery-search(t); }
-                    }
-                    TouchArea {
-                        clicked => { root.open-creator(); }
-                        Rectangle {
-                            height: 36px; border-radius: 0px; background: #000000;
-                            border-width: 1px; border-color: #3d3d3d;
-                            Text { text: "OPEN WIDGET CREATOR…"; color: #e6e6e6; font-size: 11px; font-family: Dy.mono; vertical-alignment: center; horizontal-alignment: center; }
-                        }
-                    }
-                    TouchArea {
-                        clicked => { root.gallery-import(); }
-                        Rectangle {
-                            height: 32px; border-radius: 0px; background: #000000;
-                            border-width: 1px; border-color: #3d3d3d;
-                            Text { text: "IMPORT .JSON"; color: #7a7a7a; font-size: 11px; font-family: Dy.mono; vertical-alignment: center; horizontal-alignment: center; }
-                        }
-                    }
+                    FieldTap { label: "Search"; value: root.gallery-query; active: root.kb-field == "gallery-query"; tapped => { root.open-keyboard("gallery-query"); } }
+                    Pill { label: "Creator"; clicked => { root.open-creator(); } }
+                    Pill { label: "Import"; clicked => { root.gallery-import(); } }
                     Text { text: "BUILT-IN"; color: #7a7a7a; font-size: 10px; font-family: Dy.mono; }
                     Flickable {
                         vertical-stretch: 1;
@@ -1325,12 +1083,17 @@ export component MainWindow inherits Window {
                                     Rectangle {
                                         width: 160px; height: 160px;
                                         border-width: 1.5px; border-color: #2a2a2a; background: #000000;
+                                        clip: true;
                                         x: (parent.width - 160px) / 2;
-                                        if root.preview-source == "live": VerticalLayout {
-                                            padding: 12px; alignment: center; spacing: 4px;
-                                            Text { text: root.gallery-kind == "weather" ? root.weather-temp : (root.gallery-kind == "lights" ? root.brightness + "%" : (root.gallery-kind == "media" ? root.track-title : root.gallery-kind)); color: #ffffff; font-size: 22px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; overflow: elide; }
-                                            Text { text: root.gallery-kind == "weather" ? root.weather-cond : (root.gallery-kind == "lights" ? root.scene : (root.gallery-kind == "media" ? root.track-artist : "Small")); color: #8a8a8a; font-size: 12px; font-family: Dy.mono; horizontal-alignment: center; overflow: elide; }
+                                        WidgetFace {
+                                            kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                            size: "1x1";
+                                            sample: true;
+                                            source: root.preview-source;
+                                            widget-id: root.gallery-custom-id;
+                                            slop-nodes: root.gallery-nodes;
                                         }
+
                                     }
                                 }
                             }
@@ -1341,12 +1104,17 @@ export component MainWindow inherits Window {
                                     Rectangle {
                                         width: 280px; height: 140px;
                                         border-width: 1.5px; border-color: #2a2a2a; background: #000000;
+                                        clip: true;
                                         x: (parent.width - 280px) / 2;
-                                        if root.preview-source == "live": VerticalLayout {
-                                            padding: 12px; alignment: center; spacing: 4px;
-                                            Text { text: root.gallery-kind == "weather" ? root.weather-temp + "  " + root.weather-cond : (root.gallery-kind == "lights" ? root.scene : (root.gallery-kind == "media" ? root.track-title : root.gallery-kind)); color: #ffffff; font-size: 20px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; overflow: elide; }
-                                            Text { text: root.gallery-kind == "weather" ? root.weather-range : (root.gallery-kind == "lights" ? root.brightness + "%" : (root.gallery-kind == "media" ? root.track-artist : "Medium")); color: #8a8a8a; font-size: 12px; font-family: Dy.mono; horizontal-alignment: center; overflow: elide; }
+                                        WidgetFace {
+                                            kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                            size: "1x2";
+                                            sample: true;
+                                            source: root.preview-source;
+                                            widget-id: root.gallery-custom-id;
+                                            slop-nodes: root.gallery-nodes;
                                         }
+
                                     }
                                 }
                             }
@@ -1357,13 +1125,17 @@ export component MainWindow inherits Window {
                                     Rectangle {
                                         width: 280px; height: 280px;
                                         border-width: 1.5px; border-color: #2a2a2a; background: #000000;
+                                        clip: true;
                                         x: (parent.width - 280px) / 2;
-                                        if root.preview-source == "live": VerticalLayout {
-                                            padding: 16px; alignment: center; spacing: 8px;
-                                            Text { text: root.gallery-kind == "weather" ? root.weather-temp : (root.gallery-kind == "lights" ? root.brightness + "%" : (root.gallery-kind == "media" ? root.track-title : root.gallery-kind)); color: #ffffff; font-size: 32px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; overflow: elide; }
-                                            Text { text: root.gallery-kind == "weather" ? root.weather-cond : (root.gallery-kind == "lights" ? root.scene : (root.gallery-kind == "media" ? root.track-artist : "Large")); color: #ffffff; font-size: 14px; font-family: Dy.mono; horizontal-alignment: center; overflow: elide; }
-                                            Text { text: root.gallery-kind == "weather" ? root.weather-note : (root.gallery-kind == "lights" ? "Colour and rooms" : (root.gallery-kind == "media" ? root.playing ? "Playing" : "Paused" : "Custom layout")); color: #8a8a8a; font-size: 12px; font-family: Dy.mono; horizontal-alignment: center; wrap: word-wrap; }
+                                        WidgetFace {
+                                            kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                            size: "2x2";
+                                            sample: true;
+                                            source: root.preview-source;
+                                            widget-id: root.gallery-custom-id;
+                                            slop-nodes: root.gallery-nodes;
                                         }
+
                                     }
                                 }
                             }
@@ -1391,51 +1163,52 @@ export component MainWindow inherits Window {
             height: parent.height - 48px;
             border-radius: 0px;
             background: #000000;
-            border-width: 1px;
-            border-color: #3d3d3d;
+            border-width: 1.5px;
+            border-color: #2a2a2a;
             TouchArea { clicked => { } }
             VerticalLayout {
-                padding: 16px;
-                spacing: 10px;
+                padding: 20px;
+                spacing: 14px;
                 HorizontalLayout {
-                    Text { text: "Widget Creator"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: "Widget"; color: #ffffff; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
                     Rectangle { horizontal-stretch: 1; }
-                    Pill { label: "Save to Home"; on: true; clicked => { root.save-creator(); } }
+                    Pill { label: "Save"; on: true; clicked => { root.save-creator(); } }
                     Pill { label: "Close"; clicked => { root.close-creator(); } }
                 }
+                FieldTap { label: "Name"; value: root.creator-name; active: root.kb-field == "creator-name"; tapped => { root.open-keyboard("creator-name"); } }
+                Text { text: "Size"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
                 HorizontalLayout {
                     spacing: 8px;
-                    LineEdit { placeholder-text: "Untitled"; text: root.creator-name; edited(t) => { root.creator-name-changed(t); } }
-                    Pill { label: "1×1"; on: root.creator-size == "1x1"; clicked => { root.set-creator-size("1x1"); } }
-                    Pill { label: "1×2"; on: root.creator-size == "1x2"; clicked => { root.set-creator-size("1x2"); } }
-                    Pill { label: "2×2"; on: root.creator-size == "2x2"; clicked => { root.set-creator-size("2x2"); } }
+                    Pill { label: "Small"; on: root.creator-size == "1x1"; clicked => { root.set-creator-size("1x1"); } }
+                    Pill { label: "Medium"; on: root.creator-size == "1x2"; clicked => { root.set-creator-size("1x2"); } }
+                    Pill { label: "Large"; on: root.creator-size == "2x2"; clicked => { root.set-creator-size("2x2"); } }
+                }
+                Text { text: "Starting layout"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                HorizontalLayout {
+                    spacing: 8px;
                     Pill { label: "Blank"; on: root.creator-template == "blank"; clicked => { root.set-creator-template("blank"); } }
-                    Pill { label: "Stat"; on: root.creator-template == "stat"; clicked => { root.set-creator-template("stat"); } }
+                    Pill { label: "Number"; on: root.creator-template == "stat"; clicked => { root.set-creator-template("stat"); } }
                     Pill { label: "Status"; on: root.creator-template == "status"; clicked => { root.set-creator-template("status"); } }
                     Pill { label: "Controls"; on: root.creator-template == "controls"; clicked => { root.set-creator-template("controls"); } }
                     Pill { label: "List"; on: root.creator-template == "list"; clicked => { root.set-creator-template("list"); } }
                 }
                 HorizontalLayout {
-                    spacing: 12px;
+                    spacing: 16px;
                     VerticalLayout {
                         width: 160px;
                         spacing: 6px;
-                        Text { text: "Components"; color: #7a7a7a; font-size: 11px; }
-                        for k in ["text", "label", "icon", "value", "button", "graph", "status", "image", "control", "box"]: TouchArea {
-                            clicked => { root.add-creator-kind(k); }
-                            Rectangle {
-                                height: 28px; border-radius: 0px; background: #000000;
-                                border-width: 1px; border-color: #3d3d3d;
-                                Text { text: k; color: #e6e6e6; font-size: 11px; font-family: Dy.mono; vertical-alignment: center; horizontal-alignment: center; }
-                            }
+                        Text { text: "Parts"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        for k in root.part-kinds: TouchArea {
+                            clicked => { root.add-creator-kind(k.id); }
+                            height: 36px;
+                            Text { text: k.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
                         }
                     }
                     Rectangle {
                         horizontal-stretch: 1;
-                        border-radius: 0px;
                         background: #000000;
-                        border-width: 1px;
-                        border-color: #3d3d3d;
+                        border-width: 1.5px;
+                        border-color: #2a2a2a;
                         for n in root.creator-nodes: TouchArea {
                             x: parent.width * n.x / 100;
                             y: parent.height * n.y / 100;
@@ -1443,9 +1216,8 @@ export component MainWindow inherits Window {
                             height: parent.height * n.h / 100;
                             clicked => { root.select-creator-node(n.id); }
                             Rectangle {
-                                border-radius: 0px;
-                                border-width: root.creator-selected == n.id ? 2px : 0px;
-                                border-color: #5ce1ff;
+                                border-width: root.creator-selected == n.id ? 1.5px : 0px;
+                                border-color: #ffffff;
                                 background: (n.kind == "button" || n.kind == "chip" || n.kind == "bar" || n.kind == "box") ? rgb(n.r, n.g, n.b) : #00000000;
                                 Text {
                                     text: n.text;
@@ -1460,15 +1232,11 @@ export component MainWindow inherits Window {
                     }
                     VerticalLayout {
                         width: 240px;
-                        spacing: 8px;
-                        Text { text: "Inspector"; color: #7a7a7a; font-size: 11px; }
-                        Text { text: root.creator-selected == "" ? "Select a part" : root.creator-selected; color: #e6e6e6; font-size: 13px; overflow: elide; }
-                        LineEdit {
-                            placeholder-text: "Text";
-                            text: root.creator-node-text;
-                            edited(t) => { root.creator-node-text-changed(t); }
-                        }
-                        Pill { label: "Delete part"; clicked => { root.delete-creator-node(); } }
+                        spacing: 10px;
+                        Text { text: "Selected"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        Text { text: root.creator-selected == "" ? "Tap a part" : root.creator-selected-kind; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                        FieldTap { label: "Text"; value: root.creator-node-text; active: root.kb-field == "creator-node"; tapped => { root.open-keyboard("creator-node"); } }
+                        Pill { label: "Remove part"; clicked => { root.delete-creator-node(); } }
                     }
                 }
             }
@@ -1622,7 +1390,7 @@ export component MainWindow inherits Window {
                     Toggle { on: root.purifier-on; toggled => { root.toggle-purifier(); } }
                     Pill { label: "CLOSE"; clicked => { root.collapse(); } }
                 }
-                Text { text: root.purifier-aq; color: #3dd68c; font-size: 36px; font-weight: 700; }
+                Text { text: root.purifier-aq; color: #ffffff; font-size: 36px; font-weight: 700; }
                 Text { text: "PM2.5  7 µg/m³   ·   Allergens  4/12"; color: #e6e6e6; font-size: 16px; }
                 HorizontalLayout {
                     spacing: 8px;
@@ -1631,7 +1399,7 @@ export component MainWindow inherits Window {
                     Pill { label: "Boost"; on: root.purifier-mode == "Manual"; clicked => { root.set-purifier-mode("Manual"); } }
                 }
                 Text { text: "Filter " + root.purifier-filter + "%"; color: #7a7a7a; font-size: 14px; }
-                Bar { level: root.purifier-filter / 100; fill: #3dd68c; }
+                Bar { level: root.purifier-filter / 100; fill: #ffffff; }
             }
         }
     }

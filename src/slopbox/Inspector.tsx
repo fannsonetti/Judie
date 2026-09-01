@@ -3,6 +3,8 @@ import { WidgetSize } from "../types/widgets";
 import { SlopIcon, SLOP_ICONS } from "./icons";
 import { ALL_WIDGET_SIZES, filledSizes, nodesFor, SLOP_KINDS, SLOP_SWATCHES, SlopDef, SlopKind, SlopNode } from "./schema";
 import { SlopExplorer } from "./Explorer";
+import { FieldTap } from "../components/chrome/FieldTap";
+import { SIZE_LABELS } from "../types/widgets";
 import { sanitizeSvg } from "./svg";
 
 interface Props {
@@ -73,19 +75,8 @@ function Swatches({
           aria-label={c}
         />
       ))}
-      <input type="color" value={toHex(value)} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
-}
-
-function toHex(value?: string) {
-  if (value && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)) {
-    if (value.length === 4) {
-      return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`;
-    }
-    return value;
-  }
-  return "#f4f5f7";
 }
 
 export function SlopInspector({
@@ -107,7 +98,7 @@ export function SlopInspector({
 
   return (
     <aside className="slop-inspector">
-      <h2>Inspector</h2>
+      <h2>Selected</h2>
 
       <SlopExplorer
         nodes={nodes}
@@ -122,12 +113,12 @@ export function SlopInspector({
       <div className="slop-block">
         <div className="slop-block-title">Widget</div>
         <Field label="Name">
-          <input value={def.name} onChange={(e) => onDef({ name: e.target.value })} />
+          <FieldTap label="Name" field="creator-name" value={def.name} onCommit={(v) => onDef({ name: v })} live />
         </Field>
         <Field label="On home screen">
           <p className="slop-hint" style={{ margin: 0 }}>
             {available.length
-              ? available.join(" · ")
+              ? available.map((s) => SIZE_LABELS[s]).join(" · ")
               : "None yet. Add elements to a size to make it available."}
           </p>
         </Field>
@@ -135,7 +126,7 @@ export function SlopInspector({
           <div className="slop-size-toggles">
             {ALL_WIDGET_SIZES.filter((s) => s !== size && nodesFor(def, s).length > 0).map((s) => (
               <button key={s} type="button" onClick={() => onCopyLayout(s)}>
-                {s}
+                {SIZE_LABELS[s]}
               </button>
             ))}
           </div>
@@ -143,39 +134,20 @@ export function SlopInspector({
       </div>
 
         {!node ? (
-        <p className="slop-hint">Pick an element in the list, or click it on the canvas.</p>
+        <p className="slop-hint">Tap a part on the canvas, or in the list.</p>
       ) : (
         <>
           <div className="slop-block">
             <div className="slop-block-title">{kindLabel}</div>
-            <Field label="Descriptor">
-              <input
-                value={node.descriptor ?? ""}
-                placeholder="e.g. climate.indoorTemp"
-                onChange={(e) => onNode({ descriptor: e.target.value })}
-              />
-            </Field>
-            <Field label="Hook note">
-              <textarea
-                className="slop-hook-note"
-                rows={3}
-                value={node.hook ?? ""}
-                placeholder="What this should bind to. Invisible on the widget, included in export."
-                onChange={(e) => onNode({ hook: e.target.value })}
-              />
-            </Field>
             {hasText(node.kind) && (
               <Field label={node.kind === "chart" ? "Series" : node.kind === "list" || node.kind === "pair" ? "Lines" : "Text"}>
-                {node.kind === "list" || node.kind === "pair" || node.kind === "chart" ? (
-                  <textarea
-                    className="slop-hook-note"
-                    rows={node.kind === "list" ? 4 : node.kind === "chart" ? 3 : 2}
-                    value={node.text ?? ""}
-                    onChange={(e) => onNode({ text: e.target.value })}
-                  />
-                ) : (
-                  <input value={node.text ?? ""} onChange={(e) => onNode({ text: e.target.value })} />
-                )}
+                <FieldTap
+                  label={node.kind === "chart" ? "Series" : node.kind === "list" || node.kind === "pair" ? "Lines" : "Text"}
+                  field="creator-text"
+                  value={node.text ?? ""}
+                  onCommit={(v) => onNode({ text: v })}
+                  live
+                />
               </Field>
             )}
             {node.kind === "icon" && (
@@ -328,7 +300,7 @@ export function SlopInspector({
           </div>
 
           <div className="slop-block">
-            <div className="slop-block-title">Box</div>
+            <div className="slop-block-title">Position</div>
             <div className="slop-xywh">
               <Field label="X">
                 <Num value={node.x} onChange={(x) => onNode({ x })} />

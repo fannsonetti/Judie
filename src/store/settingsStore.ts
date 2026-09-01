@@ -22,6 +22,10 @@ export const useSettingsStore = create<SettingsState>()(
           ...current,
           ...p,
           lockAspect1610: p.lockAspect1610 ?? false,
+          tempUnit: p.tempUnit ?? current.tempUnit,
+          distanceUnit: p.distanceUnit ?? current.distanceUnit,
+          preferredNet: p.preferredNet ?? current.preferredNet,
+          dhcp: p.dhcp ?? current.dhcp,
           proactive: { ...DEFAULT_INSTALLATION.proactive, ...p.proactive },
         };
       },

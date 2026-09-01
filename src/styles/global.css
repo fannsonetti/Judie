@@ -1,18 +1,18 @@
 :root {
-  --bg: #0c0d10;
-  --bg-elevated: #14161c;
-  --surface: #1a1c24;
-  --surface-2: #22252f;
-  --surface-3: #2a2e3a;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.1);
-  --text: #f4f5f7;
-  --text-muted: #8b909d;
-  --text-dim: #5c6170;
-  --accent: #2d7bff;
-  --accent-soft: rgba(45, 123, 255, 0.18);
-  --danger: #ff5c5c;
-  --success: #3dd68c;
+  --bg: #000000;
+  --bg-elevated: #000000;
+  --surface: #000000;
+  --surface-2: #111111;
+  --surface-3: #1a1a1a;
+  --border: #2a2a2a;
+  --border-strong: #5a5a5a;
+  --text: #ffffff;
+  --text-muted: #8a8a8a;
+  --text-dim: #4a4a4a;
+  --accent: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.12);
+  --danger: #ffffff;
+  --success: #ffffff;
   --radius-sm: 16px;
   --radius-md: 22px;
   --radius-lg: 28px;
@@ -103,10 +103,7 @@ input:focus-visible {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(45, 123, 255, 0.07), transparent 55%),
-    radial-gradient(900px 500px at 90% 10%, rgba(255, 255, 255, 0.03), transparent 50%),
-    var(--bg);
+  background: #000;
   position: relative;
   overflow: hidden;
 }
@@ -131,11 +128,11 @@ input:focus-visible {
 }
 
 .status-version {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.04em;
-  color: var(--text);
-  opacity: 0.22;
+  color: #fff;
+  opacity: 0.1;
   pointer-events: none;
   user-select: none;
 }
@@ -165,53 +162,6 @@ input:focus-visible {
   color: var(--text-muted);
 }
 
-.update-bar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px var(--page-pad);
-  background: rgba(245, 176, 70, 0.14);
-  border-bottom: 1px solid rgba(245, 176, 70, 0.28);
-  color: #f3d7a4;
-  font-size: 13px;
-  font-weight: 500;
-  z-index: 19;
-}
-
-.update-bar-msg {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.update-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.update-bar-btn {
-  border: 0;
-  border-radius: 999px;
-  padding: 4px 12px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  background: #f3d7a4;
-  color: #1a1408;
-  cursor: pointer;
-}
-
-.update-bar-btn.ghost {
-  background: transparent;
-  color: #f3d7a4;
-  border: 1px solid rgba(243, 215, 164, 0.35);
-}
-
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -219,14 +169,14 @@ input:focus-visible {
 }
 
 .status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
+  width: 8px;
+  height: 8px;
+  border-radius: 0;
+  background: #fff;
 }
 
 .status-dot.offline {
-  background: var(--danger);
+  background: #4a4a4a;
 }
 
 /* Home pages */
@@ -331,7 +281,7 @@ input:focus-visible {
 
 .widget-shell.pending-remove {
   animation: remove-shake 0.28s ease-in-out infinite !important;
-  box-shadow: 0 0 0 2px rgba(255, 69, 58, 0.45), 0 12px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 2px #fff, 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 
 @keyframes remove-shake {
@@ -1004,7 +954,7 @@ input:focus-visible {
   flex-shrink: 0;
 }
 
-.cal-icon { background: #2E7CF6; }
+.cal-icon { background: #ffffff; color: #000; }
 
 .wx-spacer { flex: 1; }
 
@@ -1027,7 +977,7 @@ input:focus-visible {
 .wx-accent-title {
   font-size: 12px;
   font-weight: 650;
-  color: #2E7CF6;
+  color: #ffffff;
   text-transform: none;
 }
 
@@ -1066,7 +1016,7 @@ input:focus-visible {
 }
 .wx-link {
   margin-top: auto;
-  color: #2E7CF6;
+  color: #ffffff;
   font-size: 12px;
   font-weight: 650;
   text-align: left;
@@ -1140,13 +1090,13 @@ input:focus-visible {
   opacity: 1;
 }
 .wx-day-btn.is-today {
-  color: #2E7CF6;
-  font-weight: 650;
-  box-shadow: inset 0 0 0 1px #2E7CF6;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px #fff;
 }
 .wx-day-btn.selected {
-  background: #2E7CF6;
-  color: #fff;
+  background: #fff;
+  color: #000;
   font-weight: 700;
   box-shadow: none;
 }
@@ -1186,7 +1136,7 @@ input:focus-visible {
   overflow: hidden;
 }
 .cal-hero { display: grid; grid-template-columns: 0.7fr 1.3fr; gap: 10px; align-items: center; }
-.cal-dow { font-size: 14px; color: #2E7CF6; font-weight: 650; }
+.cal-dow { font-size: 14px; color: #ffffff; font-weight: 650; }
 .cal-num { font-size: 48px; font-weight: 700; letter-spacing: -0.06em; line-height: 0.9; }
 .cal-quad {
   flex: 1;
@@ -1756,11 +1706,10 @@ input:focus-visible {
 .palette-panel {
   width: min(420px, 34vw, 100%);
   max-height: calc(100% - 16px);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: 28px;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
 }
 
 .cc-grab {

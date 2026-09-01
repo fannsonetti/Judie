@@ -14,6 +14,12 @@ export type WidgetType =
 
 export type WidgetSize = "1x1" | "1x2" | "2x2";
 
+export const SIZE_LABELS: Record<WidgetSize, string> = {
+  "1x1": "Small",
+  "1x2": "Medium",
+  "2x2": "Large",
+};
+
 export interface WidgetInstance {
   id: string;
   type: WidgetType;

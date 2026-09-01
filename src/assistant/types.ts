@@ -26,7 +26,7 @@ export type RoomAction =
   | { type: "timer.create"; name: string; durationMs: number; fireText?: string }
   | { type: "alarm.create"; name: string; hour: number; minute: number }
   | { type: "timer.cancel"; id?: string; all?: boolean }
-  | { type: "routine.create"; phrase: string; command: string }
+  | { type: "routine.create"; phrase: string; command: string; name?: string }
   | { type: "routine.delete"; id: string };
 
 export interface LightSnap {

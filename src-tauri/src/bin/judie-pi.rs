@@ -266,6 +266,7 @@ fn push_ui(ui: &MainWindow) {
         ui.set_creator_template(room.creator_template.clone().into());
         ui.set_creator_size(room.creator_size.clone().into());
         ui.set_creator_selected(room.creator_selected.clone().into());
+        ui.set_creator_selected_kind(room.selected_creator_kind_label().into());
         ui.set_creator_node_text(room.selected_creator_text().into());
         let desc = if room.gallery_kind == "custom" {
             "A widget from Widget Creator."
@@ -398,11 +399,17 @@ fn push_ui(ui: &MainWindow) {
             .map(|r| RoutineRow {
                 id: r.id.clone().into(),
                 name: r.name.clone().into(),
-                hint: format!(
-                    "{}{}",
-                    r.phrases.join(", "),
-                    if r.builtin { " · built-in" } else { "" }
-                )
+                hint: if r.builtin {
+                    format!("{} · built-in", r.phrases.first().cloned().unwrap_or_else(|| r.name.clone()))
+                } else if r.command.is_empty() {
+                    r.phrases.join(", ")
+                } else {
+                    format!(
+                        "When you say “{}” → {}",
+                        r.phrases.first().cloned().unwrap_or_else(|| r.name.clone()),
+                        r.command
+                    )
+                }
                 .into(),
                 builtin: r.builtin,
             })
@@ -432,6 +439,13 @@ fn push_ui(ui: &MainWindow) {
             })
             .collect();
         ui.set_cal_cells(ModelRc::new(VecModel::from(cells)));
+
+        let gallery_nodes: Vec<SlopNode> = room
+            .gallery_preview_nodes()
+            .iter()
+            .map(|(wid, n)| slop_ui(wid, n))
+            .collect();
+        ui.set_gallery_nodes(ModelRc::new(VecModel::from(gallery_nodes)));
     });
 }
 
@@ -464,6 +478,22 @@ fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
         "wifi-pass" => ui.set_wifi_pass(text.into()),
         "math" => ui.set_math_typed(text.into()),
         "verify" => ui.set_verify_typed(text.into()),
+        "creator-name" => {
+            pi_room::with(|room| room.creator_name = text.to_string());
+            ui.set_creator_name(text.into());
+        }
+        "creator-node" => {
+            pi_room::with(|room| room.set_creator_node_text(text));
+            ui.set_creator_node_text(text.into());
+        }
+        "routine-name" => ui.set_routine_draft(text.into()),
+        "routine-phrase" => ui.set_routine_phrase(text.into()),
+        "routine-command" => ui.set_routine_command(text.into()),
+        "gallery-query" => {
+            pi_room::with(|room| room.gallery_query = text.to_string());
+            ui.set_gallery_query(text.into());
+            push_ui(ui);
+        }
         _ => {}
     }
 }
@@ -479,6 +509,12 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
         "wifi-pass" => ui.get_wifi_pass().to_string(),
         "math" => ui.get_math_typed().to_string(),
         "verify" => ui.get_verify_typed().to_string(),
+        "creator-name" => ui.get_creator_name().to_string(),
+        "creator-node" => ui.get_creator_node_text().to_string(),
+        "routine-name" => ui.get_routine_draft().to_string(),
+        "routine-phrase" => ui.get_routine_phrase().to_string(),
+        "routine-command" => ui.get_routine_command().to_string(),
+        "gallery-query" => ui.get_gallery_query().to_string(),
         _ => String::new(),
     }
 }
@@ -931,6 +967,19 @@ fn bind(ui: &MainWindow) {
     let r = refresh.clone();
     ui.on_remove_routine(move |id| {
         pi_room::with(|room| room.remove_routine(id.as_str()));
+        r();
+    });
+    let weak = ui.as_weak();
+    let r = refresh.clone();
+    ui.on_save_routine(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let name = ui.get_routine_draft().to_string();
+        let phrase = ui.get_routine_phrase().to_string();
+        let command = ui.get_routine_command().to_string();
+        pi_room::with(|room| room.add_routine(&name, &phrase, &command));
+        ui.set_routine_draft("".into());
+        ui.set_routine_phrase("".into());
+        ui.set_routine_command("".into());
         r();
     });
 
@@ -1417,6 +1466,33 @@ fn main() {
     slint::Timer::default().start(TimerMode::Repeated, Duration::from_secs(5), move || {
         if let Some(ui) = weak.upgrade() {
             load_link(&ui);
+            if ui.get_net_menu_open() && !ui.get_wifi_busy() {
+                let weak = ui.as_weak();
+                std::thread::spawn(move || {
+                    let result = pi_ctl::wifi_scan();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        let Some(ui) = weak.upgrade() else { return };
+                        if !ui.get_net_menu_open() {
+                            return;
+                        }
+                        if let Ok(nets) = result {
+                            let model: Vec<WifiNet> = nets
+                                .into_iter()
+                                .map(|n| WifiNet {
+                                    ssid: n.ssid.into(),
+                                    signal: n.signal.to_string().into(),
+                                    bars: n.bars,
+                                    secured: n.secured,
+                                    saved: n.saved,
+                                    connected: n.connected,
+                                })
+                                .collect();
+                            ui.set_wifi_nets(ModelRc::new(VecModel::from(model)));
+                            load_link(&ui);
+                        }
+                    });
+                });
+            }
         }
     });
 

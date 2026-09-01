@@ -47,7 +47,7 @@ export const TEMPLATES: { id: string; label: string; hint: string; make: () => S
   },
   {
     id: "stat",
-    label: "Stat",
+    label: "Number",
     hint: "Big number + label",
     make: () =>
       def("Stat", ["1x1", "1x2", "2x2"], {
@@ -209,7 +209,7 @@ export const TEMPLATES: { id: string; label: string; hint: string; make: () => S
         ],
         "2x2": [
           n("text", { x: 6, y: 6, w: 50, h: 7, text: "SCENES" }),
-          n("button", { x: 6, y: 18, w: 42, h: 16, text: "Good Night", fill: "#2d7bff" }),
+          n("button", { x: 6, y: 18, w: 42, h: 16, text: "Good Night", fill: "#ffffff" }),
           n("button", {
             x: 52,
             y: 18,

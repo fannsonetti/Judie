@@ -30,7 +30,7 @@ export function SlopExplorer({
 
   return (
     <div className="slop-block slop-explorer">
-      <div className="slop-block-title">Elements</div>
+      <div className="slop-block-title">Parts</div>
       {listed.length === 0 ? (
         <p className="slop-hint" style={{ margin: 0 }}>
           Nothing on this size yet. Use Add.

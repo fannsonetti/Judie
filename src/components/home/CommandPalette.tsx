@@ -6,6 +6,8 @@ import { useRoomStore } from "../../store/roomStore";
 import { SCENE_PRESETS } from "../../lib/mockData";
 import { WIDGET_LABELS, WidgetType } from "../../types/widgets";
 import { overlayTransition } from "../../lib/performance";
+import { FieldTap } from "../chrome/FieldTap";
+import { useChromeStore } from "../../store/chromeStore";
 
 interface Hit {
   id: string;
@@ -24,7 +26,6 @@ export function CommandPalette() {
   const stopListening = useAssistantStore((s) => s.stopListening);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
   const swipe = useRef<{ y: number } | null>(null);
   const lights = useRoomStore((s) => s.lights);
   const routines = useRoomStore((s) => s.routines);
@@ -32,11 +33,28 @@ export function CommandPalette() {
   const addWidget = useLayoutStore((s) => s.addWidget);
   const listening = status === "listening";
 
+  const enterSeq = useChromeStore((s) => s.kbEnterSeq);
+  const kbField = useChromeStore((s) => s.kbField);
+  const kbText = useChromeStore((s) => s.kbText);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      if (useChromeStore.getState().kbField === "palette") {
+        useChromeStore.getState().closeKeyboard();
+      }
+      return;
+    }
     setQ("");
     setSel(0);
+    useChromeStore.getState().openKeyboard("palette", "");
   }, [open]);
+
+  useEffect(() => {
+    if (kbField === "palette") {
+      setQ(kbText);
+      setSel(0);
+    }
+  }, [kbField, kbText]);
 
   const hits = useMemo<Hit[]>(() => {
     const n = q.trim().toLowerCase();
@@ -123,21 +141,12 @@ export function CommandPalette() {
     );
   }, [q, lights, routines, execute, setOpen, addWidget, setPage]);
 
-  const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      setOpen(false);
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setSel((s) => Math.min(hits.length - 1, s + 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setSel((s) => Math.max(0, s - 1));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      (hits[sel] ?? hits[0])?.run();
-    }
-  };
+  useEffect(() => {
+    if (!enterSeq || !open) return;
+    if (useChromeStore.getState().kbField !== "palette") return;
+    (hits[sel] ?? hits[0])?.run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enterSeq]);
 
   const onSheetPointerDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest("input, button, .palette-list")) return;
@@ -203,18 +212,7 @@ export function CommandPalette() {
                 Edit Home
               </button>
             </div>
-            <input
-              ref={inputRef}
-              className="palette-input"
-              placeholder="Search or ask Judie"
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setSel(0);
-              }}
-              onKeyDown={onKey}
-              aria-label="Search"
-            />
+            <FieldTap label="Search or ask" field="palette" value={q} onCommit={setQ} live />
             {lastResponse && !q && <div className="palette-reply">{lastResponse}</div>}
             <div className="palette-list">
               {hits.map((h, i) => (

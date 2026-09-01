@@ -125,7 +125,7 @@ interface RoomState {
   snapshot: (lastActivity?: { title: string; source: string; ts: number }) => RoomSnapshot;
   dueTimers: () => TimerSnap[];
   completeTimer: (id: string) => void;
-  addRoutine: (phrase: string, command: string) => void;
+  addRoutine: (phrase: string, command: string, name?: string) => void;
   removeRoutine: (id: string) => void;
 }
 
@@ -331,11 +331,13 @@ function applyOne(s: RoomState, action: RoomAction): Partial<RoomState> {
     }
     case "routine.create": {
       const id = `r-${Date.now().toString(36)}`;
+      const phrase = action.phrase.trim();
+      const name = (action.name ?? phrase).trim() || phrase;
       const routine: RoutineSnap = {
         id,
-        name: action.phrase,
-        phrases: [action.phrase.toLowerCase()],
-        command: action.command,
+        name,
+        phrases: [phrase.toLowerCase()],
+        command: action.command.trim(),
       };
       return { routines: [...s.routines.filter((r) => r.id !== id), routine] };
     }
@@ -621,8 +623,8 @@ export const useRoomStore = create<RoomState>()(
 
       completeTimer: (id) => set((s) => ({ timers: s.timers.filter((t) => t.id !== id) })),
 
-      addRoutine: (phrase, command) =>
-        get().applyActions([{ type: "routine.create", phrase, command }], "assistant"),
+      addRoutine: (phrase, command, name) =>
+        get().applyActions([{ type: "routine.create", phrase, command, name }], "user"),
 
       removeRoutine: (id) => get().applyActions([{ type: "routine.delete", id }], "user"),
     }),

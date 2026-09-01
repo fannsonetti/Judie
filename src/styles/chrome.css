@@ -546,3 +546,223 @@ select.settings-input {
     transform: rotate(360deg);
   }
 }
+
+.status-net {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 100%;
+  min-width: 48px;
+  background: transparent;
+  border: none;
+  color: #fff;
+  z-index: 22;
+  position: relative;
+}
+.net-glyph {
+  display: block;
+  flex-shrink: 0;
+}
+.status-center {
+  background: none;
+  border: none;
+  color: inherit;
+}
+.status-date { display: none; }
+
+.settings-sheet.os-sheet {
+  background: #000;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.settings-sheet.os-sheet.tracking {
+  transition: none;
+}
+.settings-handle {
+  height: 28px;
+  flex-shrink: 0;
+  cursor: ns-resize;
+}
+.settings-handle::after {
+  content: "";
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin: 12px auto 0;
+  background: #2a2a2a;
+}
+.settings-tabs.os-tabs button {
+  background: transparent;
+  border-radius: 0;
+  color: #6a6a6a;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.settings-tabs.os-tabs button.on {
+  background: transparent;
+  color: #fff;
+}
+.settings-header h2 {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 18px;
+}
+.settings-close { display: none; }
+.os-kicker {
+  margin: 18px 0 8px;
+  color: #6a6a6a;
+  font-size: 12px;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.os-sub {
+  color: #8a8a8a;
+  font-size: 12px;
+  margin: 4px 0;
+}
+.os-pills { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; }
+.os-pill {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid #2a2a2a;
+  background: #000;
+  color: #8a8a8a;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+.os-pill.on { border-color: #fff; color: #fff; }
+.os-pill:disabled { opacity: 0.35; }
+.os-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  color: #fff;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.os-toggle {
+  width: 56px;
+  height: 28px;
+  border: 1.5px solid #2a2a2a;
+  background: #000;
+  position: relative;
+}
+.os-toggle.on { border-color: #fff; }
+.os-toggle::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  background: #8a8a8a;
+}
+.os-toggle.on::after { left: calc(100% - 22px); background: #fff; }
+.os-hit {
+  width: 100%;
+  min-height: 72px;
+  margin: 8px 0;
+  border: 1.5px solid #5a5a5a;
+  background: #000;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.os-version-list {
+  max-height: 220px;
+  overflow: auto;
+  border: 1.5px solid #2a2a2a;
+  margin-bottom: 16px;
+}
+.field-tap {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #000;
+  border: none;
+  border-bottom: 1.5px solid #2a2a2a;
+  padding: 10px 0 12px;
+  margin-bottom: 8px;
+  color: #fff;
+}
+.field-tap.on { border-bottom-color: #fff; }
+.field-tap-label {
+  display: block;
+  color: #8a8a8a;
+  font-size: 11px;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.field-tap-value {
+  display: block;
+  font-size: 16px;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+
+.wifi-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+}
+.wifi-menu {
+  position: absolute;
+  top: 52px;
+  right: 16px;
+  width: min(400px, calc(100% - 24px));
+  max-height: min(640px, calc(100% - 80px));
+  overflow: auto;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
+  padding: 16px;
+  z-index: 61;
+}
+.wifi-menu-title { color: #fff; font-size: 16px; font-family: ui-monospace, monospace; margin-bottom: 10px; }
+.wifi-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  background: none;
+  color: #fff;
+  text-align: left;
+}
+.wifi-menu-row strong, .wifi-menu-row em { display: block; font-style: normal; }
+.wifi-menu-row em { color: #6a6a6a; font-size: 11px; }
+.wifi-menu-empty, .wifi-status { color: #fff; font-size: 13px; }
+.wifi-back { color: #8a8a8a; margin-bottom: 12px; background: none; }
+.wifi-auto { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #fff; margin: 12px 0; }
+
+.osk {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 90;
+  height: 400px;
+  background: #000;
+  border-top: 1.5px solid #2a2a2a;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.osk-bar { display: flex; align-items: center; gap: 10px; height: 28px; color: #fff; font-family: ui-monospace, monospace; }
+.osk-field { color: #8a8a8a; font-size: 12px; }
+.osk-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.osk-bar button { color: #8a8a8a; background: none; font-size: 12px; }
+.osk-row { display: flex; gap: 5px; flex: 1; }
+.osk-key {
+  position: relative;
+  min-width: 0;
+  border: 1.5px solid #2a2a2a;
+  background: #000;
+  color: #fff;
+  font-family: ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 600;
+}
+.osk-key.on { border-color: #fff; background: #141414; }
+.osk-sub { position: absolute; left: 4px; top: 3px; font-size: 8px; color: #4a4a4a; }
+.os-confirm { background: #000; border: 1.5px solid #5a5a5a; }
+.settings-backdrop { background: rgba(0,0,0,0.8); }
+

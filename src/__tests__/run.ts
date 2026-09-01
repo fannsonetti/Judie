@@ -190,10 +190,21 @@ test("teach routine", () => {
   );
 });
 
-test("good night routine", () => {
-  const r = processUtterance("good night", snap());
-  assert(r.success, r.response);
-  assert(r.actions.length > 1, JSON.stringify(r.actions));
+test("custom routine runs its command", () => {
+  const s = snap();
+  s.routines = [
+    ...s.routines,
+    {
+      id: "r-desk",
+      name: "Desk",
+      phrases: ["desk time"],
+      command: "turn on the desk lamp",
+    },
+  ];
+  const r = processUtterance("desk time", s);
+  const a = r.actions.find((x) => x.type === "lights.power");
+  assert(a && a.type === "lights.power" && a.on === true, JSON.stringify(r.actions));
+  assert(a && a.type === "lights.power" && a.ids?.includes("desk"), JSON.stringify(a));
 });
 
 test("device alias desk lamp", () => {
@@ -626,11 +637,13 @@ test("newer GitHub tags are detected without auto-installing", () => {
   assert(!isNewerVersion("0.1.1", "0.1.1"), "same version is current");
 });
 
-test("uninstall challenge is 12 mixed letters and digits", () => {
+test("uninstall challenge mixes letters, digits, and symbols", () => {
   const code = generateUninstallChallenge();
   assert(code.length === 12, code);
-  assert(/[A-Za-z]/.test(code), "has a letter");
+  assert(/[a-z]/.test(code), "has lowercase");
+  assert(/[A-Z]/.test(code), "has uppercase");
   assert(/[0-9]/.test(code), "has a digit");
+  assert(/[^A-Za-z0-9]/.test(code), "has a symbol");
   assert(generateUninstallChallenge() !== generateUninstallChallenge(), "fresh each time");
 });
 

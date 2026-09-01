@@ -1,603 +1,427 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { useAssistantStore } from "../../store/assistantStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useRoomStore } from "../../store/roomStore";
 import { useLayoutStore } from "../../store/layoutStore";
-import { getConversationLogPath } from "../../lib/conversationLog";
-import { enterFullscreen, leaveFullscreen, minimizeJudie, quitJudie } from "../../lib/windowControls";
-import { overlayTransition } from "../../lib/performance";
+import { useChromeStore } from "../../store/chromeStore";
+import { relaunchJudie, quitJudie } from "../../lib/windowControls";
 import {
+  generateMathChallenge,
   generateUninstallChallenge,
+  isNewerVersion,
   listInstallations,
-  releaseLabel,
   switchInstallation,
   uninstallJudie,
   type ReleaseInfo,
 } from "../../lib/install";
 import { JUDIE_VERSION } from "../../lib/version";
+import { ConfirmSheet } from "../chrome/ConfirmSheet";
+import { FieldTap } from "../chrome/FieldTap";
+import { networkReconnect, networkSetDhcp } from "../../lib/network";
 
-type Tab = "room" | "voice" | "notices" | "routines" | "app";
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "room", label: "Room" },
-  { id: "voice", label: "Voice" },
-  { id: "notices", label: "Notices" },
-  { id: "routines", label: "Routines" },
-  { id: "app", label: "Judie" },
-];
+type Tab = "general" | "network" | "power";
+type Confirm =
+  | null
+  | { kind: "restart" }
+  | { kind: "shutdown" }
+  | { kind: "uninstall1" }
+  | { kind: "uninstall2"; prompt: string; answer: number }
+  | { kind: "uninstall3"; code: string }
+  | { kind: "upgrade"; tag: string }
+  | { kind: "downgrade1"; tag: string }
+  | { kind: "downgrade2"; tag: string };
 
 export function SettingsOverlay() {
   const open = useAssistantStore((s) => s.settingsOpen);
   const setOpen = useAssistantStore((s) => s.setSettingsOpen);
+  const pull = useChromeStore((s) => s.settingsPull);
+  const tracking = useChromeStore((s) => s.settingsTracking);
+  const setPull = useChromeStore((s) => s.setSettingsPull);
   const settings = useSettingsStore();
   const update = useSettingsStore((s) => s.update);
   const routines = useRoomStore((s) => s.routines);
+  const addRoutine = useRoomStore((s) => s.addRoutine);
   const removeRoutine = useRoomStore((s) => s.removeRoutine);
-  const [tab, setTab] = useState<Tab>("room");
-  const [logPath, setLogPath] = useState<string | null>(null);
-  const [busy, setBusy] = useState<"min" | "quit" | "install" | "uninstall" | null>(null);
+  const [tab, setTab] = useState<Tab>("general");
+  const [busy, setBusy] = useState(false);
   const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
-  const [releaseError, setReleaseError] = useState<string | null>(null);
-  const [selectedTag, setSelectedTag] = useState("");
-  const [confirmUninstall, setConfirmUninstall] = useState(false);
-  const [uninstallCode, setUninstallCode] = useState("");
-  const [uninstallTyped, setUninstallTyped] = useState("");
+  const [versionOpen, setVersionOpen] = useState(false);
+  const [confirm, setConfirm] = useState<Confirm>(null);
+  const [typed, setTyped] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [routineName, setRoutineName] = useState("");
+  const [routinePhrase, setRoutinePhrase] = useState("");
+  const [routineCommand, setRoutineCommand] = useState("");
+
+  const visible = open || pull > 0.01;
+  const t = tracking ? pull : open ? 1 : pull;
 
   useEffect(() => {
-    if (!open) return;
-    setTab("room");
-    setBusy(null);
-    setConfirmUninstall(false);
-    setUninstallCode("");
-    setUninstallTyped("");
-    setActionError(null);
-    void getConversationLogPath().then(setLogPath);
-  }, [open]);
+    if (open) setPull(1);
+  }, [open, setPull]);
 
   useEffect(() => {
-    if (!open || tab !== "app") return;
+    if (!visible) {
+      setTab("general");
+      setConfirm(null);
+      setTyped("");
+      setVersionOpen(false);
+      setActionError(null);
+      setRoutineName("");
+      setRoutinePhrase("");
+      setRoutineCommand("");
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || tab !== "power") return;
     let cancelled = false;
     void listInstallations()
       .then((list) => {
-        if (cancelled) return;
-        setReleases(list);
-        setReleaseError(null);
-        setSelectedTag((prev) => {
-          if (prev && list.some((r) => r.tag === prev)) return prev;
-          return list.find((r) => r.current)?.tag ?? list[0]?.tag ?? "";
-        });
+        if (!cancelled) setReleases(list);
       })
       .catch(() => {
-        if (cancelled) return;
-        setReleases([]);
-        setReleaseError("Open the desktop app to see GitHub installations.");
+        if (!cancelled) setReleases([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [open, tab]);
+  }, [visible, tab]);
 
-  const close = () => setOpen(false);
-
-  const openEditMode = () => {
-    close();
-    useLayoutStore.getState().enterEditMode();
+  const close = () => {
+    setOpen(false);
+    setPull(0);
   };
 
-  const onMinimize = async () => {
-    setBusy("min");
-    close();
+  const saveRoutine = () => {
+    const phrase = routinePhrase.trim();
+    const command = routineCommand.trim();
+    if (!phrase || !command) return;
+    addRoutine(phrase, command, routineName.trim() || phrase);
+    setRoutineName("");
+    setRoutinePhrase("");
+    setRoutineCommand("");
+  };
+
+  const pickVersion = (tag: string) => {
+    setVersionOpen(false);
+    if (tag.replace(/^v/, "") === JUDIE_VERSION.replace(/^v/, "")) return;
+    if (isNewerVersion(tag, JUDIE_VERSION)) setConfirm({ kind: "upgrade", tag });
+    else setConfirm({ kind: "downgrade1", tag });
+  };
+
+  const runInstall = async (tag: string) => {
+    setBusy(true);
+    setActionError(null);
     try {
-      await minimizeJudie();
-    } catch {
-      /* ignore */
+      await switchInstallation(tag);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not switch version");
+      setBusy(false);
     }
-    setBusy(null);
   };
 
-  const onLeaveFullscreen = async () => {
-    try {
-      await leaveFullscreen();
-    } catch {
-      /* ignore */
+  const accept = async () => {
+    if (!confirm) return;
+    if (confirm.kind === "restart") {
+      setConfirm(null);
+      await relaunchJudie();
+      return;
     }
-  };
-
-  const onQuit = async () => {
-    setBusy("quit");
-    try {
+    if (confirm.kind === "shutdown") {
+      setConfirm(null);
       await quitJudie();
-    } catch {
-      setBusy(null);
+      return;
+    }
+    if (confirm.kind === "uninstall1") {
+      const math = generateMathChallenge();
+      setTyped("");
+      setConfirm({ kind: "uninstall2", ...math });
+      return;
+    }
+    if (confirm.kind === "uninstall2") {
+      if (Number(typed) !== confirm.answer) return;
+      const code = generateUninstallChallenge();
+      setTyped("");
+      setConfirm({ kind: "uninstall3", code });
+      return;
+    }
+    if (confirm.kind === "uninstall3") {
+      if (typed !== confirm.code) return;
+      setBusy(true);
+      try {
+        await uninstallJudie();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Could not uninstall");
+        setBusy(false);
+        setConfirm(null);
+      }
+      return;
+    }
+    if (confirm.kind === "upgrade") {
+      const tag = confirm.tag;
+      setConfirm(null);
+      await runInstall(tag);
+      return;
+    }
+    if (confirm.kind === "downgrade1") {
+      setConfirm({ kind: "downgrade2", tag: confirm.tag });
+      return;
+    }
+    if (confirm.kind === "downgrade2") {
+      const tag = confirm.tag;
+      setConfirm(null);
+      await runInstall(tag);
     }
   };
 
-  const onSwitchInstall = async () => {
-    if (!selectedTag) return;
-    setBusy("install");
-    setActionError(null);
-    try {
-      await switchInstallation(selectedTag);
-    } catch (err) {
-      setActionError(typeof err === "string" ? err : err instanceof Error ? err.message : "Could not switch installation");
-      setBusy(null);
-    }
-  };
+  const setTemp = (tempUnit: "c" | "f" | "k") =>
+    update({ tempUnit, units: tempUnit === "f" ? "imperial" : "metric" });
 
-  const closeUninstall = () => {
-    setConfirmUninstall(false);
-    setUninstallCode("");
-    setUninstallTyped("");
-  };
-
-  const openUninstall = () => {
-    setConfirmUninstall(true);
-    setUninstallCode(generateUninstallChallenge());
-    setUninstallTyped("");
-  };
-
-  const onUninstall = async () => {
-    if (uninstallTyped !== uninstallCode) return;
-    setBusy("uninstall");
-    setActionError(null);
-    try {
-      await uninstallJudie();
-    } catch (err) {
-      setActionError(typeof err === "string" ? err : err instanceof Error ? err.message : "Could not uninstall");
-      setBusy(null);
-      closeUninstall();
-    }
-  };
+  if (!visible) return null;
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          className="settings-backdrop"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={close}
-        >
-          <motion.div
-            className="settings-sheet"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={overlayTransition()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="settings-grab" aria-hidden />
-            <header className="settings-header">
-              <h2>Settings</h2>
-              <button type="button" className="settings-close" onClick={close} aria-label="Done">
-                Done
+    <div className="settings-backdrop" onClick={close}>
+      <div
+        className={`settings-sheet os-sheet${tracking ? " tracking" : ""}`}
+        style={{ transform: `translate3d(0, ${(t - 1) * 100}%, 0)` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="settings-handle"
+          onPointerDown={(e) => {
+            const start = e.clientY;
+            const base = t;
+            const move = (ev: PointerEvent) => {
+              const dy = ev.clientY - start;
+              const next = Math.max(0, Math.min(1, base + dy / window.innerHeight));
+              useChromeStore.getState().setSettingsTracking(true);
+              setPull(next);
+            };
+            const up = (ev: PointerEvent) => {
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+              useChromeStore.getState().setSettingsTracking(false);
+              const dy = ev.clientY - start;
+              const next = Math.max(0, Math.min(1, base + dy / window.innerHeight));
+              if (next < 0.68) close();
+              else {
+                setPull(1);
+                setOpen(true);
+              }
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+          }}
+        />
+        <header className="settings-header">
+          <h2>Settings</h2>
+        </header>
+        <nav className="settings-tabs os-tabs" aria-label="Settings">
+          {(["general", "network", "power"] as const).map((id) => (
+            <button key={id} type="button" className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
+              {id[0].toUpperCase() + id.slice(1)}
+            </button>
+          ))}
+        </nav>
+        <div className="settings-body os-body">
+          {tab === "general" && (
+            <>
+              <p className="os-kicker">Profile</p>
+              <FieldTap label="Username" field="room-name" value={settings.roomName} onCommit={(v) => update({ roomName: v.trim() || "Room" })} />
+              <p className="os-kicker">Location</p>
+              <FieldTap label="Location name" field="location" value={settings.locationName} onCommit={(v) => update({ locationName: v.trim() || settings.locationName })} />
+              <div className="settings-field-row">
+                <FieldTap label="Latitude" field="latitude" value={String(settings.latitude)} onCommit={(v) => {
+                  const n = Number(v);
+                  if (Number.isFinite(n)) update({ latitude: n });
+                }} />
+                <FieldTap label="Longitude" field="longitude" value={String(settings.longitude)} onCommit={(v) => {
+                  const n = Number(v);
+                  if (Number.isFinite(n)) update({ longitude: n });
+                }} />
+              </div>
+              <p className="os-kicker">Units</p>
+              <p className="os-sub">Temperature</p>
+              <div className="os-pills">
+                <button type="button" className={`os-pill${settings.tempUnit === "c" ? " on" : ""}`} onClick={() => setTemp("c")}>Celsius</button>
+                <button type="button" className={`os-pill${settings.tempUnit === "f" ? " on" : ""}`} onClick={() => setTemp("f")}>Fahrenheit</button>
+                <button type="button" className={`os-pill${settings.tempUnit === "k" ? " on" : ""}`} onClick={() => setTemp("k")}>Kelvin</button>
+              </div>
+              <p className="os-sub">Distance</p>
+              <div className="os-pills">
+                {([
+                  ["km", "Kilometres"],
+                  ["mi", "Miles"],
+                  ["nm", "Nautical miles"],
+                  ["fur", "Furlongs"],
+                ] as const).map(([id, label]) => (
+                  <button key={id} type="button" className={`os-pill${settings.distanceUnit === id ? " on" : ""}`} onClick={() => update({ distanceUnit: id })}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="os-kicker">Voice</p>
+              <div className="os-row">
+                <span>Voice Response</span>
+                <button type="button" className={`os-toggle${settings.speakReplies ? " on" : ""}`} aria-pressed={settings.speakReplies} onClick={() => update({ speakReplies: !settings.speakReplies })} />
+              </div>
+              <div className="os-row">
+                <span>Microphone</span>
+                <button type="button" className={`os-toggle${settings.voiceEnabled ? " on" : ""}`} aria-pressed={settings.voiceEnabled} onClick={() => update({ voiceEnabled: !settings.voiceEnabled })} />
+              </div>
+              <p className="os-kicker">Routines</p>
+              <FieldTap label="Name" field="routine-name" value={routineName} onCommit={setRoutineName} live />
+              <FieldTap label="When you say" field="routine-phrase" value={routinePhrase} onCommit={setRoutinePhrase} live />
+              <FieldTap label="Judie should" field="routine-command" value={routineCommand} onCommit={setRoutineCommand} live />
+              <button
+                type="button"
+                className="os-pill"
+                disabled={!routinePhrase.trim() || !routineCommand.trim()}
+                onClick={saveRoutine}
+              >
+                Save routine
               </button>
-            </header>
-            <nav className="settings-tabs" aria-label="Settings">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={tab === t.id ? "on" : ""}
-                  onClick={() => setTab(t.id)}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </nav>
-
-            <div className="settings-body">
-              {tab === "room" && (
-                <>
-                  <div className="settings-group">
-                    <label className="settings-field">
-                      <span className="settings-label">Room name</span>
-                      <input
-                        className="settings-input"
-                        value={settings.roomName}
-                        onChange={(e) => update({ roomName: e.target.value })}
-                        onBlur={(e) => update({ roomName: e.target.value.trim() || "Room" })}
-                      />
-                    </label>
-                    <label className="settings-field">
-                      <span className="settings-label">Location label</span>
-                      <input
-                        className="settings-input"
-                        value={settings.locationName}
-                        onChange={(e) => update({ locationName: e.target.value })}
-                        onBlur={(e) =>
-                          update({ locationName: e.target.value.trim() || settings.locationName })
-                        }
-                      />
-                    </label>
-                    <div className="settings-field-row">
-                      <label className="settings-field">
-                        <span className="settings-label">Latitude</span>
-                        <input
-                          className="settings-input"
-                          inputMode="decimal"
-                          value={settings.latitude}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            if (Number.isFinite(n)) update({ latitude: n });
-                          }}
-                        />
-                      </label>
-                      <label className="settings-field">
-                        <span className="settings-label">Longitude</span>
-                        <input
-                          className="settings-input"
-                          inputMode="decimal"
-                          value={settings.longitude}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            if (Number.isFinite(n)) update({ longitude: n });
-                          }}
-                        />
-                      </label>
+              {routines.map((r) => (
+                <div key={r.id} className="os-row">
+                  <div>
+                    <div>{r.name}</div>
+                    <div className="os-sub">
+                      {r.builtin
+                        ? `${r.phrases[0] ?? r.name} · built-in`
+                        : r.command
+                          ? `When you say “${r.phrases[0] ?? r.name}” → ${r.command}`
+                          : r.phrases.join(", ")}
                     </div>
-                    <label className="settings-field">
-                      <span className="settings-label">Judie Assistant URL</span>
-                      <input
-                        className="settings-input"
-                        value={settings.assistantBaseUrl}
-                        onChange={(e) => update({ assistantBaseUrl: e.target.value })}
-                        onBlur={(e) => update({ assistantBaseUrl: e.target.value.trim() })}
-                        placeholder="http://127.0.0.1:8742"
-                      />
-                    </label>
                   </div>
-                  <p className="settings-note">
-                    Weather uses Open-Meteo from your coordinates. Indoor climate and playback stay
-                    local until hardware is connected.
-                  </p>
-                  <div className="settings-group">
-                    <div className="settings-label">Conversation log</div>
-                    <p className="settings-note settings-log-path">
-                      {logPath ??
-                        "Available in the desktop app. Not stored in the browser-only build."}
-                    </p>
-                    {logPath && (
-                      <button
-                        type="button"
-                        className="settings-btn"
-                        onClick={async () => {
-                          try {
-                            const { openPath } = await import("@tauri-apps/plugin-opener");
-                            await openPath(logPath);
-                          } catch {
-                            /* ignore */
-                          }
-                        }}
-                      >
-                        Open log file
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {tab === "voice" && (
-                <div className="settings-group">
-                  <div className="settings-switch-row">
-                    <div>
-                      <div className="settings-switch-title">Voice replies</div>
-                      <div className="settings-switch-hint">Judie speaks answers aloud</div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`settings-toggle ${settings.speakReplies ? "on" : ""}`}
-                      aria-pressed={settings.speakReplies}
-                      onClick={() => update({ speakReplies: !settings.speakReplies })}
-                    >
-                      <span className="settings-toggle-knob" />
+                  {!r.builtin && (
+                    <button type="button" className="os-pill" onClick={() => removeRoutine(r.id)}>
+                      Remove
                     </button>
-                  </div>
-                  <div className="settings-switch-row">
-                    <div>
-                      <div className="settings-switch-title">Microphone</div>
-                      <div className="settings-switch-hint">
-                        Swipe down from the top, then Listen
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`settings-toggle ${settings.voiceEnabled ? "on" : ""}`}
-                      aria-pressed={settings.voiceEnabled}
-                      onClick={() => update({ voiceEnabled: !settings.voiceEnabled })}
-                    >
-                      <span className="settings-toggle-knob" />
-                    </button>
-                  </div>
-                  <div className="settings-switch-row">
-                    <div>
-                      <div className="settings-switch-title">Units</div>
-                      <div className="settings-switch-hint">Temperature and wind speed</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="settings-btn"
-                      onClick={() =>
-                        update({ units: settings.units === "metric" ? "imperial" : "metric" })
-                      }
-                    >
-                      {settings.units === "metric" ? "°C / km/h" : "°F / mph"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {tab === "notices" && (
-                <div className="settings-group">
-                  {(
-                    [
-                      ["timers", "Timers", "Finished timers and alarms"],
-                      ["calendar", "Calendar", "Upcoming events"],
-                      ["weather", "Weather", "Rain and forecast shifts"],
-                      ["air", "Air quality", "AQI and purifier nudges"],
-                      ["devices", "Device issues", "Offline or slow services"],
-                    ] as const
-                  ).map(([key, title, hint]) => (
-                    <div className="settings-switch-row" key={key}>
-                      <div>
-                        <div className="settings-switch-title">{title}</div>
-                        <div className="settings-switch-hint">{hint}</div>
-                      </div>
-                      <button
-                        type="button"
-                        className={`settings-toggle ${settings.proactive[key] ? "on" : ""}`}
-                        aria-pressed={settings.proactive[key]}
-                        onClick={() =>
-                          update({
-                            proactive: { ...settings.proactive, [key]: !settings.proactive[key] },
-                          })
-                        }
-                      >
-                        <span className="settings-toggle-knob" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {tab === "routines" && (
-                <div className="settings-group settings-routines">
-                  {routines.length === 0 ? (
-                    <p className="settings-note">
-                      No routines yet. Teach one by saying “teach routine …”.
-                    </p>
-                  ) : (
-                    routines.map((r) => (
-                      <div key={r.id} className="settings-routine-card">
-                        <div>
-                          <div className="settings-switch-title">{r.name}</div>
-                          <div className="settings-switch-hint">
-                            {r.phrases.join(", ")}
-                            {r.command ? ` → ${r.command}` : ""}
-                            {r.builtin ? " · built-in" : ""}
-                          </div>
-                        </div>
-                        {!r.builtin && (
-                          <button
-                            type="button"
-                            className="settings-btn danger"
-                            onClick={() => removeRoutine(r.id)}
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    ))
                   )}
                 </div>
-              )}
-
-              {tab === "app" && (
-                <>
-                  <p className="settings-kicker">Installation</p>
-                  <div className="settings-group">
-                    <div className="settings-field">
-                      <span className="settings-label">This copy</span>
-                      <div className="settings-switch-title">Judie {JUDIE_VERSION}</div>
-                    </div>
-                    <label className="settings-field">
-                      <span className="settings-label">Change installation</span>
-                      <select
-                        className="settings-input"
-                        value={selectedTag}
-                        disabled={busy !== null || !releases || releases.length === 0}
-                        onChange={(e) => setSelectedTag(e.target.value)}
-                      >
-                        {(releases ?? []).map((r) => (
-                          <option key={r.tag} value={r.tag} disabled={!r.installable}>
-                            {releaseLabel(r)}
-                            {r.installable ? "" : " (no package for this computer)"}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      type="button"
-                      className="settings-btn"
-                      disabled={
-                        busy !== null
-                        || !selectedTag
-                        || !!releases?.find((r) => r.tag === selectedTag && r.current)
-                      }
-                      onClick={() => void onSwitchInstall()}
-                    >
-                      {busy === "install" ? "Installing…" : "Switch to this version"}
-                    </button>
-                    {releaseError && <p className="settings-note">{releaseError}</p>}
-                    <p className="settings-note">
-                      Picks a GitHub release for this computer and installs it without a password
-                      prompt. The app will close and reopen.
-                    </p>
-                  </div>
-
-                  <p className="settings-kicker">Window</p>
-                  <div className="settings-group">
-                    <div className="settings-switch-row">
-                      <div>
-                        <div className="settings-switch-title">Lock 16:10</div>
-                        <div className="settings-switch-hint">
-                          Letterbox on 16:9 so the home grid is not stretched
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className={`settings-toggle ${settings.lockAspect1610 ? "on" : ""}`}
-                        aria-pressed={settings.lockAspect1610}
-                        onClick={() => update({ lockAspect1610: !settings.lockAspect1610 })}
-                      >
-                        <span className="settings-toggle-knob" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="settings-power">
-                    <button type="button" className="settings-power-card" onClick={onMinimize} disabled={busy !== null}>
-                      <span className="settings-power-ico" aria-hidden>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                          <path d="M5 12h14" />
-                        </svg>
-                      </span>
-                      <strong>Minimize</strong>
-                      <span>Hide Judie and show the desktop</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="settings-power-card"
-                      onClick={() => void enterFullscreen()}
-                      disabled={busy !== null}
-                    >
-                      <span className="settings-power-ico" aria-hidden>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M16 21h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-                        </svg>
-                      </span>
-                      <strong>Fullscreen</strong>
-                      <span>Cover the screen again</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="settings-power-card"
-                      onClick={() => void onLeaveFullscreen()}
-                      disabled={busy !== null}
-                    >
-                      <span className="settings-power-ico" aria-hidden>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M8 3v3a2 2 0 0 1-2 2H3M21 8h-3a2 2 0 0 1-2-2V3M16 21v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
-                        </svg>
-                      </span>
-                      <strong>Unfullscreen</strong>
-                      <span>Windowed, with the desktop around it</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="settings-power-card danger"
-                      onClick={onQuit}
-                      disabled={busy !== null}
-                    >
-                      <span className="settings-power-ico" aria-hidden>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 6 6 18M6 6l12 12" />
-                        </svg>
-                      </span>
-                      <strong>{busy === "quit" ? "Closing…" : "Close Judie"}</strong>
-                      <span>Quit the app until you open it again</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="settings-power-card danger"
-                      onClick={openUninstall}
-                      disabled={busy !== null}
-                    >
-                      <span className="settings-power-ico" aria-hidden>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-                        </svg>
-                      </span>
-                      <strong>{busy === "uninstall" ? "Removing…" : "Uninstall"}</strong>
-                      <span>Remove Judie from this computer</span>
-                    </button>
-                  </div>
-                  {actionError && <p className="settings-note">{actionError}</p>}
-                  <p className="settings-note">
-                    Autostart opens one Judie window at login. Unfullscreen is remembered the next
-                    time you launch.
-                  </p>
-                </>
-              )}
-            </div>
-
-            <footer className="settings-footer">
-              <button type="button" className="settings-btn" onClick={openEditMode}>
+              ))}
+              <div className="os-row">
+                <div>
+                  <div>Lock 16:10</div>
+                  <div className="os-sub">Letterbox on 16:9 displays</div>
+                </div>
+                <button type="button" className={`os-toggle${settings.lockAspect1610 ? " on" : ""}`} aria-pressed={settings.lockAspect1610} onClick={() => update({ lockAspect1610: !settings.lockAspect1610 })} />
+              </div>
+              <button type="button" className="os-pill" onClick={() => { close(); useLayoutStore.getState().enterEditMode(); }}>
                 Edit home screen
               </button>
-              <button type="button" className="settings-btn primary" onClick={close}>
-                Done
-              </button>
-            </footer>
-          </motion.div>
-          {confirmUninstall && (
-            <div
-              className="confirm-backdrop"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (busy === "uninstall") return;
-                closeUninstall();
-              }}
-            >
-              <div
-                className="confirm-sheet"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="confirm-uninstall-title"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h2 id="confirm-uninstall-title">Uninstall Judie?</h2>
-                <p>
-                  This removes Judie from this computer. Type the code below to confirm.
-                </p>
-                <div className="challenge-code" aria-live="polite">
-                  {uninstallCode}
-                </div>
-                <input
-                  className="settings-field-input challenge-input"
-                  value={uninstallTyped}
-                  onChange={(e) => setUninstallTyped(e.target.value)}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder="Type the code exactly"
-                  disabled={busy === "uninstall"}
-                />
-                <div className="confirm-actions">
-                  <button
-                    type="button"
-                    className="settings-btn"
-                    onClick={closeUninstall}
-                    disabled={busy === "uninstall"}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="settings-btn danger"
-                    onClick={() => void onUninstall()}
-                    disabled={busy === "uninstall" || uninstallTyped !== uninstallCode}
-                  >
-                    {busy === "uninstall" ? "Removing…" : "Uninstall"}
-                  </button>
-                </div>
-              </div>
-            </div>
+            </>
           )}
-        </motion.div>
+          {tab === "network" && (
+            <>
+              <p className="os-kicker">Connection</p>
+              <p className="os-sub">Preferred interface</p>
+              <div className="os-pills">
+                <button
+                  type="button"
+                  className={`os-pill${settings.preferredNet === "ethernet" ? " on" : ""}`}
+                  onClick={() => update({ preferredNet: "ethernet" })}
+                >
+                  Ethernet
+                </button>
+                <button
+                  type="button"
+                  className={`os-pill${settings.preferredNet === "wifi" ? " on" : ""}`}
+                  onClick={() => update({ preferredNet: "wifi" })}
+                >
+                  Wi-Fi
+                </button>
+              </div>
+              <p className="settings-note">Wi-Fi join is on the network icon. This page only chooses the preferred interface.</p>
+              <p className="os-kicker">Automatic Configuration</p>
+              <div className="os-row">
+                <span>DHCP</span>
+                <button
+                  type="button"
+                  className={`os-toggle${settings.dhcp ? " on" : ""}`}
+                  aria-pressed={settings.dhcp}
+                  onClick={() => {
+                    const next = !settings.dhcp;
+                    update({ dhcp: next });
+                    void networkSetDhcp(next);
+                  }}
+                />
+              </div>
+              <p className="os-kicker">Reconnect</p>
+              <button type="button" className="os-pill on" onClick={() => void networkReconnect(settings.preferredNet)}>
+                Reconnect
+              </button>
+            </>
+          )}
+          {tab === "power" && (
+            <>
+              <div className="os-row">
+                <span>Version</span>
+                <button type="button" className="os-pill" onClick={() => setVersionOpen(!versionOpen)}>
+                  v{JUDIE_VERSION} ▼
+                </button>
+              </div>
+              {versionOpen && (
+                <div className="os-version-list">
+                  {(releases ?? []).map((r) => (
+                    <button key={r.tag} type="button" className="os-row" onClick={() => pickVersion(r.tag)}>
+                      <span>{r.tag}</span>
+                      {r.current && <em>current</em>}
+                    </button>
+                  ))}
+                  {releases?.length === 0 && <p className="settings-note">No other releases listed.</p>}
+                </div>
+              )}
+              <button type="button" className="os-hit" onClick={() => setConfirm({ kind: "restart" })}>
+                Restart
+              </button>
+              <button type="button" className="os-hit" onClick={() => setConfirm({ kind: "shutdown" })}>
+                Shutdown
+              </button>
+              <button type="button" className="os-hit" onClick={() => setConfirm({ kind: "uninstall1" })}>
+                Uninstall
+              </button>
+              {actionError && <p className="settings-note">{actionError}</p>}
+            </>
+          )}
+        </div>
+      </div>
+
+      {confirm?.kind === "restart" && (
+        <ConfirmSheet title="Restart Judie?" body="The app will close and open again." onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
       )}
-    </AnimatePresence>
+      {confirm?.kind === "shutdown" && (
+        <ConfirmSheet title="Shut down Judie?" body="Judie will quit until you open it again." primary="Shutdown" onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
+      )}
+      {confirm?.kind === "uninstall1" && (
+        <ConfirmSheet title="Are you sure?" body="This starts uninstall. Two more steps follow." onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
+      )}
+      {confirm?.kind === "uninstall2" && (
+        <ConfirmSheet title={confirm.prompt} body="Follow normal order of operations." onAccept={() => void accept()} onDismiss={() => setConfirm(null)}>
+          <FieldTap label="Answer" field="math" value={typed} onCommit={setTyped} />
+        </ConfirmSheet>
+      )}
+      {confirm?.kind === "uninstall3" && (
+        <ConfirmSheet title="Type this exactly" body={confirm.code} onAccept={() => void accept()} onDismiss={() => setConfirm(null)}>
+          <FieldTap label="Verification" field="verify" value={typed} onCommit={setTyped} />
+        </ConfirmSheet>
+      )}
+      {confirm?.kind === "upgrade" && (
+        <ConfirmSheet title="Install this version?" body={`Judie will close and reopen on ${confirm.tag}.`} onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
+      )}
+      {confirm?.kind === "downgrade1" && (
+        <ConfirmSheet title="Are you sure you want to downgrade?" body={`You are about to install older software (${confirm.tag}).`} onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
+      )}
+      {confirm?.kind === "downgrade2" && (
+        <ConfirmSheet
+          title="Are you REALLY sure? Downgrading may delete some of your data."
+          body="Older software may remove or invalidate settings and data."
+          onAccept={() => void accept()}
+          onDismiss={() => setConfirm(null)}
+        />
+      )}
+      {busy && <p className="settings-note os-busy">Working…</p>}
+    </div>
   );
 }

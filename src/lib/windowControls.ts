@@ -24,6 +24,15 @@ export async function minimizeJudie() {
   await w.minimize();
 }
 
+export async function relaunchJudie() {
+  try {
+    const { relaunch } = await import("@tauri-apps/plugin-process");
+    await relaunch();
+  } catch {
+    window.location.reload();
+  }
+}
+
 export async function quitJudie() {
   try {
     const { exit } = await import("@tauri-apps/plugin-process");

@@ -44,23 +44,35 @@ export async function switchInstallation(tag: string) {
 }
 
 export function generateUninstallChallenge(length = 12): string {
-  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const digits = "23456789";
-  const chars = letters + digits;
-  const n = Math.max(2, length);
+  const specials = "!@#$%^*-_=+?";
+  const n = Math.max(4, length);
   const bytes = new Uint8Array(n);
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     crypto.getRandomValues(bytes);
   } else {
     for (let i = 0; i < n; i++) bytes[i] = Math.floor(Math.random() * 256);
   }
-  const out = Array.from(bytes, (b) => chars[b % chars.length]);
-  const letterAt = bytes[0] % n;
-  let digitAt = bytes[1] % n;
-  if (digitAt === letterAt) digitAt = (digitAt + 1) % n;
-  out[letterAt] = letters[bytes[0] % letters.length];
-  out[digitAt] = digits[bytes[1] % digits.length];
+  const pools = [lower, upper, digits, specials];
+  const out: string[] = [];
+  out[0] = lower[bytes[0] % lower.length];
+  out[1] = upper[bytes[1] % upper.length];
+  out[2] = digits[bytes[2] % digits.length];
+  out[3] = specials[bytes[3] % specials.length];
+  for (let i = 4; i < n; i++) {
+    const pool = pools[bytes[i] % 4];
+    out[i] = pool[bytes[i] % pool.length];
+  }
   return out.join("");
+}
+
+export function generateMathChallenge() {
+  const x = 1 + Math.floor(Math.random() * 9);
+  const y = 1 + Math.floor(Math.random() * 9);
+  const z = 1 + Math.floor(Math.random() * 9);
+  return { prompt: `${x} + ${y} × ${z}`, answer: x + y * z };
 }
 
 export async function uninstallJudie() {

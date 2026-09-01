@@ -1,0 +1,436 @@
+import { Slider } from "std-widgets.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, CalCell, SlopNode, Pill, Toggle, Swatch, IconBtn, Bar, QuickTask } from "cards.slint";
+
+// Live widget face used on the home grid and in the add-widget carousel.
+// `sample` swaps in default preview data so gallery never reads the live room.
+// `source` is the preview renderer: "live" draws this component; "image" is reserved
+// for a later static thumbnail without changing the carousel.
+
+export component WidgetFace inherits Rectangle {
+    in property <string> kind: "activity";
+    in property <string> size: "1x1";
+    in property <bool> sample: false;
+    in property <string> source: "live";
+    in property <image> thumb;
+    in property <string> widget-id: "";
+
+    in property <string> weather-loc: "";
+    in property <string> weather-temp: "";
+    in property <string> weather-cond: "";
+    in property <string> weather-range: "";
+    in property <string> weather-feel: "";
+    in property <string> weather-note: "";
+    in property <[HourRow]> hours: [];
+
+    in property <bool> master-on: true;
+    in property <int> brightness: 70;
+    in property <string> scene: "Cozy";
+    in property <string> master-color: "#FFB366";
+    in property <[LightRow]> lights: [];
+
+    in property <bool> playing: false;
+    in property <string> track-title: "";
+    in property <string> track-artist: "";
+    in property <int> volume: 62;
+    in property <float> media-progress: 0.2;
+
+    in property <string> indoor: "";
+    in property <string> outdoor: "";
+    in property <string> humidity: "";
+    in property <string> comfort: "";
+    in property <[EventRow]> events: [];
+    in property <string> month-name: "";
+    in property <[CalCell]> cal-cells: [];
+
+    in property <bool> purifier-on: true;
+    in property <string> purifier-mode: "Auto";
+    in property <string> purifier-aq: "Good";
+    in property <int> purifier-filter: 38;
+
+    in property <float> cpu: 0;
+    in property <float> memory: 0;
+    in property <string> mem-detail: "";
+    in property <string> temp-text: "";
+    in property <[ServiceRow]> services: [];
+    in property <[ActivityRow]> activity: [];
+    in property <[TimerRow]> timers: [];
+    in property <[SlopNode]> slop-nodes: [];
+    in property <bool> dnd: false;
+
+    callback toggle-master();
+    callback brightness-changed(int);
+    callback set-color(string);
+    callback toggle-light(string);
+    callback toggle-play();
+    callback next-track();
+    callback prev-track();
+    callback volume-changed(int);
+    callback quick(string);
+    callback set-purifier-mode(string);
+
+    background: transparent;
+    clip: true;
+
+    property <[HourRow]> demo-hours: [
+        { hour: "12", temp: "18°", precip: "10%" },
+        { hour: "13", temp: "17°", precip: "20%" },
+        { hour: "14", temp: "16°", precip: "15%" },
+        { hour: "15", temp: "16°", precip: "5%" },
+    ];
+    property <[EventRow]> demo-events: [
+        { time: "09:00", title: "Stand-up", detail: "Kitchen" },
+        { time: "14:30", title: "Delivery", detail: "" },
+        { time: "19:00", title: "Dinner", detail: "Home" },
+    ];
+    property <[CalCell]> demo-cal: [
+        { label: "1", today: false }, { label: "2", today: false }, { label: "3", today: false }, { label: "4", today: false }, { label: "5", today: false }, { label: "6", today: false }, { label: "7", today: false },
+        { label: "8", today: false }, { label: "9", today: false }, { label: "10", today: true }, { label: "11", today: false }, { label: "12", today: false }, { label: "13", today: false }, { label: "14", today: false },
+        { label: "15", today: false }, { label: "16", today: false }, { label: "17", today: false }, { label: "18", today: false }, { label: "19", today: false }, { label: "20", today: false }, { label: "21", today: false },
+        { label: "22", today: false }, { label: "23", today: false }, { label: "24", today: false }, { label: "25", today: false }, { label: "26", today: false }, { label: "27", today: false }, { label: "28", today: false },
+        { label: "29", today: false }, { label: "30", today: false }, { label: "", today: false }, { label: "", today: false }, { label: "", today: false }, { label: "", today: false }, { label: "", today: false },
+    ];
+    property <[LightRow]> demo-lights: [
+        { id: "a", name: "Ceiling", on: true, brightness: "40%" },
+        { id: "b", name: "Desk", on: true, brightness: "70%" },
+        { id: "c", name: "Lamp", on: false, brightness: "Off" },
+        { id: "d", name: "Strip", on: true, brightness: "25%" },
+    ];
+    property <[ServiceRow]> demo-services: [
+        { name: "Core", status: "4 ms", online: true },
+        { name: "Lights", status: "6 ms", online: true },
+        { name: "Media", status: "9 ms", online: true },
+        { name: "Weather", status: "12 ms", online: true },
+        { name: "Voice", status: "Down", online: false },
+    ];
+    property <[ActivityRow]> demo-activity: [
+        { title: "Good Night", source: "Routine", time: "22:14" },
+        { title: "Lights Off", source: "You", time: "22:15" },
+        { title: "Do Not Disturb", source: "Routine", time: "22:15" },
+    ];
+    property <[TimerRow]> demo-timers: [
+        { label: "Pasta", remain: "4:20" },
+        { label: "Laundry", remain: "32:00" },
+    ];
+
+    property <string> t-loc: root.sample ? "Hafnarfjörður" : root.weather-loc;
+    property <string> t-temp: root.sample ? "18°" : root.weather-temp;
+    property <string> t-cond: root.sample ? "Cloudy" : root.weather-cond;
+    property <string> t-range: root.sample ? "H 20°  L 12°" : root.weather-range;
+    property <string> t-feel: root.sample ? "Feels 16°" : root.weather-feel;
+    property <string> t-note: root.sample ? "Light rain later this evening." : root.weather-note;
+    property <bool> t-master: root.sample ? true : root.master-on;
+    property <int> t-bright: root.sample ? 40 : root.brightness;
+    property <string> t-scene: root.sample ? "Focus" : root.scene;
+    property <string> t-color: root.sample ? "#2D7BFF" : root.master-color;
+    property <bool> t-play: root.sample ? false : root.playing;
+    property <string> t-track: root.sample ? "Night Drive" : root.track-title;
+    property <string> t-artist: root.sample ? "Analog Heart" : root.track-artist;
+    property <int> t-vol: root.sample ? 62 : root.volume;
+    property <float> t-prog: root.sample ? 0.42 : root.media-progress;
+    property <string> t-in: root.sample ? "21°" : root.indoor;
+    property <string> t-out: root.sample ? "7°" : root.outdoor;
+    property <string> t-hum: root.sample ? "44%" : root.humidity;
+    property <string> t-comfort: root.sample ? "Comfortable" : root.comfort;
+    property <string> t-month: root.sample ? "March" : root.month-name;
+    property <string> t-aq: root.sample ? "Good" : root.purifier-aq;
+    property <string> t-pmode: root.sample ? "Auto" : root.purifier-mode;
+    property <int> t-filter: root.sample ? 38 : root.purifier-filter;
+    property <float> t-cpu: root.sample ? 24 : root.cpu;
+    property <float> t-mem: root.sample ? 51 : root.memory;
+    property <string> t-memd: root.sample ? "4.1 / 8.0 GB" : root.mem-detail;
+    property <string> t-temp-host: root.sample ? "52°" : root.temp-text;
+    property <bool> t-dnd: root.sample ? false : root.dnd;
+
+    if root.source == "image": Image {
+        source: root.thumb;
+        width: 100%;
+        height: 100%;
+        image-fit: contain;
+    }
+
+    if root.source != "image": Rectangle {
+        background: transparent;
+
+        if root.kind == "quickControls": GridLayout {
+            spacing: 8px;
+            padding: 0px;
+            QuickTask { row: 0; col: 0; glyph: "☾"; label: "Good Night"; clicked => { if !root.sample { root.quick("goodNight"); } } }
+            QuickTask { row: 0; col: 1; glyph: "○"; label: "Lights Off"; clicked => { if !root.sample { root.quick("lightsOff"); } } }
+            QuickTask { row: 1; col: 0; glyph: "⊘"; label: "Do Not Disturb"; on: root.t-dnd; clicked => { if !root.sample { root.quick("dnd"); } } }
+            QuickTask { row: 1; col: 1; glyph: "▶"; label: "Movie Mode"; clicked => { if !root.sample { root.quick("movie"); } } }
+        }
+
+        if root.kind == "climate": HorizontalLayout {
+            spacing: 10px;
+            Rectangle {
+                width: 72px; height: 72px;
+                border-width: 2px; border-color: #ffffff; background: #000000;
+                VerticalLayout {
+                    alignment: center;
+                    Text { text: root.t-in; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                    Text { text: "NOW"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; horizontal-alignment: center; }
+                }
+            }
+            VerticalLayout {
+                alignment: center; spacing: 6px;
+                Text { text: "HUMIDITY"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
+                Text { text: root.t-hum; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+                Text { text: "OUTDOOR"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
+                Text { text: root.t-out; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+                if root.size == "1x2": Text { text: root.t-comfort; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+            }
+        }
+
+        if root.kind == "calendar": HorizontalLayout {
+            spacing: 10px;
+            if root.size != "1x1": VerticalLayout {
+                spacing: 4px; horizontal-stretch: 1;
+                Text { text: "Today"; color: #8a8a8a; font-size: 12px; }
+                for ev in root.sample ? root.demo-events : root.events: HorizontalLayout {
+                    spacing: 6px;
+                    Rectangle { width: 4px; height: 18px; background: #ffffff; }
+                    VerticalLayout {
+                        Text { text: ev.title; color: #ffffff; font-size: 12px; font-weight: 600; overflow: elide; }
+                        Text { text: ev.time + (ev.detail == "" ? "" : " · " + ev.detail); color: #8a8a8a; font-size: 10px; overflow: elide; }
+                    }
+                }
+            }
+            VerticalLayout {
+                spacing: 4px; horizontal-stretch: 1;
+                Text { text: root.t-month; color: #8a8a8a; font-size: 12px; }
+                HorizontalLayout {
+                    spacing: 0;
+                    for d in ["S", "M", "T", "W", "T", "F", "S"]: Text {
+                        text: d; color: #555555; font-size: 9px; horizontal-alignment: center; horizontal-stretch: 1;
+                    }
+                }
+                GridLayout {
+                    spacing: 2px;
+                    for cell[i] in root.sample ? root.demo-cal : root.cal-cells: Rectangle {
+                        row: floor(i / 7); col: mod(i, 7);
+                        height: 16px;
+                        border-width: cell.today ? 1.5px : 0px;
+                        border-color: #ffffff;
+                        background: #00000000;
+                        Text {
+                            text: cell.label;
+                            color: cell.today ? #ffffff : #e6e6e6;
+                            font-size: 10px;
+                            font-weight: cell.today ? 700 : 400;
+                            font-family: Dy.mono;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.kind == "purifier": VerticalLayout {
+            spacing: 8px;
+            if root.size != "1x1": HorizontalLayout {
+                spacing: 10px;
+                Rectangle {
+                    width: 88px; height: 88px;
+                    border-width: 2px; border-color: #ffffff; background: #000000;
+                    VerticalLayout {
+                        alignment: center;
+                        Text { text: root.t-aq; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                        Text { text: "AIR QUALITY"; color: #8a8a8a; font-size: 9px; font-family: Dy.mono; horizontal-alignment: center; }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 6px;
+                    Rectangle {
+                        background: #000000;
+                        border-width: 1.5px; border-color: Dy.border;
+                        VerticalLayout {
+                            padding: 8px;
+                            Text { text: "PM2.5"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
+                            Text { text: "7 µg/m³"; color: #ffffff; font-size: 14px; font-weight: 700; font-family: Dy.mono; }
+                            Text { text: "Fine particles"; color: #555555; font-size: 10px; font-family: Dy.mono; }
+                        }
+                    }
+                    Rectangle {
+                        background: #000000;
+                        border-width: 1.5px; border-color: Dy.border;
+                        VerticalLayout {
+                            padding: 8px;
+                            Text { text: "ALLERGENS"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
+                            Text { text: "4/12"; color: #ffffff; font-size: 14px; font-weight: 700; font-family: Dy.mono; }
+                            Text { text: "Allergen level"; color: #555555; font-size: 10px; font-family: Dy.mono; }
+                        }
+                    }
+                }
+            }
+            if root.size == "1x1": VerticalLayout {
+                Text { text: "7"; color: #ffffff; font-size: 28px; font-weight: 700; }
+                Text { text: "PM2.5 · " + root.t-aq; color: #8a8a8a; font-size: 12px; }
+            }
+            if root.size == "2x2": Text { text: "Filter: Clean soon. Dust can cut performance. Clean the filter for the best air."; color: #8a8a8a; font-size: 11px; wrap: word-wrap; }
+            Text { text: "Filter"; color: #8a8a8a; font-size: 11px; }
+            Bar { level: root.t-filter / 100; fill: #ffffff; }
+            Text { text: root.t-filter + "%"; color: #ffffff; font-size: 12px; }
+            if root.size == "2x2": HorizontalLayout {
+                spacing: 8px;
+                Pill { label: "Auto"; on: root.t-pmode == "Auto"; clicked => { if !root.sample { root.set-purifier-mode("Auto"); } } }
+                Pill { label: "Sleep"; on: root.t-pmode == "Sleep"; clicked => { if !root.sample { root.set-purifier-mode("Sleep"); } } }
+                Pill { label: "Boost"; on: root.t-pmode == "Manual"; clicked => { if !root.sample { root.set-purifier-mode("Manual"); } } }
+            }
+        }
+
+        if root.kind == "activity": VerticalLayout {
+            for a in root.sample ? root.demo-activity : root.activity: HorizontalLayout {
+                spacing: 8px;
+                if root.size == "2x2": Text { text: a.time; color: #8a8a8a; font-size: 12px; min-width: 44px; }
+                Text { text: a.title; color: #ffffff; font-size: 13px; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                if root.size == "2x2": Text { text: a.source; color: #8a8a8a; font-size: 11px; }
+            }
+        }
+
+        if root.kind == "server": VerticalLayout {
+            spacing: 4px;
+            Text { text: root.sample ? "6 ms" : "122 ms"; color: #ffffff; font-size: 28px; font-weight: 700; }
+            Text { text: root.sample ? "4/5 up" : "4/5 up"; color: #8a8a8a; font-size: 12px; }
+            if root.size != "1x1": VerticalLayout {
+                spacing: 4px;
+                for s in root.sample ? root.demo-services : root.services: HorizontalLayout {
+                    spacing: 8px;
+                    Rectangle { width: 8px; height: 8px; background: s.online ? #ffffff : #4a4a4a; y: 4px; }
+                    Text { text: s.name; color: #ffffff; font-size: 13px; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text { text: s.status; color: #8a8a8a; font-size: 12px; }
+                }
+            }
+        }
+
+        if root.kind == "weather": VerticalLayout {
+            HorizontalLayout {
+                Text { text: root.t-loc; color: #8a8a8a; font-size: 12px; overflow: elide; horizontal-stretch: 1; }
+                if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: 11px; }
+            }
+            HorizontalLayout {
+                VerticalLayout {
+                    Text { text: root.t-temp; color: #ffffff; font-size: 32px; font-weight: 700; }
+                    Text { text: root.t-cond; color: #ffffff; font-size: 14px; }
+                    Text { text: root.t-range; color: #8a8a8a; font-size: 12px; }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Rectangle {
+                    width: 36px; height: 36px; background: #000000; y: 8px;
+                    border-width: 1px; border-color: #f0a030;
+                    Text { text: "*"; color: #f0a030; font-size: 18px; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
+                }
+            }
+            if root.size == "2x2": Text { text: root.t-note; color: #ffffff; font-size: 12px; wrap: word-wrap; }
+            if root.size != "1x1": HorizontalLayout {
+                spacing: 8px;
+                for h in root.sample ? root.demo-hours : root.hours: VerticalLayout {
+                    Text { text: h.hour; color: #555555; font-size: 10px; horizontal-alignment: center; }
+                    Text { text: h.temp; color: #ffffff; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
+                    Text { text: h.precip; color: #8a8a8a; font-size: 10px; horizontal-alignment: center; }
+                }
+            }
+        }
+
+        if root.kind == "lights": VerticalLayout {
+            spacing: 6px;
+            HorizontalLayout {
+                Text { text: root.t-scene; color: #8a8a8a; font-size: 12px; vertical-alignment: center; }
+                Rectangle { horizontal-stretch: 1; }
+                Toggle { on: root.t-master; toggled => { if !root.sample { root.toggle-master(); } } }
+            }
+            Text { text: root.t-master ? root.t-bright + "%" : "Off"; color: #ffffff; font-size: 28px; font-weight: 700; }
+            Slider { minimum: 0; maximum: 100; value: root.t-bright; changed(v) => { if !root.sample { root.brightness-changed(round(v)); } } }
+            HorizontalLayout {
+                spacing: 8px;
+                Swatch { swatch: #ff5a5a; on: root.t-color == "#FF5A5A"; clicked => { if !root.sample { root.set-color("#FF5A5A"); } } }
+                Swatch { swatch: #ff8c42; on: root.t-color == "#FF8C42"; clicked => { if !root.sample { root.set-color("#FF8C42"); } } }
+                Swatch { swatch: #ffd166; on: root.t-color == "#FFD166"; clicked => { if !root.sample { root.set-color("#FFD166"); } } }
+                Swatch { swatch: #7cf29c; on: root.t-color == "#7CF29C"; clicked => { if !root.sample { root.set-color("#7CF29C"); } } }
+                Swatch { swatch: #5ce1ff; on: root.t-color == "#2D7BFF"; clicked => { if !root.sample { root.set-color("#2D7BFF"); } } }
+                if root.size != "1x1": Swatch { swatch: #7b61ff; on: root.t-color == "#7B61FF"; clicked => { if !root.sample { root.set-color("#7B61FF"); } } }
+                if root.size != "1x1": Swatch { swatch: #ff6bcb; on: root.t-color == "#FF6BCB"; clicked => { if !root.sample { root.set-color("#FF6BCB"); } } }
+                if root.size != "1x1": Swatch { swatch: #ffffff; on: root.t-color == "#FFFFFF"; clicked => { if !root.sample { root.set-color("#FFFFFF"); } } }
+            }
+            if root.size == "2x2": GridLayout {
+                spacing: 8px;
+                for light[i] in root.sample ? root.demo-lights : root.lights: Rectangle {
+                    row: floor(i / 2); col: mod(i, 2);
+                    background: #000000; height: 44px;
+                    border-width: 1.5px; border-color: Dy.border;
+                    HorizontalLayout {
+                        spacing: 0px;
+                        Rectangle { width: 3px; background: light.on ? #f0a030 : #3d3d3d; }
+                        TouchArea {
+                            clicked => { if !root.sample { root.toggle-light(light.id); } }
+                            VerticalLayout {
+                                padding: 6px;
+                                Text { text: light.name; color: #ffffff; font-size: 11px; font-family: Dy.mono; overflow: elide; }
+                                Text { text: light.brightness; color: #8a8a8a; font-size: 11px; font-family: Dy.mono; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.kind == "media": VerticalLayout {
+            Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: 12px; }
+            Text { text: root.t-track; color: #ffffff; font-size: 16px; font-weight: 600; overflow: elide; }
+            if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: 12px; overflow: elide; }
+            if root.size != "1x1": Bar { level: root.t-prog; fill: #ffffff; }
+            HorizontalLayout {
+                spacing: 8px;
+                if root.size != "1x1": IconBtn { glyph: "⟨"; clicked => { if !root.sample { root.prev-track(); } } }
+                IconBtn { glyph: root.t-play ? "❚❚" : "▶"; primary: true; clicked => { if !root.sample { root.toggle-play(); } } }
+                if root.size != "1x1": IconBtn { glyph: "⟩"; clicked => { if !root.sample { root.next-track(); } } }
+                if root.size == "2x2": Rectangle { horizontal-stretch: 1; }
+                if root.size == "2x2": Text { text: root.t-vol + "%"; color: #8a8a8a; font-size: 12px; vertical-alignment: center; }
+            }
+            if root.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.t-vol; changed(v) => { if !root.sample { root.volume-changed(round(v)); } } }
+        }
+
+        if root.kind == "system": VerticalLayout {
+            Text { text: "CPU"; color: #8a8a8a; font-size: 12px; }
+            Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: 24px; font-weight: 700; }
+            Bar { level: root.t-cpu / 100; fill: #ffffff; }
+            if root.size != "1x1": Text { text: "Memory"; color: #8a8a8a; font-size: 12px; }
+            if root.size != "1x1": Text { text: round(root.t-mem) + "%"; color: #ffffff; font-size: 24px; font-weight: 700; }
+            if root.size != "1x1": Bar { level: root.t-mem / 100; fill: #ffffff; }
+            if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: 12px; }
+            if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: 12px; }
+        }
+
+        if root.kind == "timers": VerticalLayout {
+            for t in root.sample ? root.demo-timers : root.timers: HorizontalLayout {
+                Text { text: t.label; color: #ffffff; font-size: 13px; }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: t.remain; color: #8a8a8a; font-size: 13px; }
+            }
+        }
+
+        if root.kind == "custom": Rectangle {
+            vertical-stretch: 1;
+            horizontal-stretch: 1;
+            for n in root.slop-nodes: Rectangle {
+                x: parent.width * n.x / 100;
+                y: parent.height * n.y / 100;
+                width: parent.width * n.w / 100;
+                height: parent.height * n.h / 100;
+                visible: root.widget-id == "" || n.widget-id == root.widget-id || n.widget-id == "";
+                background: (n.kind == "button" || n.kind == "chip" || n.kind == "bar" || n.kind == "toggle") ? rgb(n.r, n.g, n.b) : #00000000;
+                border-radius: 0px;
+                opacity: (n.kind == "bar" || n.kind == "gauge") ? 0.85 : 1;
+                Text {
+                    text: n.text;
+                    color: rgb(n.r, n.g, n.b);
+                    font-size: n.kind == "metric" ? 28px : 12px;
+                    font-weight: n.kind == "metric" ? 700 : 500;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

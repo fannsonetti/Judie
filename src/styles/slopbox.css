@@ -10,16 +10,14 @@
   height: 100%;
   display: grid;
   grid-template-columns: 260px 1fr 280px;
-  background:
-    radial-gradient(900px 500px at 20% -10%, rgba(45, 123, 255, 0.08), transparent 50%),
-    var(--bg);
-  color: var(--text);
+  background: #000;
+  color: #fff;
 }
 
 .slop-sidebar,
 .slop-inspector {
-  background: rgba(18, 20, 26, 0.92);
-  border-right: 1px solid var(--border);
+  background: #000;
+  border-right: 1.5px solid #2a2a2a;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -27,7 +25,7 @@
 
 .slop-inspector {
   border-right: none;
-  border-left: 1px solid var(--border);
+  border-left: 1.5px solid #2a2a2a;
   padding: 18px 16px 24px;
   overflow: auto;
 }
@@ -64,20 +62,21 @@
 .slop-new {
   height: 32px;
   padding: 0 12px;
-  border-radius: 10px;
-  background: var(--accent);
+  border-radius: 0;
+  background: #000;
   color: #fff;
   font-size: 13px;
   font-weight: 600;
+  border: 1.5px solid #2a2a2a;
 }
 
 .slop-done {
   height: 32px;
   padding: 0 12px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-strong);
-  color: var(--text);
+  border-radius: 0;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
+  color: #fff;
   font-size: 13px;
   font-weight: 600;
   margin-right: 8px;
@@ -94,19 +93,18 @@
   right: 0;
   top: 38px;
   width: 180px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-strong);
-  border-radius: 14px;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
+  border-radius: 0;
   padding: 6px;
   z-index: 8;
-  box-shadow: 0 16px 40px rgba(0,0,0,0.4);
 }
 
 .slop-new-menu button {
   width: 100%;
   text-align: left;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -125,12 +123,12 @@
 .slop-widget-item {
   display: flex;
   gap: 4px;
-  border-radius: 12px;
+  border-radius: 0;
   margin-bottom: 4px;
 }
 
 .slop-widget-item.active {
-  background: rgba(45, 123, 255, 0.14);
+  background: #141414;
 }
 
 .slop-widget-main {
@@ -202,12 +200,12 @@
   min-height: 44px;
   min-width: 44px;
   padding: 0 12px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  border-radius: 0;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #8a8a8a;
 }
 
 .slop-size-tabs button.on,
@@ -268,12 +266,12 @@
 .slop-zoom-btn {
   min-height: 36px;
   padding: 0 10px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  border-radius: 0;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #8a8a8a;
 }
 
 .slop-zoom-btn:disabled,
@@ -288,7 +286,7 @@
   transition: opacity 0.2s ease;
 }
 
-.slop-saved.on { opacity: 1; color: var(--success); }
+.slop-saved.on { opacity: 1; color: #fff; }
 
 .slop-top-actions {
   margin-left: auto;
@@ -303,9 +301,9 @@
 .slop-inspector .slop-icon-grid button {
   min-height: 44px;
   padding: 0 14px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  border-radius: 0;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
   font-size: 14px;
 }
 
@@ -532,7 +530,7 @@
 }
 
 .slop-explorer-item.on {
-  background: rgba(45, 123, 255, 0.18);
+  background: #141414;
 }
 
 .slop-explorer-actions {
@@ -590,8 +588,8 @@
 .slop-glyph-bar {
   width: 28px;
   height: 5px;
-  border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent), rgba(45,123,255,0.2));
+  border-radius: 0;
+  background: #fff;
   margin-top: 6px;
 }
 .slop-glyph-btn {
@@ -629,10 +627,7 @@
   overflow: auto;
   padding: 24px;
   -webkit-overflow-scrolling: touch;
-  background:
-    radial-gradient(1200px 600px at 20% -10%, rgba(45, 123, 255, 0.07), transparent 55%),
-    radial-gradient(900px 500px at 90% 10%, rgba(255, 255, 255, 0.03), transparent 50%),
-    var(--bg);
+  background: #000;
 }
 
 .slop-stage.preview {
@@ -692,18 +687,20 @@
 
 .slop-sidebar-foot {
   padding: 12px 16px 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1.5px solid #2a2a2a;
+  display: flex;
+  gap: 8px;
 }
 
 .slop-import-btn {
-  width: 100%;
+  flex: 1;
   min-height: 48px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  border-radius: 0;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: #fff;
 }
 
 .slop-artboard-face {
@@ -742,13 +739,13 @@
   touch-action: none;
 }
 
-.slop-hit:hover { border-color: rgba(45, 123, 255, 0.45); }
+.slop-hit:hover { border-color: #5a5a5a; }
 .slop-hit.selected { border-color: transparent; }
 
 .slop-selection {
   position: absolute;
-  border: 1.5px solid var(--accent);
-  box-shadow: 0 0 0 1px rgba(45,123,255,0.2);
+  border: 1.5px solid #fff;
+  box-shadow: none;
   pointer-events: none;
   z-index: 3;
 }
@@ -757,9 +754,9 @@
   position: absolute;
   width: 18px;
   height: 18px;
-  border-radius: 4px;
-  background: #fff;
-  border: 2px solid var(--accent);
+  border-radius: 0;
+  background: #000;
+  border: 1.5px solid #fff;
   pointer-events: auto;
   z-index: 4;
   touch-action: none;
@@ -772,10 +769,10 @@
 
 .slop-guide {
   position: absolute;
-  background: #FF9F0A;
+  background: #fff;
   pointer-events: none;
   z-index: 5;
-  opacity: 0.85;
+  opacity: 0.35;
 }
 
 .slop-guide.x { top: 0; bottom: 0; width: 1px; }

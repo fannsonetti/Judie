@@ -66,7 +66,7 @@ export function IconSpeaker({ size = 14 }: { size?: number }) {
   );
 }
 
-export const EVENT_COLORS = ["#2E7CF6", "#34C759", "#FF9F0A", "#AF52DE", "#FF3B30"];
+export const EVENT_COLORS = ["#ffffff", "#c8c8c8", "#8a8a8a", "#5a5a5a", "#3a3a3a"];
 
 export function eventColor(key: string) {
   let n = 0;
@@ -74,10 +74,8 @@ export function eventColor(key: string) {
   return EVENT_COLORS[n % EVENT_COLORS.length];
 }
 
-export function aqTone(quality: string) {
-  if (quality === "Poor") return { fg: "#FF9F0A", bg: "rgba(255,159,10,0.16)", label: "Poor" };
-  if (quality === "Moderate") return { fg: "#FFD166", bg: "rgba(255,209,102,0.14)", label: "Moderate" };
-  return { fg: "#72B043", bg: "rgba(114,176,67,0.16)", label: "Good" };
+export function aqTone(_quality: string) {
+  return { fg: "#ffffff", bg: "transparent", label: _quality };
 }
 
 export type MonthCell = {

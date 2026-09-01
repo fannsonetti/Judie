@@ -68,7 +68,7 @@ export async function fetchWeather(
   cfg: InstallationConfig,
   signal?: AbortSignal
 ): Promise<WeatherSnapshot> {
-  const tempUnit = cfg.units === "imperial" ? "fahrenheit" : "celsius";
+  const tempUnit = cfg.tempUnit === "f" || cfg.units === "imperial" ? "fahrenheit" : "celsius";
   const windUnit = cfg.units === "imperial" ? "mph" : "kmh";
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${cfg.latitude}` +

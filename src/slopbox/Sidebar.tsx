@@ -1,4 +1,5 @@
 import { filledSizes } from "./schema";
+import { SIZE_LABELS } from "../types/widgets";
 import { useSlopStore } from "./store";
 import { TEMPLATES } from "./templates";
 import { useState } from "react";
@@ -6,10 +7,11 @@ import { useState } from "react";
 interface Props {
   onPick: (id: string) => void;
   onImport: () => void;
+  onExport?: () => void;
   onClose?: () => void;
 }
 
-export function SlopSidebar({ onPick, onImport, onClose }: Props) {
+export function SlopSidebar({ onPick, onImport, onExport, onClose }: Props) {
   const widgets = useSlopStore((s) => s.widgets);
   const selectedId = useSlopStore((s) => s.selectedId);
   const create = useSlopStore((s) => s.create);
@@ -22,7 +24,7 @@ export function SlopSidebar({ onPick, onImport, onClose }: Props) {
       <div className="slop-sidebar-head">
         <div>
           <div className="slop-brand">Widget Creator</div>
-          <div className="slop-brand-sub">Design in Judie</div>
+          <div className="slop-brand-sub">Widgets</div>
         </div>
         <div className="slop-new-wrap">
           {onClose && (
@@ -56,7 +58,7 @@ export function SlopSidebar({ onPick, onImport, onClose }: Props) {
 
       <div className="slop-widget-list">
         {widgets.length === 0 && (
-          <p className="slop-hint">No widgets yet. Hit New, or import a .json export.</p>
+          <p className="slop-hint">No widgets yet. Tap New to start from a layout.</p>
         )}
         {widgets.map((w) => {
           const available = filledSizes(w);
@@ -68,7 +70,7 @@ export function SlopSidebar({ onPick, onImport, onClose }: Props) {
               <button type="button" className="slop-widget-main" onClick={() => onPick(w.id)}>
                 <strong>{w.name}</strong>
                 <span>
-                  {available.length ? available.join(" · ") : "not on home screen"}
+                  {available.length ? available.map((s) => SIZE_LABELS[s]).join(" · ") : "empty"}
                 </span>
               </button>
               <div className="slop-widget-actions">
@@ -85,8 +87,13 @@ export function SlopSidebar({ onPick, onImport, onClose }: Props) {
       </div>
       <div className="slop-sidebar-foot">
         <button type="button" className="slop-import-btn" onClick={onImport}>
-          Import JSON
+          Import
         </button>
+        {onExport && (
+          <button type="button" className="slop-import-btn" onClick={onExport}>
+            Export
+          </button>
+        )}
       </div>
     </aside>
   );
