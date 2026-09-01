@@ -1,7 +1,33 @@
 #!/bin/sh
 # Passwordless helper: power reboot | poweroff | uninstall
-set -e
-case "${1:-}" in
+#
+# Only these three actions are accepted. The frontend cannot pass a shell.
+#
+# Do not stop judie.service. Stopping the kiosk blanks tty1 (cursor on black)
+# and systemd can kill this helper with the kiosk cgroup.
+#
+# Uninstall does not reboot. The UI reboots only after this helper reports
+# that the package is gone. User data in ~/.local/share/judie is not part
+# of the package and is left in place.
+set -eu
+
+fail() { echo "$1" >&2; exit 1; }
+
+ACTION="${1:-}"
+case "$ACTION" in
+  reboot|poweroff|uninstall) ;;
+  *) fail "usage: power reboot|poweroff|uninstall" ;;
+esac
+
+[ "$#" -eq 1 ] || fail "refused extra arguments"
+
+if [ -n "${JUDIE_POWER_MOCK:-}" ]; then
+  printf '%s\n' "$ACTION" > "$JUDIE_POWER_MOCK"
+  echo "MOCK ${ACTION}"
+  exit 0
+fi
+
+case "$ACTION" in
   reboot)
     /sbin/reboot
     ;;
@@ -9,16 +35,13 @@ case "${1:-}" in
     /sbin/poweroff
     ;;
   uninstall)
-    if command -v apt-get >/dev/null 2>&1; then
-      DEBIAN_FRONTEND=noninteractive apt-get remove -y judie || true
-    fi
-    systemctl stop judie >/dev/null 2>&1 || true
-    systemctl disable judie >/dev/null 2>&1 || true
-    rm -f /usr/bin/judie /usr/lib/judie/judie-pi 2>/dev/null || true
-    /sbin/reboot
-    ;;
-  *)
-    echo "usage: power reboot|poweroff|uninstall" >&2
-    exit 1
+    command -v apt-get >/dev/null 2>&1 || fail "apt-get missing"
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get remove -y judie || fail "could not remove judie"
+    still="$(dpkg-query -W -f '${Status}' judie 2>/dev/null || true)"
+    case "$still" in
+      *installed*) fail "judie is still installed" ;;
+    esac
+    echo "REMOVED"
     ;;
 esac

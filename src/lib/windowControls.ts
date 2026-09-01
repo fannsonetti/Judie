@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { setKiosk } from "./install";
+import { powerMockEnabled } from "./power";
 
 let restoreFullscreen = false;
 
@@ -25,6 +26,7 @@ export async function minimizeJudie() {
 }
 
 export async function relaunchJudie() {
+  if (powerMockEnabled()) return;
   try {
     const { relaunch } = await import("@tauri-apps/plugin-process");
     await relaunch();
@@ -34,6 +36,7 @@ export async function relaunchJudie() {
 }
 
 export async function quitJudie() {
+  if (powerMockEnabled()) return;
   try {
     const { exit } = await import("@tauri-apps/plugin-process");
     await exit(0);

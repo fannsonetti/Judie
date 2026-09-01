@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { JUDIE_VERSION } from "./version";
+import { powerMockEnabled } from "./power";
 
 export interface ReleaseInfo {
   tag: string;
@@ -128,6 +129,7 @@ export function generateMathChallenge() {
 }
 
 export async function uninstallJudie() {
+  if (powerMockEnabled()) return;
   await invoke("uninstall_judie");
 }
 

@@ -221,6 +221,45 @@ export component IconBtn inherits Rectangle {
     }
 }
 
+export component PowerAction inherits Rectangle {
+    in property <string> label;
+    in property <string> glyph;
+    in property <bool> enabled: true;
+    callback clicked;
+    border-radius: 0px;
+    border-width: 1.5px;
+    border-color: Dy.border-hi;
+    background: Dy.canvas;
+    min-height: 108px;
+    horizontal-stretch: 1;
+    opacity: root.enabled ? 1 : 0.35;
+    TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+    VerticalLayout {
+        padding: 10px;
+        spacing: 8px;
+        alignment: center;
+        Text {
+            text: root.glyph;
+            color: Dy.text;
+            font-size: 22px;
+            font-weight: 700;
+            font-family: Dy.mono;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: root.label;
+            color: Dy.text;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: Dy.mono;
+            horizontal-alignment: center;
+        }
+    }
+}
+
 export component HitBtn inherits Rectangle {
     in property <string> label;
     in property <string> kicker;
@@ -416,15 +455,16 @@ export component ConfirmSheet inherits Rectangle {
     in property <string> primary: "Continue";
     in property <string> secondary: "Cancel";
     in property <bool> danger: false;
+    in property <length> box-height: 400px;
     callback accept;
     callback dismiss;
     background: #000000cc;
     TouchArea { clicked => { root.dismiss(); } }
     Rectangle {
-        x: parent.width * 0.22;
-        y: parent.height * 0.28;
-        width: parent.width * 0.56;
-        height: 340px;
+        x: parent.width * 0.18;
+        y: parent.height * 0.18;
+        width: parent.width * 0.64;
+        height: root.box-height;
         background: #000000;
         border-width: 1.5px;
         border-color: Dy.border-hi;

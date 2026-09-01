@@ -668,6 +668,64 @@ select.settings-input {
   font-weight: 700;
   font-family: ui-monospace, "Cascadia Mono", monospace;
 }
+.os-power-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin: 4px 0 12px;
+}
+.os-power-btn {
+  min-height: 108px;
+  border: 1.5px solid #5a5a5a;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.os-power-btn:disabled { opacity: 0.35; }
+.os-power-glyph {
+  font-size: 22px;
+  line-height: 1;
+}
+.os-section {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1.5px solid #2a2a2a;
+}
+.os-row-wrap {
+  align-items: flex-start;
+  min-height: auto;
+  padding: 6px 0;
+}
+.os-row-wrap span:last-child {
+  text-align: right;
+  max-width: 62%;
+}
+.os-version-trigger,
+.os-version-action {
+  width: 100%;
+  min-height: 56px;
+  margin: 8px 0;
+  border: 1.5px solid #fff;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.os-version-trigger:disabled,
+.os-version-action:disabled {
+  border-color: #2a2a2a;
+  color: #6a6a6a;
+}
 .os-version-list {
   max-height: 220px;
   overflow: auto;
@@ -763,6 +821,12 @@ select.settings-input {
 }
 .osk-key.on { border-color: #fff; background: #141414; }
 .osk-sub { position: absolute; left: 4px; top: 3px; font-size: 8px; color: #4a4a4a; }
-.os-confirm { background: #000; border: 1.5px solid #5a5a5a; }
+.os-confirm {
+  background: #000;
+  border: 1.5px solid #5a5a5a;
+  border-radius: 0;
+  width: min(640px, 92%);
+}
+.os-confirm p { white-space: pre-wrap; }
 .settings-backdrop { background: rgba(0,0,0,0.8); }
 

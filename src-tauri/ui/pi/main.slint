@@ -1,5 +1,5 @@
 import { ScrollView, Slider, Button } from "std-widgets.slint";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, KeyBtn, Bar, TileShell, QuickTask, NetGlyph, ConfirmSheet } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, KeyBtn, Bar, TileShell, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 
@@ -139,6 +139,9 @@ export component MainWindow inherits Window {
     in-out property <string> verify-code: "";
     in-out property <string> verify-typed: "";
     in-out property <bool> version-menu-open: false;
+    in-out property <bool> power-busy: false;
+    in-out property <string> power-status: "";
+    in-out property <string> refresh-status: "";
     in-out property <string> preview-source: "live";
     in-out property <string> wifi-detail: "";
     in-out property <[SlopNode]> gallery-nodes: [];
@@ -831,35 +834,113 @@ export component MainWindow inherits Window {
                         Pill { label: "Reconnect"; on: true; clicked => { root.reconnect-net(); } }
                     }
                     if root.settings-tab == 2: VerticalLayout {
-                        spacing: 20px;
-                        Text { text: "Installed version"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        Text { text: "v" + root.version-text; color: #ffffff; font-size: 18px; font-family: Dy.mono; }
+                        spacing: 14px;
+                        Text { text: "Device"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
                         HorizontalLayout {
-                            Text { text: "Switch version"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                            spacing: 12px;
+                            PowerAction {
+                                label: "Restart";
+                                glyph: "↻";
+                                enabled: !root.updating && !root.power-busy;
+                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("restart"); } }
+                            }
+                            PowerAction {
+                                label: "Shut Down";
+                                glyph: "○";
+                                enabled: !root.updating && !root.power-busy;
+                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("shutdown"); } }
+                            }
+                            PowerAction {
+                                label: "Uninstall";
+                                glyph: "×";
+                                enabled: !root.updating && !root.power-busy;
+                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("uninstall1"); } }
+                            }
+                        }
+                        if root.power-status != "": Text {
+                            text: root.power-status;
+                            color: #ffffff;
+                            font-size: 14px;
+                            font-family: Dy.mono;
+                            wrap: word-wrap;
+                        }
+                        Rectangle { height: 8px; }
+                        Rectangle { height: 1.5px; background: #2a2a2a; }
+                        Text { text: "Software"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        HorizontalLayout {
+                            Text { text: "Installed version"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
+                            Text { text: "v" + root.version-text; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                        }
+                        HorizontalLayout {
+                            Text { text: "Selected version"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Text {
+                                text: root.selected-release == "" ? "—" : root.selected-release;
+                                color: #ffffff;
+                                font-size: 16px;
+                                font-family: Dy.mono;
+                                vertical-alignment: center;
+                            }
+                        }
+                        HorizontalLayout {
+                            Text { text: "Update status"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: top; }
+                            Rectangle { width: 16px; }
+                            Text {
+                                text: root.update-label == "" ? "Not checked yet." : root.update-label;
+                                color: #ffffff;
+                                font-size: 14px;
+                                font-family: Dy.mono;
+                                wrap: word-wrap;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                        HorizontalLayout {
+                            Text { text: "Last refresh"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: top; }
+                            Rectangle { width: 16px; }
+                            Text {
+                                text: root.refresh-status == "" ? "Open this page or tap Check for updates." : root.refresh-status;
+                                color: #8a8a8a;
+                                font-size: 13px;
+                                font-family: Dy.mono;
+                                wrap: word-wrap;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                        Text { text: "Switch version"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                        Rectangle {
+                            height: 56px;
+                            border-width: 1.5px;
+                            border-color: (root.updating || root.power-busy) ? #2a2a2a : #ffffff;
+                            background: #000000;
                             TouchArea {
                                 clicked => {
-                                    if !root.updating {
+                                    if !root.updating && !root.power-busy {
                                         root.version-menu-open = !root.version-menu-open;
                                     }
                                 }
+                            }
+                            HorizontalLayout {
+                                padding-left: 16px;
+                                padding-right: 16px;
                                 Text {
-                                    text: "v" + root.version-text + "  ▼";
-                                    color: root.updating ? #6a6a6a : #ffffff;
+                                    text: (root.selected-release == "" ? ("v" + root.version-text) : root.selected-release) + "  ▼";
+                                    color: (root.updating || root.power-busy) ? #6a6a6a : #ffffff;
                                     font-size: 16px;
                                     font-family: Dy.mono;
                                     vertical-alignment: center;
                                 }
+                                Rectangle { horizontal-stretch: 1; }
                             }
                         }
-                        if root.version-menu-open && !root.updating: Flickable {
+                        if root.version-menu-open && !root.updating && !root.power-busy: Flickable {
                             height: 180px;
                             viewport-height: 24 * 40px;
                             VerticalLayout {
                                 spacing: 2px;
                                 for rel in root.releases: TouchArea {
-                                    clicked => { if !rel.current && !root.updating { root.pick-version(rel.tag); } }
-                                    height: 36px;
+                                    clicked => { if !rel.current && !root.updating && !root.power-busy { root.pick-version(rel.tag); } }
+                                    height: 40px;
                                     HorizontalLayout {
                                         Text { text: rel.tag; color: rel.current ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; }
                                         Rectangle { horizontal-stretch: 1; }
@@ -868,10 +949,23 @@ export component MainWindow inherits Window {
                                 }
                             }
                         }
-                        Pill {
-                            label: "Check for updates";
-                            on: !root.updating;
-                            clicked => { if !root.updating { root.check-updates(); } }
+                        Rectangle {
+                            height: 56px;
+                            border-width: 1.5px;
+                            border-color: (root.updating || root.power-busy) ? #2a2a2a : #ffffff;
+                            background: #000000;
+                            TouchArea {
+                                clicked => { if !root.updating && !root.power-busy { root.check-updates(); } }
+                            }
+                            Text {
+                                text: "Check for updates";
+                                color: (root.updating || root.power-busy) ? #6a6a6a : #ffffff;
+                                font-size: 16px;
+                                font-weight: 700;
+                                font-family: Dy.mono;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
                         }
                         Text {
                             text: root.release-status;
@@ -880,10 +974,6 @@ export component MainWindow inherits Window {
                             font-family: Dy.mono;
                             wrap: word-wrap;
                         }
-                        Rectangle { height: 24px; }
-                        HitBtn { label: "Restart"; clicked => { if !root.updating { root.begin-confirm("restart"); } } }
-                        HitBtn { label: "Shutdown"; clicked => { if !root.updating { root.begin-confirm("shutdown"); } } }
-                        HitBtn { label: "Uninstall"; clicked => { if !root.updating { root.begin-confirm("uninstall1"); } } }
                     }
                 }
             }
@@ -1469,6 +1559,47 @@ export component MainWindow inherits Window {
                     font-family: Dy.mono;
                     wrap: word-wrap;
                     vertical-stretch: 1;
+                }
+            }
+        }
+    }
+
+    if root.power-busy: Rectangle {
+        background: #00000099;
+        TouchArea { clicked => { } }
+        Rectangle {
+            x: parent.width * 0.22;
+            y: parent.height * 0.32;
+            width: parent.width * 0.56;
+            height: 200px;
+            background: #000000;
+            border-width: 1.5px;
+            border-color: #ffffff;
+            TouchArea { clicked => { } }
+            VerticalLayout {
+                padding: 28px;
+                spacing: 16px;
+                Text {
+                    text: "Device";
+                    color: #ffffff;
+                    font-size: 20px;
+                    font-weight: 700;
+                    font-family: Dy.mono;
+                }
+                Text {
+                    text: root.power-status;
+                    color: #ffffff;
+                    font-size: 16px;
+                    font-family: Dy.mono;
+                    wrap: word-wrap;
+                    vertical-stretch: 1;
+                }
+                Text {
+                    text: "This screen stays up. A blank terminal never appears.";
+                    color: #8a8a8a;
+                    font-size: 13px;
+                    font-family: Dy.mono;
+                    wrap: word-wrap;
                 }
             }
         }

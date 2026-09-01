@@ -50,13 +50,17 @@ The package pulls the X server, `xinit`, fonts, and input stack. No GTK/WebKit. 
 startx /usr/bin/judie -- :0 vt1 -nolisten tcp -nocursor
 ```
 
-Uninstall: `sudo apt remove judie`.
+Uninstall: Settings → Power → Uninstall. The panel warns what is removed (the Judie package and kiosk autostart) and what is kept (`~/.local/share/judie`). It does not stop the kiosk first. After the package is gone, the panel reboots to the normal login screen.
+
+Or from a terminal: `sudo apt remove judie`.
 
 ## Updates
 
 Settings → Power lists **stable** GitHub releases that ship a compatible `.deb` for this Pi. Drafts, prereleases, and packages for other architectures are omitted.
 
 Tap **Check for updates** to refresh the list. The panel reports whether the installed package is already latest.
+
+Restart, Shut Down, and Uninstall sit in one compact row. Each action asks for confirmation. Restart and Shut Down call `/usr/lib/judie/power` (`reboot` or `poweroff` only). Uninstall uses the same helper, then reboots after removal is verified. The helper never stops `judie.service`, so tty1 does not drop to a blank cursor. Failures stay on this screen with the real error.
 
 Choose another version to upgrade or downgrade. A confirmation shows the current version, the target, and which direction this is. The current version cannot be selected again.
 

@@ -16,7 +16,9 @@ import { sanitizeSvg } from "../slopbox/svg";
 import { overlayTransition } from "../lib/performance";
 import { isLinuxWebview } from "../lib/platform";
 import { monthCells } from "../components/widgets/chrome";
+import { readFileSync } from "node:fs";
 import { compatibleReleaseTags, confirmInstallBody, generateUninstallChallenge, isNewerVersion, isSameVersion, releaseLabel, versionChange, type ReleaseInfo } from "../lib/install";
+import { allowedPowerAction, uninstallWarning } from "../lib/power";
 
 function snap(): RoomSnapshot {
   return {
@@ -673,6 +675,44 @@ test("uninstall challenge mixes letters, digits, and symbols", () => {
   assert(/[0-9]/.test(code), "has a digit");
   assert(/[^A-Za-z0-9]/.test(code), "has a symbol");
   assert(generateUninstallChallenge() !== generateUninstallChallenge(), "fresh each time");
+});
+
+test("power actions are narrowly scoped", () => {
+  assert(allowedPowerAction("reboot") === "reboot", "reboot");
+  assert(allowedPowerAction("poweroff") === "poweroff", "poweroff");
+  assert(allowedPowerAction("shutdown") === "poweroff", "shutdown alias");
+  assert(allowedPowerAction("uninstall") === "uninstall", "uninstall");
+  for (const bad of ["reboot; rm -rf /", "apt-get remove vim", "", "/bin/sh"]) {
+    let threw = false;
+    try {
+      allowedPowerAction(bad);
+    } catch {
+      threw = true;
+    }
+    assert(threw, bad);
+  }
+});
+
+test("uninstall warning names removal and preserved data", () => {
+  const pi = uninstallWarning("pi");
+  assert(pi.includes("removes the Judie application"), pi);
+  assert(pi.includes("~/.local/share/judie"), pi);
+  assert(pi.includes("widgets"), pi);
+  assert(pi.includes("routines"), pi);
+  const desktop = uninstallWarning("desktop");
+  assert(desktop.includes("not deleted"), desktop);
+});
+
+test("power helper and package scripts never stop the kiosk", () => {
+  const power = readFileSync("src-tauri/linux/power", "utf8");
+  assert(power.includes("reboot|poweroff|uninstall"), "allowlist");
+  assert(!power.includes("systemctl stop"), "power helper stops judie");
+  const uninstallCase = power.slice(power.lastIndexOf("uninstall)"));
+  assert(!uninstallCase.includes("/sbin/reboot"), uninstallCase);
+  assert(!uninstallCase.includes("systemctl"), uninstallCase);
+  const pack = readFileSync("scripts/package-armhf-deb.sh", "utf8");
+  assert(!/systemctl disable --now/.test(pack), "prerm still uses disable --now");
+  assert(!/systemctl start getty@tty1\.service/.test(pack), "postrm still starts getty during remove");
 });
 
 if (failed) {

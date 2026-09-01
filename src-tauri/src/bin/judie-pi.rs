@@ -534,7 +534,7 @@ fn load_wifi_status(ui: &MainWindow) {
 }
 
 fn begin_package_install(ui: &MainWindow, tag: String) {
-    if ui.get_updating() {
+    if ui.get_updating() || ui.get_power_busy() {
         return;
     }
     if tag.is_empty() {
@@ -587,6 +587,7 @@ fn begin_package_install(ui: &MainWindow, tag: String) {
 }
 
 fn load_releases(ui: &MainWindow) {
+    ui.set_refresh_status("Checking GitHub…".into());
     ui.set_release_status("Checking GitHub…".into());
     let weak = ui.as_weak();
     std::thread::spawn(move || {
@@ -596,10 +597,13 @@ fn load_releases(ui: &MainWindow) {
             let Some(ui) = weak.upgrade() else { return };
             match rows {
                 Ok(rows) => {
+                    let count = rows.len();
                     let current = rows.iter().find(|r| r.current).map(|r| r.tag.clone());
                     if ui.get_selected_release().is_empty() {
-                        if let Some(tag) = current {
+                        if let Some(tag) = current.clone() {
                             ui.set_selected_release(tag.into());
+                        } else {
+                            ui.set_selected_release(format!("v{}", ui.get_version_text()).into());
                         }
                     }
                     let model: Vec<ReleaseRow> = rows
@@ -612,19 +616,80 @@ fn load_releases(ui: &MainWindow) {
                         })
                         .collect();
                     ui.set_releases(ModelRc::new(VecModel::from(model)));
+                    ui.set_refresh_status(
+                        format!("Checked GitHub. {count} compatible release{}.", if count == 1 { "" } else { "s" })
+                            .into(),
+                    );
                     if let Some(n) = latest {
                         ui.set_update_available(n.outdated);
-                        ui.set_update_label(format!("Judie {} is available", n.latest).into());
-                        ui.set_release_status(if n.outdated {
+                        let status = if n.outdated {
                             format!("Current {} is not latest. Latest is {}.", n.current, n.latest)
                         } else {
                             format!("Current {} is the latest compatible release.", n.current)
-                        }.into());
+                        };
+                        ui.set_update_label(status.clone().into());
+                        ui.set_release_status(status.into());
                     } else {
+                        ui.set_update_label("Could not compare with GitHub.".into());
                         ui.set_release_status("Release list loaded.".into());
                     }
                 }
-                Err(err) => ui.set_release_status(err.into()),
+                Err(err) => {
+                    ui.set_refresh_status(err.clone().into());
+                    ui.set_release_status(err.into());
+                }
+            }
+        });
+    });
+}
+
+fn begin_power_action(ui: &MainWindow, action: &str) {
+    if ui.get_updating() || ui.get_power_busy() {
+        return;
+    }
+    let action = match pi_ctl::allowed_power_action(action) {
+        Ok(action) => action,
+        Err(err) => {
+            ui.set_power_status(err.into());
+            return;
+        }
+    };
+    ui.set_power_busy(true);
+    ui.set_power_status(pi_ctl::power_status_label(action).into());
+    let mocked = pi_ctl::power_mock_path().is_some();
+    let weak = ui.as_weak();
+    let action = action.to_string();
+    std::thread::spawn(move || {
+        let result = match action.as_str() {
+            "uninstall" => match pi_ctl::power("uninstall") {
+                Ok(()) => {
+                    let weak = weak.clone();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(ui) = weak.upgrade() {
+                            ui.set_power_status("Removed. Rebooting…".into());
+                        }
+                    });
+                    pi_ctl::power("reboot")
+                }
+                err => err,
+            },
+            other => pi_ctl::power(other),
+        };
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            match result {
+                Ok(()) if mocked => {
+                    ui.set_power_busy(false);
+                    ui.set_power_status(
+                        format!("Mock: {action} recorded. The panel stays on.")
+                            .into(),
+                    );
+                }
+                Ok(()) => {}
+                Err(err) => {
+                    ui.set_power_busy(false);
+                    ui.set_power_status(err.into());
+                }
             }
         });
     });
@@ -1038,7 +1103,7 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_check_updates(move || {
         if let Some(ui) = weak.upgrade() {
-            if ui.get_updating() {
+            if ui.get_updating() || ui.get_power_busy() {
                 return;
             }
             load_releases(&ui);
@@ -1160,11 +1225,17 @@ fn bind(ui: &MainWindow) {
             });
         });
     });
+    let weak = ui.as_weak();
     ui.on_reboot_now(move || {
-        let _ = pi_ctl::power("reboot");
+        if let Some(ui) = weak.upgrade() {
+            begin_power_action(&ui, "reboot");
+        }
     });
+    let weak = ui.as_weak();
     ui.on_shutdown_now(move || {
-        let _ = pi_ctl::power("poweroff");
+        if let Some(ui) = weak.upgrade() {
+            begin_power_action(&ui, "poweroff");
+        }
     });
     let weak = ui.as_weak();
     ui.on_open_keyboard(move |field| {
@@ -1310,20 +1381,23 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_begin_confirm(move |kind| {
         let Some(ui) = weak.upgrade() else { return };
+        if ui.get_updating() || ui.get_power_busy() {
+            return;
+        }
         match kind.as_str() {
             "restart" => {
                 ui.set_confirm_title("Restart?".into());
-                ui.set_confirm_body("The panel will reboot.".into());
+                ui.set_confirm_body("The panel will reboot. Judie stays on screen until the computer restarts.".into());
                 ui.set_confirm_kind("restart".into());
             }
             "shutdown" => {
                 ui.set_confirm_title("Shut down?".into());
-                ui.set_confirm_body("The panel will power off.".into());
+                ui.set_confirm_body("The panel will power off. Judie stays on screen until the computer shuts down.".into());
                 ui.set_confirm_kind("shutdown".into());
             }
             "uninstall1" => {
-                ui.set_confirm_title("Are you sure?".into());
-                ui.set_confirm_body("This removes Judie from this computer.".into());
+                ui.set_confirm_title("Uninstall Judie?".into());
+                ui.set_confirm_body(pi_ctl::uninstall_warning().into());
                 ui.set_confirm_kind("uninstall1".into());
             }
             _ => ui.set_confirm_kind(kind),
@@ -1340,14 +1414,17 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_accept_confirm(move || {
         let Some(ui) = weak.upgrade() else { return };
+        if ui.get_updating() || ui.get_power_busy() {
+            return;
+        }
         match ui.get_confirm_kind().as_str() {
             "restart" => {
                 ui.set_confirm_kind("".into());
-                let _ = pi_ctl::power("reboot");
+                begin_power_action(&ui, "reboot");
             }
             "shutdown" => {
                 ui.set_confirm_kind("".into());
-                let _ = pi_ctl::power("poweroff");
+                begin_power_action(&ui, "poweroff");
             }
             "uninstall1" => {
                 let (prompt, answer) = math_challenge();
@@ -1374,7 +1451,7 @@ fn bind(ui: &MainWindow) {
                     return;
                 }
                 ui.set_confirm_kind("".into());
-                ui.invoke_uninstall_now();
+                begin_power_action(&ui, "uninstall");
             }
             "upgrade" | "downgrade" => {
                 let tag = PENDING.lock().ok().map(|p| p.tag.clone()).unwrap_or_default();
@@ -1387,13 +1464,11 @@ fn bind(ui: &MainWindow) {
             _ => ui.set_confirm_kind("".into()),
         }
     });
-    ui.on_uninstall_now(move || {
-        let _ = pi_ctl::power("uninstall");
-    });
+    ui.on_uninstall_now(move || {});
     let weak = ui.as_weak();
     ui.on_pick_version(move |tag| {
         let Some(ui) = weak.upgrade() else { return };
-        if ui.get_updating() {
+        if ui.get_updating() || ui.get_power_busy() {
             return;
         }
         let tag = tag.to_string();
@@ -1481,6 +1556,7 @@ fn main() {
     };
     apply_kiosk_geometry(&ui);
     ui.set_version_text(releases::display_version().into());
+    ui.set_selected_release(format!("v{}", releases::display_version()).into());
     bind(&ui);
     push_ui(&ui);
     load_link(&ui);
@@ -1543,7 +1619,7 @@ fn main() {
     let weak = ui.as_weak();
     ui.on_update_now(move || {
         let Some(ui) = weak.upgrade() else { return };
-        if ui.get_updating() {
+        if ui.get_updating() || ui.get_power_busy() {
             return;
         }
         ui.set_updating(true);

@@ -317,13 +317,43 @@ pub fn wifi_disconnect() -> Result<(), String> {
     sudo("/usr/lib/judie/wifi", &["disconnect"]).map(|_| ())
 }
 
-pub fn power(action: &str) -> Result<(), String> {
+/// Only the kiosk helper verbs. The frontend cannot pass a shell command.
+pub fn allowed_power_action(action: &str) -> Result<&'static str, String> {
     match action {
-        "reboot" | "poweroff" | "uninstall" => {
-            sudo("/usr/lib/judie/power", &[action]).map(|_| ())
-        }
+        "reboot" => Ok("reboot"),
+        "poweroff" | "shutdown" => Ok("poweroff"),
+        "uninstall" => Ok("uninstall"),
         _ => Err("Unknown power action".into()),
     }
+}
+
+pub fn power_mock_path() -> Option<String> {
+    match std::env::var("JUDIE_POWER_MOCK") {
+        Ok(path) if !path.is_empty() => Some(path),
+        _ => None,
+    }
+}
+
+pub fn uninstall_warning() -> &'static str {
+    "This removes the Judie application, kiosk helpers, and autostart from this Raspberry Pi.\n\nKept on this computer:\n• Room settings, widgets, and routines (~/.local/share/judie)\n• Saved Wi-Fi networks\n\nThe panel stays on screen until uninstall finishes, then it reboots to the normal login screen."
+}
+
+pub fn power_status_label(action: &str) -> &'static str {
+    match action {
+        "reboot" => "Restarting the panel…",
+        "poweroff" => "Shutting down…",
+        "uninstall" => "Removing Judie. Settings stay on this computer…",
+        _ => "Working…",
+    }
+}
+
+pub fn power(action: &str) -> Result<(), String> {
+    let action = allowed_power_action(action)?;
+    if let Some(path) = power_mock_path() {
+        std::fs::write(&path, action).map_err(|e| format!("Could not write power mock: {e}"))?;
+        return Ok(());
+    }
+    sudo("/usr/lib/judie/power", &[action]).map(|_| ())
 }
 
 pub fn version_rows() -> Result<Vec<VersionRow>, String> {
@@ -337,4 +367,63 @@ pub fn version_rows() -> Result<Vec<VersionRow>, String> {
             installable: r.installable,
         })
         .collect())
+}
+
+#[cfg(test)]
+mod power_tests {
+    use super::*;
+    use std::sync::Mutex;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static MOCK_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn power_actions_are_narrow() {
+        assert_eq!(allowed_power_action("reboot").unwrap(), "reboot");
+        assert_eq!(allowed_power_action("poweroff").unwrap(), "poweroff");
+        assert_eq!(allowed_power_action("shutdown").unwrap(), "poweroff");
+        assert_eq!(allowed_power_action("uninstall").unwrap(), "uninstall");
+        for bad in [
+            "reboot; rm -rf /",
+            "poweroff && reboot",
+            "/bin/sh",
+            "apt-get remove vim",
+            "",
+            "reboot\npoweroff",
+        ] {
+            assert!(allowed_power_action(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn mock_power_does_not_call_sudo() {
+        let _guard = MOCK_LOCK.lock().unwrap();
+        let path = std::env::temp_dir().join(format!(
+            "judie-power-mock-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::env::set_var("JUDIE_POWER_MOCK", &path);
+        power("reboot").expect("mock reboot");
+        assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), "reboot");
+        power("shutdown").expect("mock shutdown");
+        assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), "poweroff");
+        power("uninstall").expect("mock uninstall");
+        assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), "uninstall");
+        let _ = std::fs::remove_file(&path);
+        std::env::remove_var("JUDIE_POWER_MOCK");
+    }
+
+    #[test]
+    fn uninstall_warning_names_removal_and_kept_data() {
+        let text = uninstall_warning();
+        assert!(text.contains("removes the Judie application"));
+        assert!(text.contains("~/.local/share/judie"));
+        assert!(text.contains("widgets"));
+        assert!(text.contains("routines"));
+        assert!(text.contains("stays on screen"));
+    }
 }

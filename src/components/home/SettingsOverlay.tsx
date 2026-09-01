@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAssistantStore } from "../../store/assistantStore";
 import { useSettingsStore } from "../../store/settingsStore";
 import { useRoomStore } from "../../store/roomStore";
@@ -17,6 +17,7 @@ import {
   type ReleaseInfo,
 } from "../../lib/install";
 import { JUDIE_VERSION } from "../../lib/version";
+import { powerMockEnabled, powerStatusLabel, uninstallWarning } from "../../lib/power";
 import { ConfirmSheet } from "../chrome/ConfirmSheet";
 import { FieldTap } from "../chrome/FieldTap";
 import { networkReconnect, networkSetDhcp } from "../../lib/network";
@@ -47,10 +48,14 @@ export function SettingsOverlay() {
   const [busy, setBusy] = useState(false);
   const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
   const [versionOpen, setVersionOpen] = useState(false);
+  const [selectedTag, setSelectedTag] = useState(`v${JUDIE_VERSION}`);
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [typed, setTyped] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [updateStatus, setUpdateStatus] = useState("");
+  const [refreshStatus, setRefreshStatus] = useState("");
+  const [powerStatus, setPowerStatus] = useState("");
+  const busyRef = useRef(false);
   const [routineName, setRoutineName] = useState("");
   const [routinePhrase, setRoutinePhrase] = useState("");
   const [routineCommand, setRoutineCommand] = useState("");
@@ -76,9 +81,13 @@ export function SettingsOverlay() {
   }, [visible]);
 
   const loadReleases = () => {
+    setRefreshStatus("Checking GitHub…");
     void listInstallations()
       .then((list) => {
         setReleases(list);
+        setRefreshStatus(
+          `Checked GitHub. ${list.length} compatible release${list.length === 1 ? "" : "s"}.`,
+        );
         const current = list.find((r) => r.current);
         const latest = list[0];
         if (!latest) {
@@ -95,7 +104,9 @@ export function SettingsOverlay() {
       })
       .catch((err) => {
         setReleases([]);
-        setUpdateStatus(err instanceof Error ? err.message : "Could not load releases");
+        const msg = err instanceof Error ? err.message : "Could not load releases";
+        setRefreshStatus(msg);
+        setUpdateStatus(msg);
       });
   };
 
@@ -121,6 +132,7 @@ export function SettingsOverlay() {
 
   const pickVersion = (tag: string) => {
     setVersionOpen(false);
+    setSelectedTag(tag);
     if (isSameVersion(tag, JUDIE_VERSION)) {
       setUpdateStatus("This version is already installed.");
       return;
@@ -130,26 +142,52 @@ export function SettingsOverlay() {
   };
 
   const runInstall = async (tag: string) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setActionError(null);
     try {
       await switchInstallation(tag);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not switch version");
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const runDeviceAction = async (action: "reboot" | "poweroff" | "uninstall") => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setActionError(null);
+    setPowerStatus(powerStatusLabel(action));
+    if (powerMockEnabled()) {
+      setPowerStatus(`Mock: ${action} recorded. The app stays open.`);
+      busyRef.current = false;
+      setBusy(false);
+      return;
+    }
+    try {
+      if (action === "reboot") await relaunchJudie();
+      else if (action === "poweroff") await quitJudie();
+      else await uninstallJudie();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Could not complete the action");
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
   const accept = async () => {
-    if (!confirm) return;
+    if (!confirm || busyRef.current) return;
     if (confirm.kind === "restart") {
       setConfirm(null);
-      await relaunchJudie();
+      await runDeviceAction("reboot");
       return;
     }
     if (confirm.kind === "shutdown") {
       setConfirm(null);
-      await quitJudie();
+      await runDeviceAction("poweroff");
       return;
     }
     if (confirm.kind === "uninstall1") {
@@ -167,14 +205,8 @@ export function SettingsOverlay() {
     }
     if (confirm.kind === "uninstall3") {
       if (typed !== confirm.code) return;
-      setBusy(true);
-      try {
-        await uninstallJudie();
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : "Could not uninstall");
-        setBusy(false);
-        setConfirm(null);
-      }
+      setConfirm(null);
+      await runDeviceAction("uninstall");
       return;
     }
     if (confirm.kind === "upgrade" || confirm.kind === "downgrade") {
@@ -365,59 +397,78 @@ export function SettingsOverlay() {
           )}
           {tab === "power" && (
             <>
-              <p className="os-kicker">Installed version</p>
-              <div className="os-row">
-                <span>v{JUDIE_VERSION}</span>
+              <p className="os-kicker">Device</p>
+              <div className="os-power-row">
+                <button type="button" className="os-power-btn" disabled={busy} onClick={() => setConfirm({ kind: "restart" })}>
+                  <span className="os-power-glyph" aria-hidden>↻</span>
+                  Restart
+                </button>
+                <button type="button" className="os-power-btn" disabled={busy} onClick={() => setConfirm({ kind: "shutdown" })}>
+                  <span className="os-power-glyph" aria-hidden>○</span>
+                  Shut Down
+                </button>
+                <button type="button" className="os-power-btn" disabled={busy} onClick={() => setConfirm({ kind: "uninstall1" })}>
+                  <span className="os-power-glyph" aria-hidden>×</span>
+                  Uninstall
+                </button>
               </div>
-              <div className="os-row">
-                <span>Switch version</span>
+              {powerStatus && <p className="settings-note">{powerStatus}</p>}
+              <div className="os-section">
+                <p className="os-kicker">Software</p>
+                <div className="os-row">
+                  <span className="os-sub">Installed version</span>
+                  <span>v{JUDIE_VERSION}</span>
+                </div>
+                <div className="os-row">
+                  <span className="os-sub">Selected version</span>
+                  <span>{selectedTag}</span>
+                </div>
+                <div className="os-row os-row-wrap">
+                  <span className="os-sub">Update status</span>
+                  <span>{updateStatus || "Not checked yet."}</span>
+                </div>
+                <div className="os-row os-row-wrap">
+                  <span className="os-sub">Last refresh</span>
+                  <span>{refreshStatus || "Open this page or tap Check for updates."}</span>
+                </div>
+                <p className="os-kicker">Switch version</p>
                 <button
                   type="button"
-                  className="os-pill"
+                  className="os-version-trigger"
                   disabled={busy}
                   onClick={() => !busy && setVersionOpen(!versionOpen)}
                 >
-                  v{JUDIE_VERSION} ▼
+                  {selectedTag} ▼
+                </button>
+                {versionOpen && !busy && (
+                  <div className="os-version-list">
+                    {(releases ?? []).map((r) => (
+                      <button
+                        key={r.tag}
+                        type="button"
+                        className="os-row"
+                        disabled={busy || r.current}
+                        onClick={() => pickVersion(r.tag)}
+                      >
+                        <span>{r.tag}</span>
+                        {r.current && <em>current</em>}
+                      </button>
+                    ))}
+                    {releases?.length === 0 && <p className="settings-note">No compatible releases listed.</p>}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="os-version-action"
+                  disabled={busy}
+                  onClick={() => {
+                    setUpdateStatus("Checking GitHub…");
+                    loadReleases();
+                  }}
+                >
+                  Check for updates
                 </button>
               </div>
-              {versionOpen && !busy && (
-                <div className="os-version-list">
-                  {(releases ?? []).map((r) => (
-                    <button
-                      key={r.tag}
-                      type="button"
-                      className="os-row"
-                      disabled={busy || r.current}
-                      onClick={() => pickVersion(r.tag)}
-                    >
-                      <span>{r.tag}</span>
-                      {r.current && <em>current</em>}
-                    </button>
-                  ))}
-                  {releases?.length === 0 && <p className="settings-note">No compatible releases listed.</p>}
-                </div>
-              )}
-              <button
-                type="button"
-                className="os-pill on"
-                disabled={busy}
-                onClick={() => {
-                  setUpdateStatus("Checking GitHub…");
-                  loadReleases();
-                }}
-              >
-                Check for updates
-              </button>
-              {updateStatus && <p className="settings-note">{updateStatus}</p>}
-              <button type="button" className="os-hit" disabled={busy} onClick={() => setConfirm({ kind: "restart" })}>
-                Restart
-              </button>
-              <button type="button" className="os-hit" disabled={busy} onClick={() => setConfirm({ kind: "shutdown" })}>
-                Shutdown
-              </button>
-              <button type="button" className="os-hit" disabled={busy} onClick={() => setConfirm({ kind: "uninstall1" })}>
-                Uninstall
-              </button>
               {actionError && <p className="settings-note">{actionError}</p>}
             </>
           )}
@@ -431,7 +482,7 @@ export function SettingsOverlay() {
         <ConfirmSheet title="Shut down Judie?" body="Judie will quit until you open it again." primary="Shutdown" onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
       )}
       {confirm?.kind === "uninstall1" && (
-        <ConfirmSheet title="Are you sure?" body="This starts uninstall. Two more steps follow." onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
+        <ConfirmSheet title="Uninstall Judie?" body={uninstallWarning("desktop")} onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
       )}
       {confirm?.kind === "uninstall2" && (
         <ConfirmSheet title={confirm.prompt} body="Follow normal order of operations." onAccept={() => void accept()} onDismiss={() => setConfirm(null)}>
@@ -459,7 +510,7 @@ export function SettingsOverlay() {
           onDismiss={() => setConfirm(null)}
         />
       )}
-      {busy && <p className="settings-note os-busy">Working…</p>}
+      {busy && <p className="settings-note os-busy">{powerStatus || "Working…"}</p>}
     </div>
   );
 }

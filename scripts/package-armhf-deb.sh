@@ -124,9 +124,11 @@ chmod 755 "$STAGING/DEBIAN/postinst"
 cat >"$STAGING/DEBIAN/prerm" <<'EOF'
 #!/bin/sh
 set -e
+# Do not stop judie.service here. disable --now blanks tty1 (cursor on black)
+# while uninstall is still running. The UI reboots after it verifies removal.
 if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
   if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-    systemctl disable --now judie.service >/dev/null 2>&1 || true
+    systemctl disable judie.service >/dev/null 2>&1 || true
   fi
 fi
 EOF
@@ -139,7 +141,9 @@ if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
   rm -rf /etc/systemd/system/judie.service.d
   if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
-    systemctl start getty@tty1.service >/dev/null 2>&1 || true
+    # Do not start getty@tty1 here. judie.service Conflicts=getty@tty1, so
+    # starting getty would stop the still-running kiosk and blank the screen.
+    # After reboot, getty@tty1 starts as usual.
   fi
 fi
 EOF
