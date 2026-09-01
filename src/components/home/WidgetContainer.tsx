@@ -11,7 +11,6 @@ import { useLayoutStore } from "../../store/layoutStore";
 import { WidgetFace } from "../widgets/WidgetFace";
 
 const EXPANDABLE = new Set<string>(["weather", "lights", "media", "purifier", "calendar"]);
-const PULL = 0.46;
 const SETTLE_MS = 280;
 
 function lerp(a: number, b: number, t: number) {
@@ -143,27 +142,13 @@ export function WidgetContainer({
       return;
     }
 
-    if (!centeredRef.current) {
-      if (Math.hypot(dx, dy) < 8) {
-        visualRef.current = { x: dx, y: dy };
-        setDragDelta({ x: dx, y: dy });
-        return;
-      }
-      centeredRef.current = true;
-    }
+    if (Math.hypot(dx, dy) > 8) centeredRef.current = true;
 
-    const finger = {
-      x: e.clientX - originCenter.current.x,
-      y: e.clientY - originCenter.current.y,
-    };
+    const visual = { x: dx, y: dy };
     const snap = snapFromPoint(e.clientX, e.clientY);
     const ok =
       snap && canPlaceWidget(useLayoutStore.getState().widgets, widget.id, snap.col, snap.row);
-    snapRef.current = ok ? snap : null;
-    const magnet = snapDeltaFor(ok ? snap : null);
-    const visual = ok
-      ? { x: lerp(finger.x, magnet.x, PULL), y: lerp(finger.y, magnet.y, PULL) }
-      : finger;
+    if (ok) snapRef.current = snap;
     visualRef.current = visual;
     setDragDelta(visual);
   };

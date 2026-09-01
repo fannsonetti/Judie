@@ -1,18 +1,55 @@
 #!/bin/sh
-# Passwordless helper: wifi status | scan | connect <ssid> [psk] | disconnect
+# Passwordless helper:
+#   status | scan | connect <ssid> [psk] [auto]
+#   disconnect | link | preferred [ethernet|wifi]
+#   dhcp [on|off] | reconnect | saved | autoconnect <ssid> <on|off>
 set -e
 export LC_ALL=C
 CMD="${1:-}"
 
-iface() {
+wifi_iface() {
   iw dev 2>/dev/null | awk '/Interface/{print $2; exit}'
 }
 
-IFACE="$(iface)"
+eth_iface() {
+  ip -o link show 2>/dev/null | awk -F': ' '
+    $2 ~ /^(eth|enp|ens|eno|end)/ { print $2; exit }
+  '
+}
+
+IFACE="$(wifi_iface)"
 [ -n "$IFACE" ] || IFACE=wlan0
+ETH="$(eth_iface)"
+[ -n "$ETH" ] || ETH=eth0
 
 safe_ssid() {
   printf '%s' "$1" | tr -d '\n\r\t' | cut -c1-32
+}
+
+bars_from_signal() {
+  s="${1:-0}"
+  if [ "$s" -ge 80 ] 2>/dev/null; then echo 4
+  elif [ "$s" -ge 55 ] 2>/dev/null; then echo 3
+  elif [ "$s" -ge 30 ] 2>/dev/null; then echo 2
+  elif [ "$s" -ge 1 ] 2>/dev/null; then echo 1
+  else echo 0
+  fi
+}
+
+eth_up() {
+  STATE="$(cat "/sys/class/net/$ETH/operstate" 2>/dev/null || echo down)"
+  CARRIER="$(cat "/sys/class/net/$ETH/carrier" 2>/dev/null || echo 0)"
+  [ "$STATE" = "up" ] && [ "$CARRIER" = "1" ]
+}
+
+eth_ip() {
+  ip -4 -o addr show "$ETH" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1
+}
+
+wifi_signal() {
+  if command -v nmcli >/dev/null 2>&1; then
+    nmcli -t -f IN-USE,SIGNAL dev wifi 2>/dev/null | awk -F: '$1=="*"{print $2; exit}'
+  fi
 }
 
 status() {
@@ -32,6 +69,145 @@ status() {
   [ -n "$SSID" ] || SSID="—"
   [ -n "$IP" ] || IP="—"
   printf '%s\t%s\t%s\n' "$SSID" "$IP" "$STATE"
+}
+
+# kind \t ssid \t bars \t state \t ip \t secured
+link() {
+  KIND="none"
+  SSID=""
+  BARS=0
+  STATE="down"
+  IP="—"
+  SECURED="0"
+
+  if eth_up; then
+    KIND="ethernet"
+    STATE="up"
+    IP="$(eth_ip)"
+    [ -n "$IP" ] || IP="—"
+    SSID="$ETH"
+  else
+    STATE="$(cat "/sys/class/net/$IFACE/operstate" 2>/dev/null || echo down)"
+    if command -v nmcli >/dev/null 2>&1; then
+      SSID="$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')"
+      IP="$(nmcli -t -f IP4.ADDRESS device show "$IFACE" 2>/dev/null | head -1 | cut -d: -f2 | cut -d/ -f1)"
+      SIG="$(wifi_signal)"
+      BARS="$(bars_from_signal "${SIG:-0}")"
+    fi
+    if [ -z "$SSID" ]; then
+      SSID="$(iw dev "$IFACE" link 2>/dev/null | awk -F': ' '/SSID/{print $2; exit}')"
+    fi
+    if [ -z "$IP" ]; then
+      IP="$(ip -4 -o addr show "$IFACE" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1)"
+    fi
+    if [ -n "$SSID" ] && [ "$SSID" != "—" ]; then
+      KIND="wifi"
+      STATE="up"
+      SECURED="1"
+    elif [ "$STATE" = "up" ]; then
+      KIND="wifi"
+    else
+      KIND="wifi"
+      STATE="down"
+      BARS=0
+    fi
+    [ -n "$SSID" ] || SSID="—"
+    [ -n "$IP" ] || IP="—"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$KIND" "$SSID" "$BARS" "$STATE" "$IP" "$SECURED"
+}
+
+preferred_get() {
+  FILE="/var/lib/judie/preferred-net"
+  if [ -f "$FILE" ]; then
+    cat "$FILE"
+  else
+    echo wifi
+  fi
+}
+
+preferred_set() {
+  WANT="${2:-wifi}"
+  case "$WANT" in
+    ethernet|wifi) ;;
+    *) echo "preferred ethernet|wifi" >&2; exit 1 ;;
+  esac
+  mkdir -p /var/lib/judie
+  printf '%s\n' "$WANT" > /var/lib/judie/preferred-net
+  if command -v nmcli >/dev/null 2>&1; then
+    if [ "$WANT" = "ethernet" ]; then
+      nmcli device connect "$ETH" >/dev/null 2>&1 || true
+      nmcli device disconnect "$IFACE" >/dev/null 2>&1 || true
+    else
+      nmcli device connect "$IFACE" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+dhcp_get() {
+  DEV="$IFACE"
+  if eth_up; then DEV="$ETH"; fi
+  if command -v nmcli >/dev/null 2>&1; then
+    METHOD="$(nmcli -t -f IP4.METHOD device show "$DEV" 2>/dev/null | head -1 | cut -d: -f2)"
+    [ "$METHOD" = "auto" ] && echo on || echo off
+  else
+    echo on
+  fi
+}
+
+dhcp_set() {
+  WANT="${2:-on}"
+  DEV="$IFACE"
+  CON=""
+  if eth_up; then DEV="$ETH"; fi
+  if command -v nmcli >/dev/null 2>&1; then
+    CON="$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | awk -F: -v d="$DEV" '$2==d{print $1; exit}')"
+    [ -n "$CON" ] || CON="$(nmcli -t -f NAME,DEVICE connection show 2>/dev/null | awk -F: -v d="$DEV" '$2==d{print $1; exit}')"
+    [ -n "$CON" ] || exit 0
+    if [ "$WANT" = "off" ]; then
+      nmcli connection modify "$CON" ipv4.method manual >/dev/null 2>&1 || true
+    else
+      nmcli connection modify "$CON" ipv4.method auto ipv4.addresses "" ipv4.gateway "" >/dev/null 2>&1 || true
+    fi
+    nmcli connection up "$CON" >/dev/null 2>&1 || true
+  fi
+}
+
+reconnect() {
+  DEV="$IFACE"
+  if eth_up; then DEV="$ETH"; fi
+  if command -v nmcli >/dev/null 2>&1; then
+    CON="$(nmcli -t -f NAME,DEVICE connection show --active 2>/dev/null | awk -F: -v d="$DEV" '$2==d{print $1; exit}')"
+    if [ -n "$CON" ]; then
+      nmcli connection down "$CON" >/dev/null 2>&1 || true
+      nmcli connection up "$CON"
+      return 0
+    fi
+    nmcli device disconnect "$DEV" >/dev/null 2>&1 || true
+    nmcli device connect "$DEV"
+    return 0
+  fi
+  ip link set "$DEV" down >/dev/null 2>&1 || true
+  ip link set "$DEV" up >/dev/null 2>&1 || true
+}
+
+saved() {
+  if command -v nmcli >/dev/null 2>&1; then
+    nmcli -t -f NAME,TYPE,AUTOCONNECT connection show 2>/dev/null | awk -F: '
+      $2 ~ /wireless|wifi/ { printf "%s\t%s\n", $1, ($3=="yes"?"auto":"manual") }
+    '
+  fi
+}
+
+autoconnect() {
+  SSID="$(safe_ssid "${2:-}")"
+  WANT="${3:-on}"
+  [ -n "$SSID" ] || { echo "missing ssid" >&2; exit 1; }
+  if command -v nmcli >/dev/null 2>&1; then
+    FLAG=yes
+    [ "$WANT" = "off" ] && FLAG=no
+    nmcli connection modify "$SSID" connection.autoconnect "$FLAG" >/dev/null 2>&1 || true
+  fi
 }
 
 scan() {
@@ -67,14 +243,27 @@ scan() {
 connect() {
   SSID="$(safe_ssid "${2:-}")"
   PSK="${3:-}"
+  AUTO="${4:-}"
   [ -n "$SSID" ] || { echo "missing ssid" >&2; exit 1; }
   rfkill unblock wifi >/dev/null 2>&1 || true
   ip link set "$IFACE" up >/dev/null 2>&1 || true
   if command -v nmcli >/dev/null 2>&1; then
-    if [ -n "$PSK" ]; then
-      nmcli device wifi connect "$SSID" password "$PSK"
+    if nmcli -t -f NAME,TYPE connection show 2>/dev/null | awk -F: -v s="$SSID" '$1==s && $2 ~ /wireless|wifi/{found=1} END{exit !found}'; then
+      if [ -n "$PSK" ]; then
+        nmcli connection modify "$SSID" wifi-sec.psk "$PSK" >/dev/null 2>&1 || true
+      fi
+      nmcli connection up "$SSID"
     else
-      nmcli device wifi connect "$SSID"
+      if [ -n "$PSK" ]; then
+        nmcli device wifi connect "$SSID" password "$PSK"
+      else
+        nmcli device wifi connect "$SSID"
+      fi
+    fi
+    if [ "$AUTO" = "auto" ] || [ "$AUTO" = "on" ]; then
+      nmcli connection modify "$SSID" connection.autoconnect yes >/dev/null 2>&1 || true
+    elif [ "$AUTO" = "off" ]; then
+      nmcli connection modify "$SSID" connection.autoconnect no >/dev/null 2>&1 || true
     fi
     return 0
   fi
@@ -108,5 +297,15 @@ case "$CMD" in
   scan) scan ;;
   connect) connect "$@" ;;
   disconnect) disconnect ;;
-  *) echo "usage: wifi status|scan|connect|disconnect" >&2; exit 1 ;;
+  link) link ;;
+  preferred)
+    if [ -n "${2:-}" ]; then preferred_set "$@"; else preferred_get; fi
+    ;;
+  dhcp)
+    if [ -n "${2:-}" ]; then dhcp_set "$@"; else dhcp_get; fi
+    ;;
+  reconnect) reconnect ;;
+  saved) saved ;;
+  autoconnect) autoconnect "$@" ;;
+  *) echo "usage: wifi status|scan|connect|disconnect|link|preferred|dhcp|reconnect|saved|autoconnect" >&2; exit 1 ;;
 esac

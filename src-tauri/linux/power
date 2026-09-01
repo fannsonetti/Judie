@@ -1,5 +1,5 @@
 #!/bin/sh
-# Passwordless helper: power reboot | poweroff
+# Passwordless helper: power reboot | poweroff | uninstall
 set -e
 case "${1:-}" in
   reboot)
@@ -8,8 +8,17 @@ case "${1:-}" in
   poweroff)
     /sbin/poweroff
     ;;
+  uninstall)
+    if command -v apt-get >/dev/null 2>&1; then
+      DEBIAN_FRONTEND=noninteractive apt-get remove -y judie || true
+    fi
+    systemctl stop judie >/dev/null 2>&1 || true
+    systemctl disable judie >/dev/null 2>&1 || true
+    rm -f /usr/bin/judie /usr/lib/judie/judie-pi 2>/dev/null || true
+    /sbin/reboot
+    ;;
   *)
-    echo "usage: power reboot|poweroff" >&2
+    echo "usage: power reboot|poweroff|uninstall" >&2
     exit 1
     ;;
 esac

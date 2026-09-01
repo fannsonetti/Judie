@@ -13,8 +13,9 @@ mod releases;
 slint::include_modules!();
 
 use pi_room::{Expanded, Overlay};
-use slint::{ModelRc, SharedString, TimerMode, VecModel};
-use std::time::Duration;
+use slint::{Model, ModelRc, SharedString, TimerMode, VecModel};
+use std::sync::Mutex;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Bare Xorg has no WM, so `set_fullscreen` (EWMH) is a no-op. Size the window
 /// to the framebuffer so Judie fills HDMI without matchbox/openbox.
@@ -73,6 +74,54 @@ fn ensure_display() {
          Manual start:    startx /usr/bin/judie -- :0 vt1 -nolisten tcp -nocursor"
     );
     std::process::exit(1);
+}
+
+struct Pending {
+    math: i32,
+    tag: String,
+}
+
+static PENDING: Mutex<Pending> = Mutex::new(Pending {
+    math: 0,
+    tag: String::new(),
+});
+
+fn mix_rand() -> u32 {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static S: AtomicU32 = AtomicU32::new(0x9e3779b9);
+    let t = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(1);
+    S.fetch_add(0x6d2b79f5, Ordering::Relaxed).wrapping_add(t)
+}
+
+fn math_challenge() -> (String, i32) {
+    let x = (mix_rand() % 9 + 1) as i32;
+    let y = (mix_rand() % 9 + 1) as i32;
+    let z = (mix_rand() % 9 + 1) as i32;
+    (format!("{x} + {y} × {z}"), x + y * z)
+}
+
+fn verify_challenge() -> String {
+    const LOWER: &[u8] = b"abcdefghijkmnpqrstuvwxyz";
+    const UPPER: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const DIGITS: &[u8] = b"23456789";
+    const SPEC: &[u8] = b"!@#$%&*?+=-_";
+    let mut out = Vec::with_capacity(9);
+    out.push(LOWER[(mix_rand() as usize) % LOWER.len()]);
+    out.push(UPPER[(mix_rand() as usize) % UPPER.len()]);
+    out.push(DIGITS[(mix_rand() as usize) % DIGITS.len()]);
+    out.push(SPEC[(mix_rand() as usize) % SPEC.len()]);
+    let all = [LOWER, UPPER, DIGITS, SPEC].concat();
+    for _ in 0..5 {
+        out.push(all[(mix_rand() as usize) % all.len()]);
+    }
+    for i in 0..out.len() {
+        let j = (mix_rand() as usize) % out.len();
+        out.swap(i, j);
+    }
+    String::from_utf8(out).unwrap_or_else(|_| "aK7@q2P!x".into())
 }
 
 fn overlay_name(o: Overlay) -> (bool, bool, bool, bool) {
@@ -172,7 +221,9 @@ fn push_ui(ui: &MainWindow) {
         ui.set_voice_enabled(room.voice);
         ui.set_speak_replies(room.speak);
         ui.set_units_metric(room.units_metric);
-        ui.set_settings_tab(room.settings_tab);
+        ui.set_temp_unit(room.temp_unit.clone().into());
+        ui.set_distance_unit(room.distance_unit.clone().into());
+        ui.set_settings_tab(room.settings_tab.clamp(0, 2));
         ui.set_palette_query(room.palette_query.clone().into());
         ui.set_palette_reply(room.palette_reply.clone().into());
         ui.set_edit_mode(room.edit_mode);
@@ -411,6 +462,8 @@ fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
             ui.set_palette_query(text.into());
         }
         "wifi-pass" => ui.set_wifi_pass(text.into()),
+        "math" => ui.set_math_typed(text.into()),
+        "verify" => ui.set_verify_typed(text.into()),
         _ => {}
     }
 }
@@ -424,15 +477,25 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
         "assistant-url" => ui.get_assistant_url().to_string(),
         "palette" => ui.get_palette_query().to_string(),
         "wifi-pass" => ui.get_wifi_pass().to_string(),
+        "math" => ui.get_math_typed().to_string(),
+        "verify" => ui.get_verify_typed().to_string(),
         _ => String::new(),
     }
 }
 
+fn load_link(ui: &MainWindow) {
+    let link = pi_ctl::link_status();
+    ui.set_net_kind(link.kind.clone().into());
+    ui.set_net_bars(link.bars);
+    ui.set_wifi_ssid(link.ssid.into());
+    ui.set_wifi_ip(link.ip.into());
+    ui.set_wifi_state(link.state.into());
+    ui.set_dhcp_on(pi_ctl::dhcp_enabled());
+    ui.set_preferred_net(pi_ctl::preferred_iface().into());
+}
+
 fn load_wifi_status(ui: &MainWindow) {
-    let st = pi_ctl::wifi_status();
-    ui.set_wifi_ssid(st.ssid.into());
-    ui.set_wifi_ip(st.ip.into());
-    ui.set_wifi_state(st.state.into());
+    load_link(ui);
 }
 
 fn load_releases(ui: &MainWindow) {
@@ -573,22 +636,32 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_set_tab(move |t| {
-        pi_room::with(|room| room.settings_tab = t);
+        pi_room::with(|room| room.settings_tab = t.clamp(0, 2));
         r();
     });
     let r = refresh.clone();
     ui.on_toggle_voice(move || {
-        pi_room::with(|room| room.voice = !room.voice);
+        pi_room::with(|room| {
+            room.voice = !room.voice;
+            room.save();
+        });
         r();
     });
     let r = refresh.clone();
     ui.on_toggle_speak(move || {
-        pi_room::with(|room| room.speak = !room.speak);
+        pi_room::with(|room| {
+            room.speak = !room.speak;
+            room.save();
+        });
         r();
     });
     let r = refresh.clone();
     ui.on_toggle_units(move || {
-        pi_room::with(|room| room.units_metric = !room.units_metric);
+        pi_room::with(|room| {
+            room.units_metric = !room.units_metric;
+            room.temp_unit = if room.units_metric { "c".into() } else { "f".into() };
+            room.save();
+        });
         r();
     });
     let r = refresh.clone();
@@ -829,16 +902,28 @@ fn bind(ui: &MainWindow) {
         r();
     });
     ui.on_set_room_name(move |t| {
-        pi_room::with(|room| room.room_name = t.to_string());
+        pi_room::with(|room| {
+            room.room_name = t.to_string();
+            room.save();
+        });
     });
     ui.on_set_location(move |t| {
-        pi_room::with(|room| room.weather_loc = t.to_string());
+        pi_room::with(|room| {
+            room.weather_loc = t.to_string();
+            room.save();
+        });
     });
     ui.on_set_latitude(move |t| {
-        pi_room::with(|room| room.latitude = t.to_string());
+        pi_room::with(|room| {
+            room.latitude = t.to_string();
+            room.save();
+        });
     });
     ui.on_set_longitude(move |t| {
-        pi_room::with(|room| room.longitude = t.to_string());
+        pi_room::with(|room| {
+            room.longitude = t.to_string();
+            room.save();
+        });
     });
     ui.on_set_assistant_url(move |t| {
         pi_room::with(|room| room.assistant_url = t.to_string());
@@ -908,7 +993,10 @@ fn bind(ui: &MainWindow) {
                             .map(|n| WifiNet {
                                 ssid: n.ssid.into(),
                                 signal: n.signal.to_string().into(),
+                                bars: n.bars,
                                 secured: n.secured,
+                                saved: n.saved,
+                                connected: n.connected,
                             })
                             .collect();
                         ui.set_wifi_status(format!("{} networks", model.len()).into());
@@ -922,20 +1010,48 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_pick_wifi(move |ssid| {
         if let Some(ui) = weak.upgrade() {
-            ui.set_wifi_pick(ssid);
-            ui.set_wifi_status("Network selected. Type the password if needed, then CONNECT.".into());
+            ui.set_wifi_pick(ssid.clone());
+            ui.set_wifi_detail(ssid.clone());
+            ui.set_wifi_auto(pi_ctl::wants_autoconnect(ssid.as_str()));
+            if let Some(pass) = pi_ctl::remembered_password(ssid.as_str()) {
+                ui.set_wifi_pass(pass.into());
+            }
+            ui.set_wifi_status("Available network".into());
         }
     });
     let weak = ui.as_weak();
     ui.on_connect_wifi(move || {
         let Some(ui) = weak.upgrade() else { return };
         let ssid = ui.get_wifi_pick().to_string();
-        let pass = ui.get_wifi_pass().to_string();
+        if ssid.is_empty() {
+            return;
+        }
+        let mut pass = ui.get_wifi_pass().to_string();
+        if pass.is_empty() {
+            pass = pi_ctl::remembered_password(&ssid).unwrap_or_default();
+        }
+        let secured = {
+            let model = ui.get_wifi_nets();
+            (0..model.row_count()).any(|i| {
+                model
+                    .row_data(i)
+                    .map(|n| n.ssid.as_str() == ssid && n.secured)
+                    .unwrap_or(false)
+            })
+        };
+        if secured && pass.is_empty() {
+            let seed = kb_seed(&ui, "wifi-pass");
+            ui.set_kb_field("wifi-pass".into());
+            ui.set_kb_text(seed.into());
+            ui.set_kb_open(true);
+            return;
+        }
+        let auto = ui.get_wifi_auto();
         ui.set_wifi_busy(true);
         ui.set_wifi_status(format!("Connecting to {ssid}…").into());
         let weak = ui.as_weak();
         std::thread::spawn(move || {
-            let result = pi_ctl::wifi_connect(&ssid, &pass);
+            let result = pi_ctl::wifi_connect(&ssid, &pass, auto);
             let _ = slint::invoke_from_event_loop(move || {
                 let Some(ui) = weak.upgrade() else { return };
                 ui.set_wifi_busy(false);
@@ -983,12 +1099,7 @@ fn bind(ui: &MainWindow) {
     ui.on_keyboard_key(move |ch| {
         let Some(ui) = weak.upgrade() else { return };
         let mut text = ui.get_kb_text().to_string();
-        let mut key = ch.to_string();
-        if key.len() == 1 && key.chars().all(|c| c.is_ascii_alphabetic()) && ui.get_kb_shift() {
-            key = key.to_uppercase();
-            ui.set_kb_shift(false);
-        }
-        text.push_str(&key);
+        text.push_str(ch.as_str());
         ui.set_kb_text(text.clone().into());
         apply_kb_field(&ui, ui.get_kb_field().as_str(), &text);
     });
@@ -1004,7 +1115,11 @@ fn bind(ui: &MainWindow) {
     ui.on_keyboard_submit(move || {
         let Some(ui) = weak.upgrade() else { return };
         apply_kb_field(&ui, ui.get_kb_field().as_str(), ui.get_kb_text().as_str());
+        let field = ui.get_kb_field().to_string();
         ui.set_kb_open(false);
+        if field == "wifi-pass" {
+            ui.invoke_connect_wifi();
+        }
     });
     let weak = ui.as_weak();
     ui.on_keyboard_close(move || {
@@ -1022,6 +1137,233 @@ fn bind(ui: &MainWindow) {
     ui.on_kb_toggle_symbols(move || {
         if let Some(ui) = weak.upgrade() {
             ui.set_kb_symbols(!ui.get_kb_symbols());
+        }
+    });
+
+    let r = refresh.clone();
+    ui.on_drag_drop(move |id, col, row| {
+        pi_room::with(|room| room.place_slot(id.as_str(), col, row));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_gallery_set_index(move |i| {
+        let size = match i {
+            1 => "1x2",
+            2 => "2x2",
+            _ => "1x1",
+        };
+        pi_room::with(|room| room.gallery_size = size.into());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_temp_unit(move |u| {
+        pi_room::with(|room| {
+            room.temp_unit = u.to_string();
+            room.units_metric = u != "f";
+            room.save();
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_distance_unit(move |u| {
+        pi_room::with(|room| {
+            room.distance_unit = u.to_string();
+            room.save();
+        });
+        r();
+    });
+    let weak = ui.as_weak();
+    ui.on_set_preferred_net(move |kind| {
+        let kind = kind.to_string();
+        let _ = pi_ctl::set_preferred_iface(&kind);
+        if let Some(ui) = weak.upgrade() {
+            ui.set_preferred_net(kind.into());
+            load_link(&ui);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_toggle_dhcp(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let next = !ui.get_dhcp_on();
+        let _ = pi_ctl::set_dhcp(next);
+        ui.set_dhcp_on(next);
+        load_link(&ui);
+    });
+    let weak = ui.as_weak();
+    ui.on_reconnect_net(move || {
+        let weak = weak.clone();
+        std::thread::spawn(move || {
+            let result = pi_ctl::reconnect();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak.upgrade() {
+                    load_link(&ui);
+                    ui.set_wifi_status(match result {
+                        Ok(()) => "Reconnected.".into(),
+                        Err(err) => err.into(),
+                    });
+                }
+            });
+        });
+    });
+    let weak = ui.as_weak();
+    ui.on_open_net_menu(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        ui.set_net_menu_open(true);
+        ui.set_wifi_detail("".into());
+        load_link(&ui);
+        ui.invoke_scan_wifi();
+    });
+    let weak = ui.as_weak();
+    ui.on_close_net_menu(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_net_menu_open(false);
+            ui.set_wifi_detail("".into());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_toggle_wifi_auto(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_wifi_auto(!ui.get_wifi_auto());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_begin_confirm(move |kind| {
+        let Some(ui) = weak.upgrade() else { return };
+        match kind.as_str() {
+            "restart" => {
+                ui.set_confirm_title("Restart?".into());
+                ui.set_confirm_body("The panel will reboot.".into());
+                ui.set_confirm_kind("restart".into());
+            }
+            "shutdown" => {
+                ui.set_confirm_title("Shut down?".into());
+                ui.set_confirm_body("The panel will power off.".into());
+                ui.set_confirm_kind("shutdown".into());
+            }
+            "uninstall1" => {
+                ui.set_confirm_title("Are you sure?".into());
+                ui.set_confirm_body("This removes Judie from this computer.".into());
+                ui.set_confirm_kind("uninstall1".into());
+            }
+            _ => ui.set_confirm_kind(kind),
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_cancel_confirm(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_confirm_kind("".into());
+            ui.set_math_typed("".into());
+            ui.set_verify_typed("".into());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_accept_confirm(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        match ui.get_confirm_kind().as_str() {
+            "restart" => {
+                ui.set_confirm_kind("".into());
+                let _ = pi_ctl::power("reboot");
+            }
+            "shutdown" => {
+                ui.set_confirm_kind("".into());
+                let _ = pi_ctl::power("poweroff");
+            }
+            "uninstall1" => {
+                let (prompt, answer) = math_challenge();
+                if let Ok(mut p) = PENDING.lock() {
+                    p.math = answer;
+                }
+                ui.set_math_prompt(prompt.into());
+                ui.set_math_typed("".into());
+                ui.set_confirm_kind("uninstall2".into());
+            }
+            "uninstall2" => {
+                let typed = ui.get_math_typed().to_string().replace(' ', "");
+                let ok = PENDING.lock().ok().is_some_and(|p| typed.parse::<i32>().ok() == Some(p.math));
+                if !ok {
+                    return;
+                }
+                let code = verify_challenge();
+                ui.set_verify_code(code.into());
+                ui.set_verify_typed("".into());
+                ui.set_confirm_kind("uninstall3".into());
+            }
+            "uninstall3" => {
+                if ui.get_verify_typed() != ui.get_verify_code() {
+                    return;
+                }
+                ui.set_confirm_kind("".into());
+                ui.invoke_uninstall_now();
+            }
+            "upgrade" | "downgrade2" => {
+                let tag = PENDING.lock().ok().map(|p| p.tag.clone()).unwrap_or_default();
+                ui.set_confirm_kind("".into());
+                ui.set_version_menu_open(false);
+                if !tag.is_empty() {
+                    ui.invoke_install_tag(tag.into());
+                }
+            }
+            "downgrade1" => {
+                ui.set_confirm_title("Are you REALLY sure? Downgrading may delete some of your data.".into());
+                ui.set_confirm_body("Older software may remove or invalidate settings and data on this panel.".into());
+                ui.set_confirm_kind("downgrade2".into());
+            }
+            _ => ui.set_confirm_kind("".into()),
+        }
+    });
+    ui.on_uninstall_now(move || {
+        let _ = pi_ctl::power("uninstall");
+    });
+    let weak = ui.as_weak();
+    ui.on_pick_version(move |tag| {
+        let Some(ui) = weak.upgrade() else { return };
+        let tag = tag.to_string();
+        let current = ui.get_version_text().to_string();
+        if tag.trim_start_matches('v') == current.trim_start_matches('v') {
+            ui.set_version_menu_open(false);
+            return;
+        }
+        if let Ok(mut p) = PENDING.lock() {
+            p.tag = tag.clone();
+        }
+        ui.set_selected_release(tag.clone().into());
+        ui.set_version_menu_open(false);
+        if releases::is_newer(&tag, &current) {
+            ui.set_confirm_title("Install this version?".into());
+            ui.set_confirm_body(format!("Judie will close and reopen on {tag}.").into());
+            ui.set_confirm_kind("upgrade".into());
+        } else {
+            ui.set_confirm_title("Are you sure you want to downgrade?".into());
+            ui.set_confirm_body(format!("You are about to install older software ({tag}).").into());
+            ui.set_confirm_kind("downgrade1".into());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_keyboard_command(move |cmd| {
+        let Some(ui) = weak.upgrade() else { return };
+        match cmd.as_str() {
+            "back" | "delete" => ui.invoke_keyboard_back(),
+            "word-back" => {
+                let mut text = ui.get_kb_text().to_string();
+                let trimmed = text.trim_end();
+                let cut = trimmed.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
+                text.truncate(cut);
+                ui.set_kb_text(text.clone().into());
+                apply_kb_field(&ui, ui.get_kb_field().as_str(), &text);
+            }
+            "enter" => ui.invoke_keyboard_submit(),
+            "esc" => ui.invoke_keyboard_close(),
+            "tab" => {
+                let mut text = ui.get_kb_text().to_string();
+                text.push('\t');
+                ui.set_kb_text(text.clone().into());
+                apply_kb_field(&ui, ui.get_kb_field().as_str(), &text);
+            }
+            "clear" => {
+                ui.set_kb_text("".into());
+                apply_kb_field(&ui, ui.get_kb_field().as_str(), "");
+            }
+            _ => {}
         }
     });
 }
@@ -1060,6 +1402,7 @@ fn main() {
     apply_kiosk_geometry(&ui);
     bind(&ui);
     push_ui(&ui);
+    load_link(&ui);
     poll_latest(ui.as_weak());
 
     let weak = ui.as_weak();
@@ -1067,6 +1410,13 @@ fn main() {
         if let Some(ui) = weak.upgrade() {
             pi_room::with(|room| room.tick_media());
             push_ui(&ui);
+        }
+    });
+
+    let weak = ui.as_weak();
+    slint::Timer::default().start(TimerMode::Repeated, Duration::from_secs(5), move || {
+        if let Some(ui) = weak.upgrade() {
+            load_link(&ui);
         }
     });
 

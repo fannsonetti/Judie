@@ -1,9 +1,12 @@
 //! Kiosk helpers: Wi-Fi, power, GitHub version list for the Pi panel.
 
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 #[derive(Clone, Default)]
+#[allow(dead_code)]
 pub struct WifiStatus {
     pub ssid: String,
     pub ip: String,
@@ -14,7 +17,19 @@ pub struct WifiStatus {
 pub struct WifiNet {
     pub ssid: String,
     pub signal: i32,
+    pub bars: i32,
     pub secured: bool,
+    pub saved: bool,
+    pub connected: bool,
+}
+
+#[derive(Clone, Default)]
+pub struct LinkStatus {
+    pub kind: String,
+    pub ssid: String,
+    pub bars: i32,
+    pub state: String,
+    pub ip: String,
 }
 
 #[derive(Clone)]
@@ -23,6 +38,14 @@ pub struct VersionRow {
     pub name: String,
     pub current: bool,
     pub installable: bool,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, Default)]
+struct WifiMemory {
+    #[serde(default)]
+    passwords: BTreeMap<String, String>,
+    #[serde(default)]
+    autoconnect: BTreeMap<String, bool>,
 }
 
 fn sudo(bin: &str, args: &[&str]) -> Result<String, String> {
@@ -44,6 +67,41 @@ fn sudo(bin: &str, args: &[&str]) -> Result<String, String> {
         });
     }
     Ok(stdout)
+}
+
+fn memory_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/home/fannsonetti".into());
+    PathBuf::from(home).join(".local/share/judie/wifi.json")
+}
+
+fn load_memory() -> WifiMemory {
+    fs::read_to_string(memory_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+fn save_memory(mem: &WifiMemory) {
+    if let Some(dir) = memory_path().parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    if let Ok(json) = serde_json::to_string_pretty(mem) {
+        let _ = fs::write(memory_path(), json);
+    }
+}
+
+fn bars_from_signal(signal: i32) -> i32 {
+    if signal >= 80 {
+        4
+    } else if signal >= 55 {
+        3
+    } else if signal >= 30 {
+        2
+    } else if signal >= 1 {
+        1
+    } else {
+        0
+    }
 }
 
 /// Global IPv4 addresses (ethernet + wifi), no sudo.
@@ -99,8 +157,74 @@ pub fn wifi_status() -> WifiStatus {
     }
 }
 
+pub fn link_status() -> LinkStatus {
+    match sudo("/usr/lib/judie/wifi", &["link"]) {
+        Ok(line) => {
+            let mut p = line.split('\t');
+            LinkStatus {
+                kind: p.next().unwrap_or("wifi").into(),
+                ssid: p.next().unwrap_or("—").into(),
+                bars: p.next().and_then(|s| s.parse().ok()).unwrap_or(0),
+                state: p.next().unwrap_or("down").into(),
+                ip: p.next().unwrap_or("—").into(),
+            }
+        }
+        Err(_) => LinkStatus {
+            kind: "wifi".into(),
+            ssid: "—".into(),
+            bars: 0,
+            state: "down".into(),
+            ip: "—".into(),
+        },
+    }
+}
+
+pub fn preferred_iface() -> String {
+    sudo("/usr/lib/judie/wifi", &["preferred"]).unwrap_or_else(|_| "wifi".into())
+}
+
+pub fn set_preferred_iface(kind: &str) -> Result<(), String> {
+    sudo("/usr/lib/judie/wifi", &["preferred", kind]).map(|_| ())
+}
+
+pub fn dhcp_enabled() -> bool {
+    sudo("/usr/lib/judie/wifi", &["dhcp"])
+        .map(|s| s.trim() == "on")
+        .unwrap_or(true)
+}
+
+pub fn set_dhcp(on: bool) -> Result<(), String> {
+    sudo("/usr/lib/judie/wifi", &["dhcp", if on { "on" } else { "off" }]).map(|_| ())
+}
+
+pub fn reconnect() -> Result<(), String> {
+    sudo("/usr/lib/judie/wifi", &["reconnect"]).map(|_| ())
+}
+
+fn saved_names() -> BTreeMap<String, bool> {
+    let mut map = BTreeMap::new();
+    if let Ok(out) = sudo("/usr/lib/judie/wifi", &["saved"]) {
+        for line in out.lines() {
+            let mut p = line.split('\t');
+            let name = p.next().unwrap_or("").trim();
+            if name.is_empty() {
+                continue;
+            }
+            let auto = p.next().unwrap_or("") == "auto";
+            map.insert(name.to_string(), auto);
+        }
+    }
+    let mem = load_memory();
+    for (ssid, auto) in mem.autoconnect {
+        map.entry(ssid).or_insert(auto);
+    }
+    map
+}
+
 pub fn wifi_scan() -> Result<Vec<WifiNet>, String> {
     let out = sudo("/usr/lib/judie/wifi", &["scan"])?;
+    let current = wifi_status().ssid;
+    let saved = saved_names();
     let mut by_ssid: BTreeMap<String, WifiNet> = BTreeMap::new();
     for line in out.lines() {
         let mut p = line.split('\t');
@@ -110,36 +234,83 @@ pub fn wifi_scan() -> Result<Vec<WifiNet>, String> {
         }
         let signal = p.next().and_then(|s| s.parse().ok()).unwrap_or(0);
         let secured = p.next().unwrap_or("open") != "open";
+        let bars = bars_from_signal(signal);
         by_ssid
             .entry(ssid.to_string())
             .and_modify(|n| {
                 if signal > n.signal {
                     n.signal = signal;
+                    n.bars = bars;
                     n.secured = secured;
                 }
             })
             .or_insert(WifiNet {
                 ssid: ssid.to_string(),
                 signal,
+                bars,
                 secured,
+                saved: saved.contains_key(ssid),
+                connected: ssid == current,
             });
     }
     let mut nets: Vec<WifiNet> = by_ssid.into_values().collect();
-    nets.sort_by(|a, b| b.signal.cmp(&a.signal));
-    nets.truncate(16);
+    nets.sort_by(|a, b| {
+        b.connected
+            .cmp(&a.connected)
+            .then(b.saved.cmp(&a.saved))
+            .then(b.signal.cmp(&a.signal))
+    });
+    nets.truncate(24);
     Ok(nets)
 }
 
-pub fn wifi_connect(ssid: &str, pass: &str) -> Result<(), String> {
+pub fn remembered_password(ssid: &str) -> Option<String> {
+    let mem = load_memory();
+    mem.passwords.get(ssid).cloned().filter(|s| !s.is_empty())
+}
+
+pub fn wants_autoconnect(ssid: &str) -> bool {
+    load_memory()
+        .autoconnect
+        .get(ssid)
+        .copied()
+        .unwrap_or(true)
+}
+
+pub fn wifi_connect(ssid: &str, pass: &str, auto: bool) -> Result<(), String> {
     let ssid = ssid.trim();
     if ssid.is_empty() {
         return Err("Pick a network first".into());
     }
-    if pass.is_empty() {
-        sudo("/usr/lib/judie/wifi", &["connect", ssid]).map(|_| ())
-    } else {
-        sudo("/usr/lib/judie/wifi", &["connect", ssid, pass]).map(|_| ())
+    let mut psk = pass.to_string();
+    if psk.is_empty() {
+        if let Some(saved) = remembered_password(ssid) {
+            psk = saved;
+        }
     }
+    let auto_flag = if auto { "auto" } else { "off" };
+    let result = if psk.is_empty() {
+        sudo("/usr/lib/judie/wifi", &["connect", ssid, "", auto_flag]).map(|_| ())
+    } else {
+        sudo(
+            "/usr/lib/judie/wifi",
+            &["connect", ssid, &psk, auto_flag],
+        )
+        .map(|_| ())
+    };
+    if result.is_ok() {
+        let mut mem = load_memory();
+        if !psk.is_empty() {
+            mem.passwords.insert(ssid.to_string(), psk);
+        }
+        mem.autoconnect.insert(ssid.to_string(), auto);
+        save_memory(&mem);
+        let _ = sudo(
+            "/usr/lib/judie/wifi",
+            &["autoconnect", ssid, if auto { "on" } else { "off" }],
+        );
+    }
+    result
 }
 
 pub fn wifi_disconnect() -> Result<(), String> {
@@ -148,7 +319,9 @@ pub fn wifi_disconnect() -> Result<(), String> {
 
 pub fn power(action: &str) -> Result<(), String> {
     match action {
-        "reboot" | "poweroff" => sudo("/usr/lib/judie/power", &[action]).map(|_| ()),
+        "reboot" | "poweroff" | "uninstall" => {
+            sudo("/usr/lib/judie/power", &[action]).map(|_| ())
+        }
         _ => Err("Unknown power action".into()),
     }
 }
@@ -156,7 +329,7 @@ pub fn power(action: &str) -> Result<(), String> {
 pub fn version_rows() -> Result<Vec<VersionRow>, String> {
     Ok(crate::releases::list_releases()?
         .into_iter()
-        .take(12)
+        .take(24)
         .map(|r| VersionRow {
             tag: r.tag,
             name: r.name,

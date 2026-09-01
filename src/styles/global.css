@@ -354,11 +354,11 @@ input:focus-visible {
   align-items: center;
   justify-content: center;
   border: none;
-  top: -7px;
-  right: -7px;
+  top: -15px;
+  right: -15px;
   left: auto;
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   background: linear-gradient(180deg, #d8d8d8 0%, #a8a8a8 100%);
   color: #2c2c2e;
@@ -1473,16 +1473,28 @@ input:focus-visible {
 .quick-btn {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 12px;
+  padding: 8px;
   border-radius: 16px;
   background: rgba(255,255,255,0.05);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  text-align: left;
+  text-align: center;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.quick-btn span:last-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.15;
+  width: 100%;
 }
 .quick-btn.on { background: var(--accent-soft); color: #fff; }
 .quick-glyph {

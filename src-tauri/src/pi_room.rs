@@ -114,6 +114,22 @@ struct Persist {
     slots: Vec<Slot>,
     #[serde(default)]
     custom: Vec<CustomWidget>,
+    #[serde(default)]
+    room_name: String,
+    #[serde(default)]
+    weather_loc: String,
+    #[serde(default)]
+    latitude: String,
+    #[serde(default)]
+    longitude: String,
+    #[serde(default)]
+    temp_unit: String,
+    #[serde(default)]
+    distance_unit: String,
+    #[serde(default)]
+    voice: Option<bool>,
+    #[serde(default)]
+    speak: Option<bool>,
 }
 
 pub const GRID_COLS: i32 = 6;
@@ -315,12 +331,20 @@ fn load_persist() -> Persist {
         .unwrap_or_default()
 }
 
-fn save_persist(slots: &[Slot], custom: &[CustomWidget]) {
+fn save_persist(room: &Room) {
     let dir = data_dir();
     let _ = std::fs::create_dir_all(&dir);
     let persist = Persist {
-        slots: slots.to_vec(),
-        custom: custom.to_vec(),
+        slots: room.slots.clone(),
+        custom: room.custom.clone(),
+        room_name: room.room_name.clone(),
+        weather_loc: room.weather_loc.clone(),
+        latitude: room.latitude.clone(),
+        longitude: room.longitude.clone(),
+        temp_unit: room.temp_unit.clone(),
+        distance_unit: room.distance_unit.clone(),
+        voice: Some(room.voice),
+        speak: Some(room.speak),
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
@@ -462,6 +486,8 @@ pub struct Room {
     pub voice: bool,
     pub speak: bool,
     pub units_metric: bool,
+    pub temp_unit: String,
+    pub distance_unit: String,
     pub notice_timers: bool,
     pub notice_calendar: bool,
     pub notice_weather: bool,
@@ -545,7 +571,7 @@ impl Default for Room {
             indoor: 21.4,
             outdoor: 9,
             humidity: 42,
-            weather_loc: "Hafnarfjörður".into(),
+            weather_loc: if persist.weather_loc.is_empty() { "Hafnarfjörður".into() } else { persist.weather_loc.clone() },
             weather_temp: 9,
             weather_cond: "Clear".into(),
             weather_high: 11,
@@ -571,13 +597,15 @@ impl Default for Room {
             purifier_mode: "Auto".into(),
             purifier_aq: "Good".into(),
             purifier_filter: 76,
-            room_name: "Room".into(),
+            room_name: if persist.room_name.is_empty() { "Room".into() } else { persist.room_name.clone() },
             assistant_url: "http://127.0.0.1:8742".into(),
-            latitude: "64.07".into(),
-            longitude: "-21.95".into(),
-            voice: true,
-            speak: true,
-            units_metric: true,
+            latitude: if persist.latitude.is_empty() { "64.07".into() } else { persist.latitude.clone() },
+            longitude: if persist.longitude.is_empty() { "-21.95".into() } else { persist.longitude.clone() },
+            voice: persist.voice.unwrap_or(true),
+            speak: persist.speak.unwrap_or(true),
+            units_metric: persist.temp_unit != "f" && persist.temp_unit != "k",
+            temp_unit: if persist.temp_unit.is_empty() { "c".into() } else { persist.temp_unit.clone() },
+            distance_unit: if persist.distance_unit.is_empty() { "km".into() } else { persist.distance_unit.clone() },
             notice_timers: true,
             notice_calendar: true,
             notice_weather: true,
@@ -622,7 +650,11 @@ impl Default for Room {
 
 impl Room {
     fn persist(&self) {
-        save_persist(&self.slots, &self.custom);
+        save_persist(self);
+    }
+
+    pub fn save(&self) {
+        self.persist();
     }
 
     pub fn used_page_count(&self) -> i32 {
@@ -1148,6 +1180,25 @@ impl Room {
             self.slots[idx].col = col;
             self.slots[idx].row = row;
             self.persist();
+            return;
+        }
+        let mut best = None;
+        let mut best_d = i32::MAX;
+        for r in 0..=GRID_ROWS - h {
+            for c in 0..=GRID_COLS - w {
+                if can_place(&self.slots, &size, page, c, r, Some(id)) {
+                    let d = (c - col).abs() + (r - row).abs();
+                    if d < best_d {
+                        best_d = d;
+                        best = Some((c, r));
+                    }
+                }
+            }
+        }
+        if let Some((c, r)) = best {
+            self.slots[idx].col = c;
+            self.slots[idx].row = r;
+            self.persist();
         }
     }
 
@@ -1157,6 +1208,15 @@ impl Room {
     }
 
     pub fn add_creator_kind(&mut self, kind: &str) {
+        let kind = match kind {
+            "label" => "text",
+            "value" => "metric",
+            "graph" => "chart",
+            "status" => "chip",
+            "image" => "box",
+            "control" => "toggle",
+            other => other,
+        };
         let id = format!("{kind}-{}", self.creator_nodes.len() + 1);
         self.creator_nodes.push(SlopNode {
             id: id.clone(),

@@ -97,22 +97,19 @@ export struct ReleaseRow {
 export struct WifiNet {
     ssid: string,
     signal: string,
+    bars: int,
     secured: bool,
+    saved: bool,
+    connected: bool,
 }
 
-// Dockyard tokens: black canvas, hairline panels, mono caps, data accents only.
 export global Dy {
     out property <color> canvas: #000000;
-    out property <color> border: #3d3d3d;
-    out property <color> border-hi: #6a6a6a;
-    out property <color> text: #e6e6e6;
-    out property <color> muted: #7a7a7a;
+    out property <color> border: #2a2a2a;
+    out property <color> border-hi: #5a5a5a;
+    out property <color> text: #ffffff;
+    out property <color> muted: #8a8a8a;
     out property <color> dim: #4a4a4a;
-    out property <color> cyan: #5ce1ff;
-    out property <color> green: #3dd68c;
-    out property <color> amber: #f0a030;
-    out property <color> red: #ff5c5c;
-    out property <color> purple: #b794f6;
     out property <string> mono: "DejaVu Sans Mono";
 }
 
@@ -142,16 +139,16 @@ export component Pill inherits Rectangle {
     in property <bool> on: false;
     callback clicked;
     border-radius: 0px;
-    border-width: 1px;
-    border-color: root.on ? Dy.cyan : Dy.border;
-    background: root.on ? #0a1a1e : Dy.canvas;
-    height: 100px;
-    min-width: 100px;
+    border-width: 1.5px;
+    border-color: root.on ? Dy.text : Dy.border;
+    background: Dy.canvas;
+    height: 44px;
+    min-width: 72px;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.label;
-        color: root.on ? Dy.cyan : Dy.text;
-        font-size: 16px;
+        color: root.on ? Dy.text : Dy.muted;
+        font-size: 13px;
         font-weight: 600;
         font-family: Dy.mono;
         horizontal-alignment: center;
@@ -163,26 +160,24 @@ export component Pill inherits Rectangle {
 export component Toggle inherits Rectangle {
     in-out property <bool> on;
     callback toggled;
-    width: 100px;
-    height: 100px;
+    width: 56px;
+    height: 28px;
     border-radius: 0px;
-    border-width: 1px;
-    border-color: root.on ? Dy.cyan : Dy.border;
-    background: root.on ? #0a1a1e : Dy.canvas;
+    border-width: 1.5px;
+    border-color: root.on ? Dy.text : Dy.border;
+    background: Dy.canvas;
     TouchArea {
         clicked => {
             root.on = !root.on;
             root.toggled();
         }
     }
-    Text {
-        text: root.on ? "ON" : "OFF";
-        color: root.on ? Dy.cyan : Dy.muted;
-        font-size: 18px;
-        font-weight: 700;
-        font-family: Dy.mono;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    Rectangle {
+        x: root.on ? parent.width - 22px : 4px;
+        y: 4px;
+        width: 18px;
+        height: 18px;
+        background: root.on ? Dy.text : Dy.muted;
     }
 }
 
@@ -194,7 +189,7 @@ export component Swatch inherits Rectangle {
     height: 16px;
     border-radius: 0px;
     background: root.swatch;
-    border-width: root.on ? 1px : 1px;
+    border-width: 2px;
     border-color: root.on ? Dy.text : Dy.border;
     TouchArea { clicked => { root.clicked(); } }
 }
@@ -203,17 +198,17 @@ export component IconBtn inherits Rectangle {
     in property <string> glyph;
     in property <bool> primary: false;
     callback clicked;
-    width: 100px;
-    height: 100px;
+    width: 48px;
+    height: 48px;
     border-radius: 0px;
-    border-width: 1px;
+    border-width: 1.5px;
     border-color: root.primary ? Dy.text : Dy.border;
     background: root.primary ? Dy.text : Dy.canvas;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.glyph;
         color: root.primary ? Dy.canvas : Dy.text;
-        font-size: 28px;
+        font-size: 18px;
         font-weight: 700;
         font-family: Dy.mono;
         horizontal-alignment: center;
@@ -227,28 +222,28 @@ export component HitBtn inherits Rectangle {
     in property <bool> danger: false;
     in property <bool> warn: false;
     callback clicked;
-    min-width: 100px;
-    min-height: 100px;
+    min-width: 140px;
+    min-height: 72px;
     border-radius: 0px;
-    border-width: 1px;
-    border-color: root.danger ? Dy.red : (root.warn ? Dy.amber : Dy.cyan);
+    border-width: 1.5px;
+    border-color: Dy.border-hi;
     background: Dy.canvas;
     TouchArea { clicked => { root.clicked(); } }
     VerticalLayout {
-        padding: 10px;
+        padding: 12px;
         spacing: 6px;
         alignment: center;
         if root.kicker != "": Text {
             text: root.kicker;
             color: Dy.muted;
-            font-size: 12px;
+            font-size: 11px;
             font-family: Dy.mono;
             horizontal-alignment: center;
         }
         Text {
             text: root.label;
-            color: root.danger ? Dy.red : (root.warn ? Dy.amber : Dy.cyan);
-            font-size: 18px;
+            color: Dy.text;
+            font-size: 16px;
             font-weight: 700;
             font-family: Dy.mono;
             horizontal-alignment: center;
@@ -261,20 +256,23 @@ export component FieldTap inherits Rectangle {
     in property <string> value;
     in property <bool> active: false;
     callback tapped;
-    height: 100px;
-    border-width: 1px;
-    border-color: root.active ? Dy.cyan : Dy.border;
+    height: 64px;
+    border-width: 0px;
     background: Dy.canvas;
     TouchArea { clicked => { root.tapped(); } }
     VerticalLayout {
-        padding-left: 14px;
-        padding-right: 14px;
+        padding-left: 0px;
+        padding-right: 0px;
         alignment: center;
-        Text { text: root.label; color: Dy.muted; font-size: 12px; font-family: Dy.mono; }
+        Text { text: root.label; color: Dy.muted; font-size: 11px; font-family: Dy.mono; }
+        Rectangle {
+            height: 1.5px;
+            background: root.active ? Dy.text : Dy.border;
+        }
         Text {
-            text: root.value == "" ? "TAP TO TYPE" : root.value;
+            text: root.value == "" ? "Tap to type" : root.value;
             color: Dy.text;
-            font-size: 18px;
+            font-size: 16px;
             font-family: Dy.mono;
             overflow: elide;
         }
@@ -283,34 +281,54 @@ export component FieldTap inherits Rectangle {
 
 export component KeyBtn inherits Rectangle {
     in property <string> glyph;
+    in property <string> sub: "";
     in property <bool> wide: false;
+    in property <float> u: 1;
+    in property <bool> on: false;
+    in property <bool> has-icon: false;
+    in property <image> icon;
     callback clicked;
-    min-width: 100px;
-    height: 100px;
-    horizontal-stretch: root.wide ? 2 : 1;
-    border-width: 1px;
-    border-color: Dy.border;
-    background: Dy.canvas;
+    min-width: 28px;
+    height: 52px;
+    horizontal-stretch: root.u;
+    border-width: 1.5px;
+    border-color: root.on ? Dy.text : Dy.border;
+    background: root.on ? #141414 : Dy.canvas;
     TouchArea { clicked => { root.clicked(); } }
-    Text {
+    if root.has-icon: Image {
+        source: root.icon;
+        width: 22px;
+        height: 22px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        image-fit: contain;
+    }
+    if !root.has-icon: Text {
         text: root.glyph;
         color: Dy.text;
-        font-size: 22px;
-        font-weight: 700;
+        font-size: 15px;
+        font-weight: 600;
         font-family: Dy.mono;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+    if root.sub != "": Text {
+        x: 4px;
+        y: 3px;
+        text: root.sub;
+        color: Dy.dim;
+        font-size: 8px;
+        font-family: Dy.mono;
     }
 }
 
 export component Bar inherits Rectangle {
     in property <float> level;
-    in property <color> fill: #5ce1ff;
-    height: 4px;
+    in property <color> fill: #ffffff;
+    height: 3px;
     border-radius: 0px;
     background: #1a1a1a;
-    border-width: 1px;
-    border-color: Dy.border;
+    border-width: 0px;
     Rectangle {
         width: parent.width * clamp(root.level, 0, 1);
         height: 100%;
@@ -319,26 +337,152 @@ export component Bar inherits Rectangle {
     }
 }
 
+export component QuickTask inherits Rectangle {
+    in property <string> label;
+    in property <string> glyph;
+    in property <bool> on: false;
+    callback clicked;
+    border-width: 1.5px;
+    border-color: root.on ? Dy.text : Dy.border;
+    background: Dy.canvas;
+    clip: true;
+    TouchArea { clicked => { root.clicked(); } }
+    VerticalLayout {
+        padding: 8px;
+        spacing: 4px;
+        alignment: center;
+        Text {
+            text: root.glyph;
+            color: Dy.text;
+            font-size: 16px;
+            font-family: Dy.mono;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: root.label;
+            color: Dy.text;
+            font-size: 10px;
+            font-weight: 600;
+            font-family: Dy.mono;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+            overflow: elide;
+        }
+    }
+}
+
+export component NetGlyph inherits Rectangle {
+    in property <string> kind: "wifi";
+    in property <int> bars: 0;
+    width: 28px;
+    height: 22px;
+    background: transparent;
+
+    if root.kind == "ethernet": Rectangle {
+        background: transparent;
+        Rectangle { x: 10px; y: 2px; width: 8px; height: 6px; background: #ffffff; }
+        Rectangle { x: 4px; y: 8px; width: 20px; height: 3px; background: #ffffff; }
+        Rectangle { x: 6px; y: 11px; width: 3px; height: 8px; background: #ffffff; }
+        Rectangle { x: 12.5px; y: 11px; width: 3px; height: 8px; background: #ffffff; }
+        Rectangle { x: 19px; y: 11px; width: 3px; height: 8px; background: #ffffff; }
+    }
+
+    if root.kind != "ethernet": Rectangle {
+        background: transparent;
+        Rectangle { x: 2px; y: 16px; width: 5px; height: 4px; background: root.bars >= 1 ? #ffffff : #3a3a3a; }
+        Rectangle { x: 8px; y: 12px; width: 5px; height: 8px; background: root.bars >= 2 ? #ffffff : #3a3a3a; }
+        Rectangle { x: 14px; y: 7px; width: 5px; height: 13px; background: root.bars >= 3 ? #ffffff : #3a3a3a; }
+        Rectangle { x: 20px; y: 2px; width: 5px; height: 18px; background: root.bars >= 4 ? #ffffff : #3a3a3a; }
+        if root.bars <= 0: Text {
+            x: 14px;
+            y: 8px;
+            text: "×";
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 700;
+            font-family: Dy.mono;
+        }
+    }
+}
+
+export component ConfirmSheet inherits Rectangle {
+    in property <string> title: "";
+    in property <string> body: "";
+    in property <string> primary: "Continue";
+    in property <string> secondary: "Cancel";
+    in property <bool> danger: false;
+    callback accept;
+    callback dismiss;
+    background: #000000cc;
+    TouchArea { clicked => { root.dismiss(); } }
+    Rectangle {
+        x: parent.width * 0.22;
+        y: parent.height * 0.28;
+        width: parent.width * 0.56;
+        height: 280px;
+        background: #000000;
+        border-width: 1.5px;
+        border-color: Dy.border-hi;
+        TouchArea { clicked => { } }
+        VerticalLayout {
+            padding: 28px;
+            spacing: 16px;
+            Text {
+                text: root.title;
+                color: Dy.text;
+                font-size: 20px;
+                font-weight: 700;
+                font-family: Dy.mono;
+            }
+            Text {
+                text: root.body;
+                color: Dy.muted;
+                font-size: 14px;
+                font-family: Dy.mono;
+                wrap: word-wrap;
+                vertical-stretch: 1;
+            }
+            HorizontalLayout {
+                spacing: 12px;
+                Pill { label: root.secondary; clicked => { root.dismiss(); } }
+                Rectangle { horizontal-stretch: 1; }
+                Pill { label: root.primary; on: true; clicked => { root.accept(); } }
+            }
+        }
+    }
+}
+
 export component TileShell inherits Rectangle {
     in property <bool> editing: false;
     in property <bool> pending: false;
-    in property <string> size-label: "";
+    in property <length> vis-x: 0px;
+    in property <length> vis-y: 0px;
     callback tapped;
     callback held;
     callback remove;
-    callback cycle-size;
-    callback drag-to(length, length);
-    background: Dy.canvas;
+    callback drag-begin(length, length);
+    callback drag-move(length, length);
+    callback drag-end();
+    background: transparent;
     border-radius: 0px;
-    border-width: 1px;
-    border-color: root.pending ? Dy.red : Dy.border;
-    clip: true;
+    border-width: 0px;
+    clip: false;
 
     ta := TouchArea {
         clicked => { if !root.editing { root.tapped(); } }
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down && root.editing {
+                root.drag-begin(self.mouse-x, self.mouse-y);
+            }
+            if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
+                if root.editing {
+                    root.drag-end();
+                }
+            }
+        }
         moved => {
             if root.editing && self.pressed {
-                root.drag-to(self.mouse-x, self.mouse-y);
+                root.drag-move(self.mouse-x, self.mouse-y);
             }
         }
     }
@@ -348,50 +492,38 @@ export component TileShell inherits Rectangle {
         triggered => { root.held(); }
     }
 
-    VerticalLayout {
-        padding: 12px;
-        spacing: 6px;
-        @children
-    }
-
-    if root.editing: TouchArea {
-        x: parent.width - 108px;
-        y: 6px;
-        width: 100px;
-        height: 100px;
-        clicked => { root.remove(); }
-        Rectangle {
-            border-radius: 0px;
-            border-width: 1px;
-            border-color: Dy.red;
-            background: Dy.canvas;
-            Text {
-                text: "×";
-                color: Dy.red;
-                font-size: 14px;
-                font-weight: 700;
-                font-family: Dy.mono;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
+    face := Rectangle {
+        x: root.vis-x;
+        y: root.vis-y;
+        width: parent.width;
+        height: parent.height;
+        background: Dy.canvas;
+        border-radius: 0px;
+        border-width: 1.5px;
+        border-color: root.pending ? #ffffff : Dy.border;
+        clip: true;
+        VerticalLayout {
+            padding: 12px;
+            spacing: 6px;
+            @children
         }
     }
 
     if root.editing: TouchArea {
-        x: 6px;
-        y: 6px;
-        width: 100px;
-        height: 100px;
-        clicked => { root.cycle-size(); }
+        x: parent.width + root.vis-x - 15px;
+        y: root.vis-y - 15px;
+        width: 30px;
+        height: 30px;
+        clicked => { root.remove(); }
         Rectangle {
-            border-radius: 0px;
-            border-width: 1px;
-            border-color: Dy.cyan;
-            background: #0a1a1e;
+            border-radius: 15px;
+            border-width: 1.5px;
+            border-color: #ffffff;
+            background: #000000;
             Text {
-                text: root.size-label;
-                color: Dy.cyan;
-                font-size: 10px;
+                text: "×";
+                color: #ffffff;
+                font-size: 16px;
                 font-weight: 700;
                 font-family: Dy.mono;
                 horizontal-alignment: center;
