@@ -16,7 +16,7 @@ import { sanitizeSvg } from "../slopbox/svg";
 import { overlayTransition } from "../lib/performance";
 import { isLinuxWebview } from "../lib/platform";
 import { monthCells } from "../components/widgets/chrome";
-import { generateUninstallChallenge, isNewerVersion, releaseLabel, type ReleaseInfo } from "../lib/install";
+import { compatibleReleaseTags, confirmInstallBody, generateUninstallChallenge, isNewerVersion, isSameVersion, releaseLabel, versionChange, type ReleaseInfo } from "../lib/install";
 
 function snap(): RoomSnapshot {
   return {
@@ -630,11 +630,39 @@ test("release labels mark the running copy", () => {
   assert(releaseLabel(rel).includes("this version"), releaseLabel(rel));
 });
 
-test("newer GitHub tags are detected without auto-installing", () => {
+test("version switch confirm names upgrade, downgrade, and current", () => {
   assert(isNewerVersion("0.1.1", "0.1.0"), "0.1.1 beats 0.1.0");
   assert(isNewerVersion("v0.1.2", "0.1.1"), "v prefix is ignored");
   assert(!isNewerVersion("0.1.0", "0.1.1"), "older is not newer");
   assert(!isNewerVersion("0.1.1", "0.1.1"), "same version is current");
+  assert(isSameVersion("v0.2.9", "0.2.9"), "v prefix is the same version");
+  assert(versionChange("0.2.10", "0.2.9") === "upgrade", "upgrade");
+  assert(versionChange("0.2.9", "0.2.10") === "downgrade", "downgrade");
+  assert(versionChange("v0.2.9", "0.2.9") === "same", "already installed");
+  const up = confirmInstallBody("0.2.9", "0.2.10");
+  assert(up.includes("Current version: 0.2.9"), up);
+  assert(up.includes("Target version: 0.2.10"), up);
+  assert(up.includes("an upgrade"), up);
+  const down = confirmInstallBody("0.2.10", "0.2.9");
+  assert(down.includes("a downgrade"), down);
+  const same = confirmInstallBody("0.2.9", "0.2.9");
+  assert(same.includes("already installed"), same);
+});
+
+test("release filter drops drafts, prereleases, incompatible debs, and duplicates", () => {
+  const tags = compatibleReleaseTags(
+    [
+      { tag: "v0.2.10", installable: true, assetName: "Judie_0.2.10_armhf.deb" },
+      { tag: "v0.2.10", installable: true, assetName: "judie_armhf.deb" },
+      { tag: "v0.2.9-rc1", prerelease: true, installable: true, assetName: "Judie_0.2.9-rc1_armhf.deb" },
+      { tag: "v0.2.8", draft: true, installable: true, assetName: "Judie_0.2.8_armhf.deb" },
+      { tag: "v0.2.7", installable: true, assetName: "Judie_0.2.7_amd64.deb" },
+      { tag: "v0.2.6", installable: true, assetName: "Judie_0.2.6_armhf.deb" },
+    ],
+    "linux",
+    "armhf",
+  );
+  assert(tags.join(",") === "v0.2.10,v0.2.6", tags.join(","));
 });
 
 test("uninstall challenge mixes letters, digits, and symbols", () => {

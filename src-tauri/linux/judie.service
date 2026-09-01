@@ -12,6 +12,8 @@ ExecStartPre=/usr/lib/judie/wait-display
 ExecStart=/usr/lib/judie/kiosk
 Restart=always
 RestartSec=2
+# process: a future stop must not SIGTERM sudo apply-update in this cgroup.
+KillMode=process
 Environment=DISPLAY=:0
 PAMName=login
 TTYPath=/dev/tty1

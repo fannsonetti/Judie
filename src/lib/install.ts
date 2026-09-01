@@ -35,6 +35,58 @@ export function isNewerVersion(candidate: string, current: string) {
   return false;
 }
 
+export function isSameVersion(a: string, b: string) {
+  return a.trim().replace(/^v/, "") === b.trim().replace(/^v/, "");
+}
+
+export function versionChange(target: string, current: string): "upgrade" | "downgrade" | "same" {
+  if (isSameVersion(target, current)) return "same";
+  return isNewerVersion(target, current) ? "upgrade" : "downgrade";
+}
+
+export function confirmInstallBody(current: string, target: string) {
+  const kind = versionChange(target, current);
+  if (kind === "same") {
+    return `Current version: ${current}\nTarget version: ${target}\nThis version is already installed.`;
+  }
+  const article = kind === "upgrade" ? "an" : "a";
+  return `Current version: ${current}\nTarget version: ${target}\nThis is ${article} ${kind}.\n\nThe panel stays on screen while the package is installed. It reboots after the new version is verified. Settings, widgets, and routines stay on this panel.`;
+}
+
+export type CompatibleRelease = {
+  tag: string;
+  draft?: boolean;
+  prerelease?: boolean;
+  installable: boolean;
+  assetName: string;
+};
+
+/** Mirrors the kiosk filter: skip drafts, prereleases, incompatible assets, duplicates. */
+export function compatibleReleaseTags(
+  rows: CompatibleRelease[],
+  os: "linux" | "windows",
+  arch: string,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of rows) {
+    if (row.draft || row.prerelease || !row.installable) continue;
+    const name = row.assetName.toLowerCase();
+    const ok =
+      os === "linux"
+        ? name.endsWith(".deb") &&
+          ((arch === "armhf" || arch === "arm") &&
+            (name.includes("armhf") || name.includes("armv7")))
+        : name.endsWith(".exe");
+    if (!ok) continue;
+    const key = row.tag.replace(/^v/, "");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row.tag);
+  }
+  return out;
+}
+
 export async function listInstallations(): Promise<ReleaseInfo[]> {
   return invoke<ReleaseInfo[]>("list_releases");
 }

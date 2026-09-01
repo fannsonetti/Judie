@@ -6,12 +6,14 @@ import { useLayoutStore } from "../../store/layoutStore";
 import { useChromeStore } from "../../store/chromeStore";
 import { relaunchJudie, quitJudie } from "../../lib/windowControls";
 import {
+  confirmInstallBody,
   generateMathChallenge,
   generateUninstallChallenge,
-  isNewerVersion,
+  isSameVersion,
   listInstallations,
   switchInstallation,
   uninstallJudie,
+  versionChange,
   type ReleaseInfo,
 } from "../../lib/install";
 import { JUDIE_VERSION } from "../../lib/version";
@@ -28,8 +30,7 @@ type Confirm =
   | { kind: "uninstall2"; prompt: string; answer: number }
   | { kind: "uninstall3"; code: string }
   | { kind: "upgrade"; tag: string }
-  | { kind: "downgrade1"; tag: string }
-  | { kind: "downgrade2"; tag: string };
+  | { kind: "downgrade"; tag: string };
 
 export function SettingsOverlay() {
   const open = useAssistantStore((s) => s.settingsOpen);
@@ -49,6 +50,7 @@ export function SettingsOverlay() {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [typed, setTyped] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [updateStatus, setUpdateStatus] = useState("");
   const [routineName, setRoutineName] = useState("");
   const [routinePhrase, setRoutinePhrase] = useState("");
   const [routineCommand, setRoutineCommand] = useState("");
@@ -73,19 +75,33 @@ export function SettingsOverlay() {
     }
   }, [visible]);
 
-  useEffect(() => {
-    if (!visible || tab !== "power") return;
-    let cancelled = false;
+  const loadReleases = () => {
     void listInstallations()
       .then((list) => {
-        if (!cancelled) setReleases(list);
+        setReleases(list);
+        const current = list.find((r) => r.current);
+        const latest = list[0];
+        if (!latest) {
+          setUpdateStatus("No compatible releases found.");
+          return;
+        }
+        if (current && isSameVersion(latest.tag, current.tag)) {
+          setUpdateStatus(`Current ${current.tag.replace(/^v/, "")} is the latest compatible release.`);
+        } else {
+          setUpdateStatus(
+            `Current ${JUDIE_VERSION} is not latest. Latest is ${latest.tag.replace(/^v/, "")}.`,
+          );
+        }
       })
-      .catch(() => {
-        if (!cancelled) setReleases([]);
+      .catch((err) => {
+        setReleases([]);
+        setUpdateStatus(err instanceof Error ? err.message : "Could not load releases");
       });
-    return () => {
-      cancelled = true;
-    };
+  };
+
+  useEffect(() => {
+    if (!visible || tab !== "power") return;
+    loadReleases();
   }, [visible, tab]);
 
   const close = () => {
@@ -105,9 +121,12 @@ export function SettingsOverlay() {
 
   const pickVersion = (tag: string) => {
     setVersionOpen(false);
-    if (tag.replace(/^v/, "") === JUDIE_VERSION.replace(/^v/, "")) return;
-    if (isNewerVersion(tag, JUDIE_VERSION)) setConfirm({ kind: "upgrade", tag });
-    else setConfirm({ kind: "downgrade1", tag });
+    if (isSameVersion(tag, JUDIE_VERSION)) {
+      setUpdateStatus("This version is already installed.");
+      return;
+    }
+    const kind = versionChange(tag, JUDIE_VERSION);
+    setConfirm({ kind: kind === "upgrade" ? "upgrade" : "downgrade", tag });
   };
 
   const runInstall = async (tag: string) => {
@@ -158,17 +177,7 @@ export function SettingsOverlay() {
       }
       return;
     }
-    if (confirm.kind === "upgrade") {
-      const tag = confirm.tag;
-      setConfirm(null);
-      await runInstall(tag);
-      return;
-    }
-    if (confirm.kind === "downgrade1") {
-      setConfirm({ kind: "downgrade2", tag: confirm.tag });
-      return;
-    }
-    if (confirm.kind === "downgrade2") {
+    if (confirm.kind === "upgrade" || confirm.kind === "downgrade") {
       const tag = confirm.tag;
       setConfirm(null);
       await runInstall(tag);
@@ -356,30 +365,57 @@ export function SettingsOverlay() {
           )}
           {tab === "power" && (
             <>
+              <p className="os-kicker">Installed version</p>
               <div className="os-row">
-                <span>Version</span>
-                <button type="button" className="os-pill" onClick={() => setVersionOpen(!versionOpen)}>
+                <span>v{JUDIE_VERSION}</span>
+              </div>
+              <div className="os-row">
+                <span>Switch version</span>
+                <button
+                  type="button"
+                  className="os-pill"
+                  disabled={busy}
+                  onClick={() => !busy && setVersionOpen(!versionOpen)}
+                >
                   v{JUDIE_VERSION} ▼
                 </button>
               </div>
-              {versionOpen && (
+              {versionOpen && !busy && (
                 <div className="os-version-list">
                   {(releases ?? []).map((r) => (
-                    <button key={r.tag} type="button" className="os-row" onClick={() => pickVersion(r.tag)}>
+                    <button
+                      key={r.tag}
+                      type="button"
+                      className="os-row"
+                      disabled={busy || r.current}
+                      onClick={() => pickVersion(r.tag)}
+                    >
                       <span>{r.tag}</span>
                       {r.current && <em>current</em>}
                     </button>
                   ))}
-                  {releases?.length === 0 && <p className="settings-note">No other releases listed.</p>}
+                  {releases?.length === 0 && <p className="settings-note">No compatible releases listed.</p>}
                 </div>
               )}
-              <button type="button" className="os-hit" onClick={() => setConfirm({ kind: "restart" })}>
+              <button
+                type="button"
+                className="os-pill on"
+                disabled={busy}
+                onClick={() => {
+                  setUpdateStatus("Checking GitHub…");
+                  loadReleases();
+                }}
+              >
+                Check for updates
+              </button>
+              {updateStatus && <p className="settings-note">{updateStatus}</p>}
+              <button type="button" className="os-hit" disabled={busy} onClick={() => setConfirm({ kind: "restart" })}>
                 Restart
               </button>
-              <button type="button" className="os-hit" onClick={() => setConfirm({ kind: "shutdown" })}>
+              <button type="button" className="os-hit" disabled={busy} onClick={() => setConfirm({ kind: "shutdown" })}>
                 Shutdown
               </button>
-              <button type="button" className="os-hit" onClick={() => setConfirm({ kind: "uninstall1" })}>
+              <button type="button" className="os-hit" disabled={busy} onClick={() => setConfirm({ kind: "uninstall1" })}>
                 Uninstall
               </button>
               {actionError && <p className="settings-note">{actionError}</p>}
@@ -408,15 +444,17 @@ export function SettingsOverlay() {
         </ConfirmSheet>
       )}
       {confirm?.kind === "upgrade" && (
-        <ConfirmSheet title="Install this version?" body={`Judie will close and reopen on ${confirm.tag}.`} onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
-      )}
-      {confirm?.kind === "downgrade1" && (
-        <ConfirmSheet title="Are you sure you want to downgrade?" body={`You are about to install older software (${confirm.tag}).`} onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
-      )}
-      {confirm?.kind === "downgrade2" && (
         <ConfirmSheet
-          title="Are you REALLY sure? Downgrading may delete some of your data."
-          body="Older software may remove or invalidate settings and data."
+          title={`Upgrade to ${confirm.tag.replace(/^v/, "")}?`}
+          body={confirmInstallBody(JUDIE_VERSION, confirm.tag.replace(/^v/, ""))}
+          onAccept={() => void accept()}
+          onDismiss={() => setConfirm(null)}
+        />
+      )}
+      {confirm?.kind === "downgrade" && (
+        <ConfirmSheet
+          title={`Downgrade to ${confirm.tag.replace(/^v/, "")}?`}
+          body={confirmInstallBody(JUDIE_VERSION, confirm.tag.replace(/^v/, ""))}
           onAccept={() => void accept()}
           onDismiss={() => setConfirm(null)}
         />

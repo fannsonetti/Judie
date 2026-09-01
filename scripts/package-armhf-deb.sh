@@ -115,7 +115,8 @@ fi
 if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
   systemctl daemon-reload || true
   systemctl enable judie.service >/dev/null 2>&1 || true
-  # Never start here. apply-update reboots; judie.service starts after boot.
+  # Never start or restart here. The running kiosk stays on screen; reboot
+  # happens only after the UI verifies the installed package version.
 fi
 EOF
 chmod 755 "$STAGING/DEBIAN/postinst"

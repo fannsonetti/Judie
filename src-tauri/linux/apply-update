@@ -1,46 +1,86 @@
 #!/bin/sh
-# Passwordless helper: only installs a Judie .deb staged in /tmp/judie-update.
-# After install, reboot. The new binary must not start on the old X session;
-# judie.service launches it once the Pi has finished coming back up.
-set -e
+# Passwordless helper: install one Judie .deb from /tmp/judie-update.
+#
+# Do not stop judie.service. Stopping the kiosk blanks tty1 (cursor on black)
+# and systemd kills this helper with the kiosk cgroup, so the package never
+# lands and reboot still runs the previous version.
+#
+# Do not reboot here. The UI reboots only after it verifies dpkg-query.
+set -eu
+
 DEB="${1:-}"
-[ -n "$DEB" ] || { echo "usage: apply-update <deb>" >&2; exit 1; }
-[ -f "$DEB" ] || { echo "missing package" >&2; exit 1; }
+WANT="${2:-}"
+
+fail() { echo "$1" >&2; exit 1; }
+
+[ -n "$DEB" ] || fail "usage: apply-update <deb> [version]"
+[ -f "$DEB" ] || fail "missing package"
 
 case "$DEB" in
   /tmp/judie-update/*.deb) ;;
-  *) echo "refused path" >&2; exit 1 ;;
+  *) fail "refused path" ;;
+esac
+
+case "$DEB" in
+  *..*) fail "refused path" ;;
 esac
 
 base=$(basename "$DEB")
 case "$base" in
   Judie_*.deb|judie_*.deb|Judie-*.deb|judie-*.deb) ;;
-  *) echo "refused name" >&2; exit 1 ;;
+  *) fail "refused name" ;;
 esac
 
 if [ -n "${SUDO_UID:-}" ]; then
   owner=$(stat -c '%u' "$DEB" 2>/dev/null || stat -f '%u' "$DEB")
-  [ "$owner" = "$SUDO_UID" ] || { echo "refused owner" >&2; exit 1; }
+  [ "$owner" = "$SUDO_UID" ] || fail "refused owner"
 fi
 
-# Stop the kiosk first so postinst does not start the new binary on this boot.
-if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-  systemctl stop judie.service >/dev/null 2>&1 || true
+[ -s "$DEB" ] || fail "empty package"
+
+magic=$(dd if="$DEB" bs=8 count=1 2>/dev/null || true)
+case "$magic" in
+  '!<arch>'*) ;;
+  *) fail "not a Debian package" ;;
+esac
+
+command -v dpkg-deb >/dev/null || fail "dpkg-deb missing"
+pkg=$(dpkg-deb -f "$DEB" Package 2>/dev/null || true)
+ver=$(dpkg-deb -f "$DEB" Version 2>/dev/null || true)
+arch=$(dpkg-deb -f "$DEB" Architecture 2>/dev/null || true)
+[ "$pkg" = "judie" ] || fail "package is not judie"
+[ -n "$ver" ] || fail "package has no version"
+
+host_arch=$(dpkg --print-architecture 2>/dev/null || true)
+[ -n "$host_arch" ] || fail "could not read architecture"
+[ "$arch" = "$host_arch" ] || fail "package architecture ${arch} does not match ${host_arch}"
+
+norm() { echo "$1" | sed 's/^v//'; }
+if [ -n "$WANT" ]; then
+  want_norm=$(norm "$WANT")
+  [ "$ver" = "$WANT" ] || [ "$ver" = "$want_norm" ] || fail "package version ${ver} does not match ${WANT}"
 fi
 
+# Replace files in place. The running kiosk keeps the old inode until reboot.
+# Never apt-get remove first — a failed follow-up install would leave no Judie.
 export DEBIAN_FRONTEND=noninteractive
-export JUDIE_POSTINST_NOSTART=1
-apt-get install -y --reinstall "$DEB"
+if command -v apt-get >/dev/null 2>&1; then
+  apt-get install -y --allow-downgrades --allow-change-held-packages "$DEB" \
+    || dpkg --force-confold -i "$DEB" \
+    || fail "could not install package"
+else
+  dpkg --force-confold -i "$DEB" || fail "could not install package"
+fi
+
 sync
 
-if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
-  systemctl enable judie.service >/dev/null 2>&1 || true
-  # Reboot after dpkg has released the lock. Kiosk starts on the next boot.
-  if command -v systemd-run >/dev/null 2>&1; then
-    systemd-run --quiet --collect --on-active=2s /bin/systemctl reboot >/dev/null 2>&1 || /sbin/reboot
-  else
-    nohup /bin/sh -c 'sleep 2; /sbin/reboot' >/dev/null 2>&1 &
-  fi
-else
-  nohup /bin/sh -c 'sleep 2; /sbin/reboot' >/dev/null 2>&1 &
+installed=$(dpkg-query -W -f '${Version}' judie 2>/dev/null || true)
+[ -n "$installed" ] || fail "judie is not installed after install"
+
+if [ -n "$WANT" ]; then
+  want_norm=$(norm "$WANT")
+  [ "$installed" = "$WANT" ] || [ "$installed" = "$want_norm" ] \
+    || fail "installed ${installed}, expected ${WANT}"
 fi
+
+echo "INSTALLED ${installed}"

@@ -54,16 +54,22 @@ Uninstall: `sudo apt remove judie`.
 
 ## Updates
 
-On boot, Judie asks GitHub whether a newer release exists. If it does, a small **warning bar** appears — it does not download or ask for a password by itself.
+Settings → Power lists **stable** GitHub releases that ship a compatible `.deb` for this Pi. Drafts, prereleases, and packages for other architectures are omitted.
 
-Tap **Update** to install. Linux packages ship `/usr/lib/judie/apply-update` plus a sudoers rule so that step is silent. The first time you move off an older copy that still uses `pkexec`, install once from a terminal:
+Tap **Check for updates** to refresh the list. The panel reports whether the installed package is already latest.
+
+Choose another version to upgrade or downgrade. A confirmation shows the current version, the target, and which direction this is. The current version cannot be selected again.
+
+Judie stays on screen through **Downloading → Validating → Installing → Verifying → Rebooting**. The helper `/usr/lib/judie/apply-update` only installs a staged Judie `.deb` (no arbitrary root commands, and it does not stop the kiosk or reboot on its own). After `dpkg-query` confirms the package version, the UI reboots. A failed install leaves the previous package in place and does not reboot.
+
+User data in `~/.local/share/judie` (layout, widgets, routines, settings) is not part of the package and is kept.
+
+The first time you move off an older copy that still uses `pkexec`, install once from a terminal:
 
 ```bash
 curl -fsSL -o /tmp/judie.deb https://github.com/fannsonetti/Judie/releases/latest/download/judie_armhf.deb
 sudo apt install -y /tmp/judie.deb
 ```
-
-After that, later versions apply from the bar with no prompt. The helper installs the `.deb`, then **reboots the Pi**. Judie does not start on the old session. After the machine is back, `judie.service` waits for the display and launches the new binary.
 
 ## Kiosk
 

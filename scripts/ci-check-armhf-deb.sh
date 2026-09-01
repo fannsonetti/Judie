@@ -43,4 +43,18 @@ for line in "${entries[@]:0:30}"; do
   fi
 done
 
+script="$(dpkg-deb --fsys-tarfile "$DEB" | tar -xO ./usr/lib/judie/apply-update)"
+echo "$script" | grep -q 'systemctl stop judie' && {
+  echo "FAIL: apply-update must not stop judie.service" >&2
+  exit 1
+}
+echo "$script" | grep -Eq 'allow-downgrades|dpkg --force-confold' || {
+  echo "FAIL: apply-update must allow downgrades" >&2
+  exit 1
+}
+echo "$script" | grep -q 'dpkg-query' || {
+  echo "FAIL: apply-update must verify the installed package" >&2
+  exit 1
+}
+
 echo "armhf .deb metadata OK"

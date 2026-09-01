@@ -168,7 +168,6 @@ fn push_ui(ui: &MainWindow) {
     ui.set_clock(now.format("%H:%M").to_string().into());
     ui.set_date_text(now.format("%A %e %B").to_string().split_whitespace().collect::<Vec<_>>().join(" ").into());
     ui.set_month_name(now.format("%B").to_string().into());
-    ui.set_version_text(env!("CARGO_PKG_VERSION").into());
     ui.set_host_ip(pi_ctl::lan_addrs().into());
 
     let stats = host::snapshot();
@@ -534,6 +533,59 @@ fn load_wifi_status(ui: &MainWindow) {
     load_link(ui);
 }
 
+fn begin_package_install(ui: &MainWindow, tag: String) {
+    if ui.get_updating() {
+        return;
+    }
+    if tag.is_empty() {
+        ui.set_release_status("Pick a version first.".into());
+        return;
+    }
+    if releases::same_version(&tag, &ui.get_version_text()) {
+        ui.set_release_status("This version is already installed.".into());
+        ui.set_version_menu_open(false);
+        return;
+    }
+    ui.set_updating(true);
+    ui.set_version_menu_open(false);
+    ui.set_update_error("".into());
+    ui.set_release_status(releases::InstallStage::Downloading.label().into());
+    let weak = ui.as_weak();
+    std::thread::spawn(move || {
+        let progress_ui = weak.clone();
+        let result = releases::install_tag_with_progress(&tag, |stage| {
+            let label = stage.label().to_string();
+            let weak = progress_ui.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak.upgrade() {
+                    ui.set_release_status(label.into());
+                }
+            });
+        });
+        let _ = slint::invoke_from_event_loop(move || {
+            let Some(ui) = weak.upgrade() else { return };
+            match result {
+                Ok(ver) => {
+                    ui.set_version_text(ver.clone().into());
+                    ui.set_release_status(releases::InstallStage::Rebooting.label().into());
+                    if let Err(err) = pi_ctl::power("reboot") {
+                        ui.set_updating(false);
+                        ui.set_release_status(
+                            format!("Installed {ver}, but reboot failed: {err}. Use Restart.")
+                                .into(),
+                        );
+                    }
+                }
+                Err(err) => {
+                    ui.set_updating(false);
+                    ui.set_release_status(err.clone().into());
+                    ui.set_update_error(err.into());
+                }
+            }
+        });
+    });
+}
+
 fn load_releases(ui: &MainWindow) {
     ui.set_release_status("Checking GitHub…".into());
     let weak = ui.as_weak();
@@ -564,9 +616,9 @@ fn load_releases(ui: &MainWindow) {
                         ui.set_update_available(n.outdated);
                         ui.set_update_label(format!("Judie {} is available", n.latest).into());
                         ui.set_release_status(if n.outdated {
-                            format!("Update available: {}", n.latest)
+                            format!("Current {} is not latest. Latest is {}.", n.current, n.latest)
                         } else {
-                            format!("Up to date ({})", n.current)
+                            format!("Current {} is the latest compatible release.", n.current)
                         }.into());
                     } else {
                         ui.set_release_status("Release list loaded.".into());
@@ -986,6 +1038,9 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_check_updates(move || {
         if let Some(ui) = weak.upgrade() {
+            if ui.get_updating() {
+                return;
+            }
             load_releases(&ui);
         }
     });
@@ -998,30 +1053,7 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_install_tag(move |tag| {
         let Some(ui) = weak.upgrade() else { return };
-        if ui.get_updating() {
-            return;
-        }
-        let tag = tag.to_string();
-        if tag.is_empty() {
-            ui.set_release_status("Pick a version first.".into());
-            return;
-        }
-        ui.set_updating(true);
-        ui.set_release_status(format!("Installing {tag}…").into());
-        let weak = ui.as_weak();
-        std::thread::spawn(move || {
-            let result = releases::install_tag(&tag);
-            let _ = slint::invoke_from_event_loop(move || match result {
-                Ok(()) => std::process::exit(0),
-                Err(err) => {
-                    if let Some(ui) = weak.upgrade() {
-                        ui.set_updating(false);
-                        ui.set_release_status(err.clone().into());
-                        ui.set_update_error(err.into());
-                    }
-                }
-            });
-        });
+        begin_package_install(&ui, tag.to_string());
     });
     let weak = ui.as_weak();
     ui.on_scan_wifi(move || {
@@ -1344,18 +1376,13 @@ fn bind(ui: &MainWindow) {
                 ui.set_confirm_kind("".into());
                 ui.invoke_uninstall_now();
             }
-            "upgrade" | "downgrade2" => {
+            "upgrade" | "downgrade" => {
                 let tag = PENDING.lock().ok().map(|p| p.tag.clone()).unwrap_or_default();
                 ui.set_confirm_kind("".into());
                 ui.set_version_menu_open(false);
                 if !tag.is_empty() {
-                    ui.invoke_install_tag(tag.into());
+                    begin_package_install(&ui, tag);
                 }
-            }
-            "downgrade1" => {
-                ui.set_confirm_title("Are you REALLY sure? Downgrading may delete some of your data.".into());
-                ui.set_confirm_body("Older software may remove or invalidate settings and data on this panel.".into());
-                ui.set_confirm_kind("downgrade2".into());
             }
             _ => ui.set_confirm_kind("".into()),
         }
@@ -1366,10 +1393,14 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_pick_version(move |tag| {
         let Some(ui) = weak.upgrade() else { return };
+        if ui.get_updating() {
+            return;
+        }
         let tag = tag.to_string();
         let current = ui.get_version_text().to_string();
-        if tag.trim_start_matches('v') == current.trim_start_matches('v') {
+        if releases::same_version(&tag, &current) {
             ui.set_version_menu_open(false);
+            ui.set_release_status("This version is already installed.".into());
             return;
         }
         if let Ok(mut p) = PENDING.lock() {
@@ -1377,15 +1408,15 @@ fn bind(ui: &MainWindow) {
         }
         ui.set_selected_release(tag.clone().into());
         ui.set_version_menu_open(false);
-        if releases::is_newer(&tag, &current) {
-            ui.set_confirm_title("Install this version?".into());
-            ui.set_confirm_body(format!("Judie will close and reopen on {tag}.").into());
-            ui.set_confirm_kind("upgrade".into());
+        let kind = releases::change_kind(&tag, &current);
+        let target = releases::normalize_version(&tag);
+        ui.set_confirm_title(if kind == "upgrade" {
+            format!("Upgrade to {target}?").into()
         } else {
-            ui.set_confirm_title("Are you sure you want to downgrade?".into());
-            ui.set_confirm_body(format!("You are about to install older software ({tag}).").into());
-            ui.set_confirm_kind("downgrade1".into());
-        }
+            format!("Downgrade to {target}?").into()
+        });
+        ui.set_confirm_body(releases::confirm_body(&current, &target).into());
+        ui.set_confirm_kind(if kind == "upgrade" { "upgrade" } else { "downgrade" }.into());
     });
     let weak = ui.as_weak();
     ui.on_keyboard_command(move |cmd| {
@@ -1449,6 +1480,7 @@ fn main() {
         }
     };
     apply_kiosk_geometry(&ui);
+    ui.set_version_text(releases::display_version().into());
     bind(&ui);
     push_ui(&ui);
     load_link(&ui);
@@ -1516,19 +1548,35 @@ fn main() {
         }
         ui.set_updating(true);
         ui.set_update_error("".into());
+        ui.set_release_status("Downloading".into());
         let weak = ui.as_weak();
         std::thread::spawn(move || {
-            let result = releases::install_latest();
-            let _ = slint::invoke_from_event_loop(move || match result {
+            let tag = match releases::check_latest() {
+                Ok(n) if n.outdated => n.latest_tag,
                 Ok(_) => {
-                    // apply-update reboots; this process dies with the old session.
-                    std::process::exit(0);
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(ui) = weak.upgrade() {
+                            ui.set_updating(false);
+                            ui.set_release_status("Already on the latest version".into());
+                        }
+                    });
+                    return;
                 }
                 Err(err) => {
-                    if let Some(ui) = weak.upgrade() {
-                        ui.set_updating(false);
-                        ui.set_update_error(err.into());
-                    }
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(ui) = weak.upgrade() {
+                            ui.set_updating(false);
+                            ui.set_release_status(err.clone().into());
+                            ui.set_update_error(err.into());
+                        }
+                    });
+                    return;
+                }
+            };
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak.upgrade() {
+                    ui.set_updating(false);
+                    begin_package_install(&ui, tag);
                 }
             });
         });

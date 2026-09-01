@@ -12,7 +12,7 @@ export component MainWindow inherits Window {
 
     in-out property <string> clock: "--:--";
     in-out property <string> date-text: "";
-    in-out property <string> version-text: "0.2.9";
+    in-out property <string> version-text: "";
     in-out property <string> status-label: "";
     in-out property <string> host-ip: "NO IP";
     in-out property <bool> dnd: false;
@@ -832,27 +832,33 @@ export component MainWindow inherits Window {
                     }
                     if root.settings-tab == 2: VerticalLayout {
                         spacing: 20px;
+                        Text { text: "Installed version"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        Text { text: "v" + root.version-text; color: #ffffff; font-size: 18px; font-family: Dy.mono; }
                         HorizontalLayout {
-                            Text { text: "Version"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "Switch version"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
                             TouchArea {
-                                clicked => { root.version-menu-open = !root.version-menu-open; }
+                                clicked => {
+                                    if !root.updating {
+                                        root.version-menu-open = !root.version-menu-open;
+                                    }
+                                }
                                 Text {
                                     text: "v" + root.version-text + "  ▼";
-                                    color: #ffffff;
+                                    color: root.updating ? #6a6a6a : #ffffff;
                                     font-size: 16px;
                                     font-family: Dy.mono;
                                     vertical-alignment: center;
                                 }
                             }
                         }
-                        if root.version-menu-open: Flickable {
-                            height: 220px;
+                        if root.version-menu-open && !root.updating: Flickable {
+                            height: 180px;
                             viewport-height: 24 * 40px;
                             VerticalLayout {
                                 spacing: 2px;
                                 for rel in root.releases: TouchArea {
-                                    clicked => { root.pick-version(rel.tag); }
+                                    clicked => { if !rel.current && !root.updating { root.pick-version(rel.tag); } }
                                     height: 36px;
                                     HorizontalLayout {
                                         Text { text: rel.tag; color: rel.current ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; }
@@ -862,10 +868,22 @@ export component MainWindow inherits Window {
                                 }
                             }
                         }
+                        Pill {
+                            label: "Check for updates";
+                            on: !root.updating;
+                            clicked => { if !root.updating { root.check-updates(); } }
+                        }
+                        Text {
+                            text: root.release-status;
+                            color: #8a8a8a;
+                            font-size: 12px;
+                            font-family: Dy.mono;
+                            wrap: word-wrap;
+                        }
                         Rectangle { height: 24px; }
-                        HitBtn { label: "Restart"; clicked => { root.begin-confirm("restart"); } }
-                        HitBtn { label: "Shutdown"; clicked => { root.begin-confirm("shutdown"); } }
-                        HitBtn { label: "Uninstall"; clicked => { root.begin-confirm("uninstall1"); } }
+                        HitBtn { label: "Restart"; clicked => { if !root.updating { root.begin-confirm("restart"); } } }
+                        HitBtn { label: "Shutdown"; clicked => { if !root.updating { root.begin-confirm("shutdown"); } } }
+                        HitBtn { label: "Uninstall"; clicked => { if !root.updating { root.begin-confirm("uninstall1"); } } }
                     }
                 }
             }
@@ -938,7 +956,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade1" || root.confirm-kind == "downgrade2" || root.confirm-kind == "upgrade": ConfirmSheet {
+    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade": ConfirmSheet {
         title: root.confirm-title;
         body: root.confirm-body;
         primary: "Continue";
@@ -1414,5 +1432,45 @@ export component MainWindow inherits Window {
         typed(ch) => { root.keyboard-key(ch); }
         command(cmd) => { root.keyboard-command(cmd); }
         close => { root.keyboard-close(); }
+    }
+
+    if root.updating: Rectangle {
+        background: #00000099;
+        TouchArea { clicked => { } }
+        Rectangle {
+            x: parent.width * 0.22;
+            y: parent.height * 0.30;
+            width: parent.width * 0.56;
+            height: 240px;
+            background: #000000;
+            border-width: 1.5px;
+            border-color: #ffffff;
+            TouchArea { clicked => { } }
+            VerticalLayout {
+                padding: 28px;
+                spacing: 16px;
+                Text {
+                    text: "Installing Judie";
+                    color: #ffffff;
+                    font-size: 20px;
+                    font-weight: 700;
+                    font-family: Dy.mono;
+                }
+                Text {
+                    text: root.release-status;
+                    color: #ffffff;
+                    font-size: 16px;
+                    font-family: Dy.mono;
+                }
+                Text {
+                    text: "Downloading, validating, installing, verifying, then reboot. This screen stays up. Settings, widgets, and routines are kept.";
+                    color: #8a8a8a;
+                    font-size: 13px;
+                    font-family: Dy.mono;
+                    wrap: word-wrap;
+                    vertical-stretch: 1;
+                }
+            }
+        }
     }
 }
