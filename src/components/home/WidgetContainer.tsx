@@ -39,7 +39,6 @@ export function WidgetContainer({
   const expandedId = useLayoutStore((s) => s.expandedId);
   const pendingRemoveId = useLayoutStore((s) => s.pendingRemoveId);
   const expandWidget = useLayoutStore((s) => s.expandWidget);
-  const requestRemoveWidget = useLayoutStore((s) => s.requestRemoveWidget);
   const setDragging = useLayoutStore((s) => s.setDragging);
   const placeWidget = useLayoutStore((s) => s.placeWidget);
 
@@ -271,27 +270,6 @@ export function WidgetContainer({
         onPointerCancel={() => finishDrag(true)}
         onClick={onClick}
       >
-        {editMode && (
-          <button
-            type="button"
-            className="widget-remove"
-            aria-label="Remove widget"
-            onClick={(e) => {
-              e.stopPropagation();
-              requestRemoveWidget(widget.id);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-              <path
-                d="M2 2l6 6M8 2L2 8"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        )}
         <div
           className="widget-face"
           style={{

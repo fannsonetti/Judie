@@ -1,5 +1,5 @@
 import { ScrollView, Slider, Button } from "std-widgets.slint";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 
@@ -299,8 +299,8 @@ export component MainWindow inherits Window {
     property <bool> gallery-swiping: false;
     property <length> gallery-press-x: 0px;
     property <int> gallery-index: 0;
-    property <int> drop-col: 0;
-    property <int> drop-row: 0;
+    in-out property <int> drop-col: 0;
+    in-out property <int> drop-row: 0;
 
     property <duration> gallery-ease: 0ms;
     property <length> general-col: min(760px, root.width - 80px);
@@ -809,6 +809,14 @@ export component MainWindow inherits Window {
                         quick(id) => { root.quick(id); }
                         set-purifier-mode(m) => { root.set-purifier-mode(m); }
                     }
+                }
+
+                for w in root.slots: WidgetRemoveBtn {
+                    x: ox + (w.col + w.cols) * cell - g - 20px;
+                    y: oy + w.row * cell - 20px;
+                    active: root.edit-mode && w.page == root.page && root.drag-id != w.id;
+                    label: w.label != "" ? "Remove " + w.label : "Remove widget";
+                    remove => { root.request-remove(w.id); }
                 }
             }
         }

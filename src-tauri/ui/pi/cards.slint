@@ -636,6 +636,61 @@ export component ConfirmSheet inherits Rectangle {
     }
 }
 
+export component WidgetRemoveBtn inherits Rectangle {
+    in property <bool> active: true;
+    in property <string> label: "Remove widget";
+    callback remove;
+    property <bool> fired: false;
+    width: 40px;
+    height: 40px;
+    background: #ffffff;
+    border-radius: 0px;
+    border-width: 0px;
+    clip: false;
+    visible: root.active;
+    accessible-role: AccessibleRole.button;
+    accessible-label: root.label;
+    accessible-action-default => {
+        if root.active && !root.fired {
+            root.fired = true;
+            root.remove();
+        }
+    }
+
+    TouchArea {
+        enabled: root.active;
+        pointer-event(ev) => {
+            if ev.kind == PointerEventKind.down {
+                root.fired = false;
+            }
+            if ev.kind == PointerEventKind.cancel {
+                root.fired = false;
+            }
+            if ev.kind == PointerEventKind.up && root.active && !root.fired {
+                root.fired = true;
+                root.remove();
+            }
+        }
+        clicked => {
+            if root.active && !root.fired {
+                root.fired = true;
+                root.remove();
+            }
+        }
+    }
+    Text {
+        width: 100%;
+        height: 100%;
+        text: "×";
+        color: #000000;
+        font-size: 28px;
+        font-weight: 700;
+        font-family: Dy.mono;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
 export component TileShell inherits Rectangle {
     in property <bool> editing: false;
     in property <bool> pending: false;
@@ -660,7 +715,9 @@ export component TileShell inherits Rectangle {
         clicked => { if !root.editing { root.tapped(); } }
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down && root.editing {
-                root.drag-begin(self.mouse-x, self.mouse-y);
+                if self.mouse-x < parent.width - 20px || self.mouse-y > 20px {
+                    root.drag-begin(self.mouse-x, self.mouse-y);
+                }
             }
             if ev.kind == PointerEventKind.up && root.editing {
                 root.drag-end();
@@ -699,27 +756,26 @@ export component TileShell inherits Rectangle {
         }
     }
 
-    if root.editing && !root.ghost: TouchArea {
-        x: parent.width + root.vis-x - 15px;
-        y: root.vis-y - 15px;
-        width: 30px;
-        height: 30px;
-        enabled: !root.layer;
-        clicked => { root.remove(); }
-        Rectangle {
-            border-radius: 15px;
-            border-width: 1.5px;
-            border-color: #ffffff;
-            background: #000000;
-            Text {
-                text: "×";
-                color: #ffffff;
-                font-size: 16px;
-                font-weight: 700;
-                font-family: Dy.mono;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
+    // Drag clone only: interactive badges live in the home overlay so they
+    // paint above neighbouring tiles and never start a drag.
+    if root.editing && !root.ghost && root.layer: Rectangle {
+        x: parent.width + root.vis-x - 20px;
+        y: root.vis-y - 20px;
+        width: 40px;
+        height: 40px;
+        background: #ffffff;
+        border-radius: 0px;
+        border-width: 0px;
+        Text {
+            width: 100%;
+            height: 100%;
+            text: "×";
+            color: #000000;
+            font-size: 28px;
+            font-weight: 700;
+            font-family: Dy.mono;
+            horizontal-alignment: center;
+            vertical-alignment: center;
         }
     }
 

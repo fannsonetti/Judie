@@ -16,8 +16,8 @@ import {
 } from "../lib/homeReadability";
 import { formatClock, formatDateLong } from "../lib/time";
 import { DEMO_ACTIVITY, DEMO_HOST_STATS, DEMO_MEDIA, DEMO_TIMERS, DEMO_WEATHER } from "../lib/demoStats";
-import { GRID_COLS, GRID_ROWS, WidgetInstance, WIDGET_LABELS } from "../types/widgets";
-import { dragOffset, dropCell, leftoverDelta } from "../lib/widgetDrag";
+import { GRID_COLS, GRID_ROWS, SIZE_DIMS, WidgetInstance, WIDGET_LABELS } from "../types/widgets";
+import { dragOffset, dropCell, leftoverDelta, REMOVE_BTN_OVERLAP, REMOVE_BTN_SIZE, acceptRemoveRequest, removeBtnBox } from "../lib/widgetDrag";
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
@@ -1021,8 +1021,102 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   assert(slint.includes("root.drag-closing = false"), "a new drag cancels the previous settle");
   const rust = readFileSync("src-tauri/src/bin/judie-pi.rs", "utf8");
   assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
+  assert(slint.includes("in-out property <int> drop-col"), "drop-col is writable from rust");
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-  assert(pkg.version === "0.2.16", "package version is 0.2.16");
+  assert(pkg.version === "0.2.17", "package version is 0.2.17");
+});
+
+test("edit-mode widget delete control is a square white X", () => {
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8") + readFileSync("src-tauri/ui/pi/cards.slint", "utf8");
+  const css = readFileSync("src/styles/global.css", "utf8");
+  const grid = readFileSync("src/components/home/WidgetGrid.tsx", "utf8");
+  const container = readFileSync("src/components/home/WidgetContainer.tsx", "utf8");
+  const store = readFileSync("src/store/layoutStore.ts", "utf8");
+  const rust = readFileSync("src-tauri/src/pi_room.rs", "utf8");
+  const cargo = readFileSync("src-tauri/Cargo.toml", "utf8");
+  const tauri = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+
+  const btnAt = slint.indexOf("export component WidgetRemoveBtn");
+  const btn = slint.slice(btnAt, btnAt + 1800);
+  assert(btn.includes("width: 40px") && btn.includes("height: 40px"), "square 40px control");
+  assert(btn.includes("background: #ffffff"), "pure white fill");
+  assert(btn.includes("color: #000000") && btn.includes("text: \"×\""), "centered black X");
+  assert(btn.includes("border-radius: 0px"), "square corners");
+  assert(btn.includes("border-width: 0px"), "filled, not outline");
+  assert(!btn.includes("border-radius: 15px") && !btn.includes("border-radius: 50%"), "must not be a circle");
+  assert(btn.includes("accessible-role: AccessibleRole.button"), "keyboard role");
+  assert(btn.includes("accessible-label: root.label"), "accessible name");
+  assert(btn.includes("PointerEventKind.up") && btn.includes("clicked =>"), "pointer and click share a fired guard");
+  assert(btn.includes("root.fired"), "duplicate pointer+touch is ignored");
+
+  assert(slint.includes("ox + (w.col + w.cols) * cell - g - 20px"), "hangs off the right border");
+  assert(slint.includes("oy + w.row * cell - 20px"), "iOS top-right overlap");
+  const overlayAt = slint.indexOf("for w in root.slots: WidgetRemoveBtn");
+  const layerAt = slint.indexOf("if root.drag-id != \"\": TileShell");
+  const tilesAt = slint.indexOf("for w in root.slots: TileShell");
+  assert(overlayAt > tilesAt && overlayAt > layerAt, "delete control paints above tiles and the drag clone");
+  assert(slint.includes("root.edit-mode && w.page == root.page"), "only while editing");
+  assert(slint.includes("pending-remove") && slint.includes("confirm-remove") && slint.includes("cancel-remove"), "confirm/undo kept");
+  assert(rust.includes("self.pending_remove == id"), "duplicate request is ignored");
+  assert(rust.includes("fn widget_remove_keeps_confirm_and_ignores_duplicate_request"), "delete-then-undo rust coverage");
+
+  assert(css.includes(".widget-remove-layer"), "react overlay above widgets");
+  assert(css.includes("background: #ffffff"), "css white fill");
+  const cssBtn = css.slice(css.indexOf(".widget-remove {"), css.indexOf(".page-indicator"));
+  assert(cssBtn.includes("border-radius: 0"), "css square");
+  assert(cssBtn.includes("width: 40px") && cssBtn.includes("height: 40px"), "css 40px");
+  assert(!cssBtn.includes("border-radius: 50%") && !cssBtn.includes("linear-gradient"), "no circle or gray fill");
+  assert(grid.includes("widget-remove-layer"), "overlay layer");
+  assert(grid.indexOf("widget-remove-layer") > grid.indexOf("widget-drag-layer"), "delete layer after widgets");
+  assert(grid.includes("aria-label={`Remove ${WIDGET_LABELS[w.type]}`}"), "useful accessible label");
+  assert(grid.includes("onPointerDown={(e) => e.stopPropagation()}"), "X does not start a drag");
+  assert(container.includes('closest(".widget-remove")'), "shell still ignores the X");
+  assert(!container.includes("className=\"widget-remove\""), "badge is not clipped inside the shell");
+  assert(store.includes("acceptRemoveRequest"), "store drops duplicate pointer/touch");
+
+  assert(acceptRemoveRequest(null, "w1"), "first tap is accepted");
+  assert(!acceptRemoveRequest("w1", "w1"), "second pointer/touch on the same X is ignored");
+  assert(acceptRemoveRequest("w1", "w2"), "a different widget can still be chosen");
+  assert(!acceptRemoveRequest(null, ""), "empty id is ignored");
+
+  const metrics = measureWidgetGrid(1920, 1092);
+  const sizes = Object.keys(SIZE_DIMS) as Array<keyof typeof SIZE_DIMS>;
+  for (const size of sizes) {
+    const dims = SIZE_DIMS[size];
+    const cols = [0, GRID_COLS - dims.cols];
+    const rows = [0, GRID_ROWS - dims.rows];
+    for (const col of cols) {
+      for (const row of rows) {
+        const shellLeft = metrics.offsetX + col * metrics.cellW + metrics.gap / 2;
+        const shellTop = metrics.offsetY + row * metrics.cellH + metrics.gap / 2;
+        const shellWidth = dims.cols * metrics.cellW - metrics.gap;
+        const shellHeight = dims.rows * metrics.cellH - metrics.gap;
+        const box = removeBtnBox(shellLeft, shellTop, shellWidth);
+        assert(box.size === REMOVE_BTN_SIZE && box.size === 40, `${size} square size`);
+        assert(box.x === shellLeft + shellWidth - REMOVE_BTN_OVERLAP, `${size} overlaps the right border`);
+        assert(box.y === shellTop - REMOVE_BTN_OVERLAP, `${size} iOS top hang`);
+        const widget = { x: shellLeft, y: shellTop, w: shellWidth, h: shellHeight };
+        const badge = { x: box.x, y: box.y, w: box.size, h: box.size };
+        assert(boxesOverlap(widget, badge), `${size} at ${col},${row} overlaps the widget`);
+        assert(box.x < shellLeft + shellWidth && box.x + box.size > shellLeft + shellWidth, `${size} crosses the right edge`);
+        const coverW = Math.min(widget.x + widget.w, badge.x + badge.w) - Math.max(widget.x, badge.x);
+        const coverH = Math.min(widget.y + widget.h, badge.y + badge.h) - Math.max(widget.y, badge.y);
+        assert(coverW * coverH < widget.w * widget.h * 0.15, `${size} must not cover important content`);
+        assert(box.x >= -1 && box.y + box.size <= 1200, `${size} stays usable at the screen edge`);
+      }
+    }
+  }
+
+  const leftShellLeft = metrics.offsetX + metrics.gap / 2;
+  const leftShellWidth = metrics.cellW - metrics.gap;
+  const left = removeBtnBox(leftShellLeft, metrics.offsetY + metrics.gap / 2, leftShellWidth);
+  assert(left.x + left.size > leftShellLeft + leftShellWidth, "badge occupies the gutter toward the next widget");
+  assert(overlayAt > tilesAt, "adjacent widgets cannot paint over the X");
+
+  assert(pkg.version === "0.2.17", "npm version");
+  assert(cargo.includes('version = "0.2.17"'), "crate version");
+  assert(tauri.version === "0.2.17", "tauri version");
 });
 
 function textHeightSafe(px: number) {

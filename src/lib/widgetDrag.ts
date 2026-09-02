@@ -1,5 +1,22 @@
 import { GRID_COLS, GRID_ROWS } from "../types/widgets";
 
+/** Square iOS-style edit badge: hangs halfway off the widget’s top-right corner. */
+export const REMOVE_BTN_SIZE = 40;
+export const REMOVE_BTN_OVERLAP = 20;
+
+export function removeBtnBox(shellLeft: number, shellTop: number, shellWidth: number) {
+  return {
+    x: shellLeft + shellWidth - REMOVE_BTN_OVERLAP,
+    y: shellTop - REMOVE_BTN_OVERLAP,
+    size: REMOVE_BTN_SIZE,
+  };
+}
+
+/** Drop a second pointer/touch event aimed at a widget already awaiting confirm. */
+export function acceptRemoveRequest(pendingId: string | null | undefined, id: string) {
+  return id.length > 0 && pendingId !== id;
+}
+
 /** Pointer delta from the press point. Used so a lift into the drag layer does not jump. */
 export function dragOffset(
   pressX: number,

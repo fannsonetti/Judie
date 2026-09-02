@@ -25,6 +25,7 @@ import {
 } from "../lib/layout";
 import { getCustomWidget } from "../store/customWidgetStore";
 import { filledSizes } from "../slopbox/schema";
+import { acceptRemoveRequest } from "../lib/widgetDrag";
 
 function sizesFor(type: WidgetType, customId?: string): WidgetSize[] {
   if (type === "custom") {
@@ -163,7 +164,10 @@ export const useLayoutStore = create<LayoutState>()(
           };
         }),
 
-      requestRemoveWidget: (id) => set({ pendingRemoveId: id }),
+      requestRemoveWidget: (id) => {
+        if (!acceptRemoveRequest(get().pendingRemoveId, id)) return;
+        set({ pendingRemoveId: id });
+      },
 
       cancelRemoveWidget: () => set({ pendingRemoveId: null }),
 

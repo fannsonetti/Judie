@@ -1356,6 +1356,9 @@ impl Room {
     }
 
     pub fn request_remove(&mut self, id: &str) {
+        if id.is_empty() || self.pending_remove == id {
+            return;
+        }
         self.pending_remove = id.into();
     }
 
@@ -2026,6 +2029,28 @@ mod tests {
             let legacy = migrated.routines.iter().find(|r| r.id == "r-old").unwrap();
             assert!(legacy.enabled);
             assert_eq!(legacy.name, "Legacy");
+        });
+    }
+
+    #[test]
+    fn widget_remove_keeps_confirm_and_ignores_duplicate_request() {
+        with_temp_room(|room| {
+            assert!(!room.slots.is_empty());
+            let id = room.slots[0].id.clone();
+            let count = room.slots.len();
+            room.request_remove(&id);
+            room.request_remove(&id);
+            assert_eq!(room.pending_remove, id);
+            assert_eq!(room.slots.len(), count, "confirm still required");
+            room.cancel_remove();
+            assert!(room.pending_remove.is_empty());
+            assert_eq!(room.slots.len(), count, "cancel is the undo");
+            room.request_remove(&id);
+            room.confirm_remove();
+            assert!(!room.slots.iter().any(|s| s.id == id));
+            let after = room.slots.len();
+            room.confirm_remove();
+            assert_eq!(room.slots.len(), after);
         });
     }
 }
