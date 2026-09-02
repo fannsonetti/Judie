@@ -303,6 +303,7 @@ export component MainWindow inherits Window {
     in-out property <int> drop-row: 0;
 
     property <duration> gallery-ease: 0ms;
+    property <string> gallery-size-caption: root.gallery-index == 0 ? "Small  240×240" : (root.gallery-index == 1 ? "Medium  480×240" : "Large  480×480");
     property <length> general-col: min(760px, root.width - 80px);
 
     animate drag-dx { duration: drag-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
@@ -741,7 +742,10 @@ export component MainWindow inherits Window {
                     background: #000000cc;
                     HorizontalLayout {
                         padding: 10px; spacing: 10px; alignment: center;
-                        Pill { label: "ADD WIDGET"; on: true; clicked => { root.open-gallery(); } }
+                        Pill { label: "ADD WIDGET"; on: true; clicked => {
+                            root.gallery-index = root.gallery-size == "2x2" ? 2 : (root.gallery-size == "1x2" ? 1 : 0);
+                            root.open-gallery();
+                        } }
                         Pill { label: "DONE"; clicked => { root.exit-edit(); } }
                     }
                 }
@@ -1392,26 +1396,67 @@ export component MainWindow inherits Window {
         background: #000000cc;
         TouchArea { clicked => { root.close-gallery(); } }
         Rectangle {
-            x: parent.width * 0.08;
-            y: 48px;
-            width: parent.width * 0.84;
-            height: parent.height - 96px;
+            x: (parent.width - 760px) / 2;
+            y: (parent.height - 540px) / 2;
+            width: 760px;
+            height: 540px;
             border-radius: 0px;
             background: #000000;
             border-width: 1px;
             border-color: #3d3d3d;
             TouchArea { clicked => { } }
+            gallery-keys := FocusScope {
+                x: 0px;
+                y: 0px;
+                width: 0px;
+                height: 0px;
+                key-pressed(event) => {
+                    if root.kb-open {
+                        return reject;
+                    }
+                    if event.text == Key.LeftArrow {
+                        if root.gallery-index > 0 {
+                            root.gallery-index -= 1;
+                            root.gallery-set-index(root.gallery-index);
+                        }
+                        return accept;
+                    }
+                    if event.text == Key.RightArrow {
+                        if root.gallery-index < 2 {
+                            root.gallery-index += 1;
+                            root.gallery-set-index(root.gallery-index);
+                        }
+                        return accept;
+                    }
+                    if event.text == Key.Return {
+                        root.gallery-add();
+                        return accept;
+                    }
+                    if event.text == Key.Escape {
+                        root.close-gallery();
+                        return accept;
+                    }
+                    return reject;
+                }
+            }
             HorizontalLayout {
                 padding: 16px;
                 spacing: 16px;
                 VerticalLayout {
-                    width: 260px;
+                    width: 240px;
                     spacing: 8px;
                     Text { text: "ADD WIDGET"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
                     FieldTap { label: "Search"; value: root.gallery-query; active: root.kb-field == "gallery-query"; tapped => { root.open-keyboard("gallery-query"); } }
-                    Pill { label: "Creator"; clicked => { root.open-creator(); } }
-                    Pill { label: "Import"; clicked => { root.gallery-import(); } }
-                    Text { text: "BUILT-IN"; color: #7a7a7a; font-size: 10px; font-family: Dy.mono; }
+                    TouchArea {
+                        height: 32px;
+                        clicked => { root.open-creator(); }
+                        Text { text: "Creator"; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                    }
+                    TouchArea {
+                        height: 32px;
+                        clicked => { root.gallery-import(); }
+                        Text { text: "Import"; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                    }
                     Flickable {
                         vertical-stretch: 1;
                         viewport-height: 24 * 36px;
@@ -1419,6 +1464,8 @@ export component MainWindow inherits Window {
                             spacing: 4px;
                             for item in root.gallery-items: TouchArea {
                                 clicked => {
+                                    root.gallery-index = 0;
+                                    root.gallery-set-index(0);
                                     if item.custom { root.gallery-pick-custom(item.id); } else { root.gallery-pick(item.kind); }
                                 }
                                 Rectangle {
@@ -1434,16 +1481,23 @@ export component MainWindow inherits Window {
                     }
                 }
                 VerticalLayout {
-                    spacing: 10px; horizontal-stretch: 1;
-                    HorizontalLayout {
-                        Text { text: root.gallery-kind; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                        Rectangle { horizontal-stretch: 1; }
-                        Pill { label: "✕"; clicked => { root.close-gallery(); } }
+                    spacing: 10px;
+                    horizontal-stretch: 1;
+                    alignment: center;
+                    Text {
+                        text: root.gallery-desc == "" ? root.gallery-kind : root.gallery-desc;
+                        color: #e6e6e6;
+                        font-size: 16px;
+                        font-weight: 700;
+                        font-family: Dy.mono;
                     }
-                    Text { text: root.gallery-desc; color: #7a7a7a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
-                    carousel := Rectangle {
-                        vertical-stretch: 1;
+                    stage := Rectangle {
+                        width: 240px;
+                        height: 240px;
                         clip: true;
+                        background: #000000;
+                        border-width: 1px;
+                        border-color: #2a2a2a;
                         TouchArea {
                             pointer-event(ev) => {
                                 if ev.kind == PointerEventKind.down {
@@ -1454,10 +1508,10 @@ export component MainWindow inherits Window {
                                 if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
                                     root.gallery-swiping = false;
                                     root.gallery-ease = 220ms;
-                                    if root.gallery-swipe < -64px && root.gallery-index < 2 {
+                                    if root.gallery-swipe < -48px && root.gallery-index < 2 {
                                         root.gallery-index += 1;
                                     }
-                                    if root.gallery-swipe > 64px && root.gallery-index > 0 {
+                                    if root.gallery-swipe > 48px && root.gallery-index > 0 {
                                         root.gallery-index -= 1;
                                     }
                                     root.gallery-swipe = 0px;
@@ -1471,81 +1525,112 @@ export component MainWindow inherits Window {
                             }
                         }
                         HorizontalLayout {
-                            x: -root.gallery-index * parent.width + root.gallery-swipe;
-                            width: parent.width * 3;
+                            x: -root.gallery-index * 240px + root.gallery-swipe;
+                            width: 720px;
+                            height: 240px;
                             spacing: 0;
                             Rectangle {
-                                width: parent.width / 3;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 160px; height: 160px;
-                                        border-width: 1.5px; border-color: #2a2a2a; background: #000000;
-                                        clip: true;
-                                        x: (parent.width - 160px) / 2;
-                                        WidgetFace {
-                                            kind: root.gallery-custom ? "custom" : root.gallery-kind;
-                                            size: "1x1";
-                                            sample: true;
-                                            source: root.preview-source;
-                                            widget-id: root.gallery-custom-id;
-                                            slop-nodes: root.gallery-nodes;
-                                        }
-
+                                width: 240px;
+                                height: 240px;
+                                Rectangle {
+                                    x: 60px;
+                                    y: 60px;
+                                    width: 120px;
+                                    height: 120px;
+                                    border-width: 1px;
+                                    border-color: #2a2a2a;
+                                    background: #000000;
+                                    clip: true;
+                                    WidgetFace {
+                                        kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                        size: "1x1";
+                                        sample: true;
+                                        source: root.preview-source;
+                                        widget-id: root.gallery-custom-id;
+                                        slop-nodes: root.gallery-nodes;
                                     }
                                 }
                             }
                             Rectangle {
-                                width: parent.width / 3;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 280px; height: 140px;
-                                        border-width: 1.5px; border-color: #2a2a2a; background: #000000;
-                                        clip: true;
-                                        x: (parent.width - 280px) / 2;
-                                        WidgetFace {
-                                            kind: root.gallery-custom ? "custom" : root.gallery-kind;
-                                            size: "1x2";
-                                            sample: true;
-                                            source: root.preview-source;
-                                            widget-id: root.gallery-custom-id;
-                                            slop-nodes: root.gallery-nodes;
-                                        }
-
+                                width: 240px;
+                                height: 240px;
+                                Rectangle {
+                                    x: 0px;
+                                    y: 60px;
+                                    width: 240px;
+                                    height: 120px;
+                                    border-width: 1px;
+                                    border-color: #2a2a2a;
+                                    background: #000000;
+                                    clip: true;
+                                    WidgetFace {
+                                        kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                        size: "1x2";
+                                        sample: true;
+                                        source: root.preview-source;
+                                        widget-id: root.gallery-custom-id;
+                                        slop-nodes: root.gallery-nodes;
                                     }
                                 }
                             }
                             Rectangle {
-                                width: parent.width / 3;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        width: 280px; height: 280px;
-                                        border-width: 1.5px; border-color: #2a2a2a; background: #000000;
-                                        clip: true;
-                                        x: (parent.width - 280px) / 2;
-                                        WidgetFace {
-                                            kind: root.gallery-custom ? "custom" : root.gallery-kind;
-                                            size: "2x2";
-                                            sample: true;
-                                            source: root.preview-source;
-                                            widget-id: root.gallery-custom-id;
-                                            slop-nodes: root.gallery-nodes;
-                                        }
-
+                                width: 240px;
+                                height: 240px;
+                                Rectangle {
+                                    width: 240px;
+                                    height: 240px;
+                                    border-width: 1px;
+                                    border-color: #2a2a2a;
+                                    background: #000000;
+                                    clip: true;
+                                    WidgetFace {
+                                        kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                        size: "2x2";
+                                        sample: true;
+                                        source: root.preview-source;
+                                        widget-id: root.gallery-custom-id;
+                                        slop-nodes: root.gallery-nodes;
                                     }
                                 }
                             }
                         }
                     }
                     HorizontalLayout {
-                        alignment: center; spacing: 10px; height: 18px;
-                        TouchArea { clicked => { root.gallery-index = 0; root.gallery-set-index(0); } Rectangle { width: 8px; height: 8px; background: root.gallery-index == 0 ? #ffffff : #4a4a4a; } }
-                        TouchArea { clicked => { root.gallery-index = 1; root.gallery-set-index(1); } Rectangle { width: 8px; height: 8px; background: root.gallery-index == 1 ? #ffffff : #4a4a4a; } }
-                        TouchArea { clicked => { root.gallery-index = 2; root.gallery-set-index(2); } Rectangle { width: 8px; height: 8px; background: root.gallery-index == 2 ? #ffffff : #4a4a4a; } }
+                        alignment: center;
+                        spacing: 10px;
+                        height: 28px;
+                        TouchArea {
+                            width: 28px;
+                            height: 28px;
+                            clicked => { root.gallery-index = 0; root.gallery-set-index(0); }
+                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 0 ? #ffffff : #8a8a8a; }
+                        }
+                        TouchArea {
+                            width: 28px;
+                            height: 28px;
+                            clicked => { root.gallery-index = 1; root.gallery-set-index(1); }
+                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 1 ? #ffffff : #8a8a8a; }
+                        }
+                        TouchArea {
+                            width: 28px;
+                            height: 28px;
+                            clicked => { root.gallery-index = 2; root.gallery-set-index(2); }
+                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 2 ? #ffffff : #8a8a8a; }
+                        }
                     }
-                    Pill { label: "Add to Home"; on: true; clicked => { root.gallery-add(); } }
+                    Text {
+                        text: root.gallery-size-caption;
+                        color: #8a8a8a;
+                        font-size: 12px;
+                        font-family: Dy.mono;
+                        horizontal-alignment: center;
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Pill { label: "Cancel"; clicked => { root.close-gallery(); } }
+                        Rectangle { horizontal-stretch: 1; }
+                        Pill { label: "Add Widget"; on: true; clicked => { root.gallery-add(); } }
+                    }
                 }
             }
         }

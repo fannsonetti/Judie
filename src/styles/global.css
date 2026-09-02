@@ -475,11 +475,11 @@ input:focus-visible {
 
 .wg-panel {
   display: flex;
-  width: min(1180px, 98vw);
-  height: min(920px, 96vh);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-xl);
+  width: min(760px, 92vw);
+  height: min(540px, 86vh);
+  background: #000000;
+  border: 1px solid #3d3d3d;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -530,8 +530,8 @@ input:focus-visible {
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  border: none;
-  border-radius: 12px;
+  border: 1px solid transparent;
+  border-radius: 0;
   background: transparent;
   color: var(--text);
   font-size: 15px;
@@ -543,7 +543,8 @@ input:focus-visible {
 
 .wg-list-item:hover { background: var(--surface-2); }
 .wg-list-item.active {
-  background: var(--surface-3);
+  background: #000000;
+  border-color: #ffffff;
 }
 
 .wg-list-heading {
@@ -650,12 +651,14 @@ input:focus-visible {
 }
 
 .wg-carousel {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
+  flex: none;
+  width: 240px;
+  height: 240px;
+  align-self: center;
   overflow: hidden;
   touch-action: pan-y;
   cursor: grab;
+  border: 1px solid #2a2a2a;
 }
 
 .wg-track {
@@ -690,19 +693,21 @@ input:focus-visible {
 }
 
 .wg-dot {
-  width: 6px;
-  height: 6px;
-  padding: 0;
+  width: 8px;
+  height: 8px;
+  padding: 10px;
+  box-sizing: content-box;
   border: none;
-  border-radius: 99px;
-  background: rgba(255, 255, 255, 0.28);
+  border-radius: 0;
+  background: #8a8a8a;
+  background-clip: content-box;
   cursor: pointer;
-  transition: width 0.2s ease, background 0.2s ease;
 }
 
 .wg-dot.on {
-  width: 16px;
-  background: #fff;
+  width: 8px;
+  background: #ffffff;
+  background-clip: content-box;
 }
 
 .wg-size-caption {
@@ -712,17 +717,44 @@ input:focus-visible {
   flex-shrink: 0;
 }
 
-.wg-add {
+.wg-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 12px;
-  height: 40px;
-  padding: 0 22px;
-  border-radius: 12px;
-  background: var(--accent);
-  color: #fff;
+  flex-shrink: 0;
+}
+
+.wg-cancel {
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 0;
+  border: 1.5px solid #2a2a2a;
+  background: #000000;
+  color: #8a8a8a;
   font-size: 14px;
   font-weight: 650;
-  border: none;
+  cursor: pointer;
+}
+
+.wg-add {
+  margin-top: 0;
+  margin-left: auto;
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 0;
+  background: #000000;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 650;
+  border: 1.5px solid #ffffff;
   flex-shrink: 0;
+  cursor: pointer;
+}
+
+.wg-add:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .wg-sizes {

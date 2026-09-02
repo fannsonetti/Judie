@@ -16,8 +16,9 @@ import {
 } from "../lib/homeReadability";
 import { formatClock, formatDateLong } from "../lib/time";
 import { DEMO_ACTIVITY, DEMO_HOST_STATS, DEMO_MEDIA, DEMO_TIMERS, DEMO_WEATHER } from "../lib/demoStats";
-import { GRID_COLS, GRID_ROWS, SIZE_DIMS, WidgetInstance, WIDGET_LABELS } from "../types/widgets";
+import { GRID_COLS, GRID_ROWS, SIZE_DIMS, WidgetInstance, WIDGET_LABELS, WIDGET_SUPPORTED_SIZES } from "../types/widgets";
 import { dragOffset, dropCell, leftoverDelta, REMOVE_BTN_OVERLAP, REMOVE_BTN_SIZE, acceptRemoveRequest, removeBtnBox } from "../lib/widgetDrag";
+import { GALLERY_SIZE_INFO, GALLERY_SIZE_ORDER, GALLERY_STAGE, galleryPreviewBox, gallerySizeAt, gallerySizeCaption, gallerySwipeIndex } from "../lib/gallerySizes";
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
@@ -1023,7 +1024,7 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
   assert(slint.includes("in-out property <int> drop-col"), "drop-col is writable from rust");
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-  assert(pkg.version === "0.2.17", "package version is 0.2.17");
+  assert(pkg.version === "0.2.18", "package version is 0.2.18");
 });
 
 test("edit-mode widget delete control is a square white X", () => {
@@ -1114,9 +1115,78 @@ test("edit-mode widget delete control is a square white X", () => {
   assert(left.x + left.size > leftShellLeft + leftShellWidth, "badge occupies the gutter toward the next widget");
   assert(overlayAt > tilesAt, "adjacent widgets cannot paint over the X");
 
-  assert(pkg.version === "0.2.17", "npm version");
-  assert(cargo.includes('version = "0.2.17"'), "crate version");
-  assert(tauri.version === "0.2.17", "tauri version");
+  assert(pkg.version === "0.2.18", "npm version");
+  assert(cargo.includes('version = "0.2.18"'), "crate version");
+  assert(tauri.version === "0.2.18", "tauri version");
+});
+
+test("widget editor size carousel is compact and has three sizes", () => {
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  const gallery = readFileSync("src/components/home/WidgetGallery.tsx", "utf8");
+  const css = readFileSync("src/styles/global.css", "utf8");
+  const rust = readFileSync("src-tauri/src/pi_room.rs", "utf8");
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  const cargo = readFileSync("src-tauri/Cargo.toml", "utf8");
+  const tauri = JSON.parse(readFileSync("src-tauri/tauri.conf.json", "utf8"));
+
+  assert(GALLERY_SIZE_INFO["1x1"].width === 240 && GALLERY_SIZE_INFO["1x1"].height === 240, "small 240×240");
+  assert(GALLERY_SIZE_INFO["1x2"].width === 480 && GALLERY_SIZE_INFO["1x2"].height === 240, "medium 480×240");
+  assert(GALLERY_SIZE_INFO["2x2"].width === 480 && GALLERY_SIZE_INFO["2x2"].height === 480, "large 480×480");
+  assert(GALLERY_SIZE_ORDER.length === 3, "exactly three sizes");
+
+  const stage = GALLERY_STAGE;
+  const small = galleryPreviewBox("1x1");
+  const medium = galleryPreviewBox("1x2");
+  const large = galleryPreviewBox("2x2");
+  assert(large.w === stage.w && large.h === stage.h, "large fills the stage without growing it");
+  assert(small.w === small.h && small.w < stage.w, "small stays 1:1 and smaller than the stage");
+  assert(medium.w / medium.h === 2, "medium keeps 2:1");
+  assert(small.w / small.h === large.w / large.h, "small and large share aspect");
+  assert(medium.w === stage.w && medium.h < stage.h, "medium uses full width, not extra height");
+  assert(gallerySizeCaption("1x1") === "Small  240×240", gallerySizeCaption("1x1"));
+  assert(gallerySizeCaption("1x2") === "Medium  480×240", "medium caption");
+  assert(gallerySizeCaption("2x2") === "Large  480×480", "large caption");
+  assert(gallerySwipeIndex(0, -80) === 1, "swipe left goes to medium");
+  assert(gallerySwipeIndex(1, 80) === 0, "swipe right goes to small");
+  assert(gallerySwipeIndex(2, -80) === 2, "large is the last page");
+  assert(gallerySizeAt(5) === "2x2" && gallerySizeAt(-1) === "1x1", "index is clamped");
+
+  for (const type of Object.keys(WIDGET_SUPPORTED_SIZES) as Array<keyof typeof WIDGET_SUPPORTED_SIZES>) {
+    const sizes = WIDGET_SUPPORTED_SIZES[type];
+    assert(sizes.length === 3, `${type} has three sizes`);
+    assert(sizes[0] === "1x1" && sizes[1] === "1x2" && sizes[2] === "2x2", `${type} order`);
+  }
+
+  assert(slint.includes("width: 760px") && slint.includes("height: 540px"), "panel does not cover the home screen");
+  assert(slint.includes("width: 240px") && slint.includes("height: 240px"), "compact 240 stage");
+  assert(slint.includes("width: 120px") && slint.includes("height: 120px"), "small preview is scaled 1:1");
+  assert(!slint.includes("width: 280px; height: 280px"), "large must not enlarge the preview stage");
+  assert(!slint.includes("vertical-stretch: 1;\n                        clip: true;"), "carousel is not a stretching pane");
+  assert(slint.includes("label: \"Add Widget\""), "Add Widget is obvious");
+  assert(slint.includes("label: \"Cancel\""), "Cancel is in reach");
+  assert(!slint.includes("Add to Home"), "old add label removed");
+  assert(!slint.includes('Pill { label: "✕"'), "duplicate close control removed");
+  assert(slint.includes("background: root.gallery-index == 0 ? #ffffff : #8a8a8a"), "active white, inactive gray");
+  assert(slint.includes("gallery-keys := FocusScope"), "keyboard focus in the editor");
+  assert(slint.includes("Key.LeftArrow") && slint.includes("Key.RightArrow") && slint.includes("Key.Return"), "keyboard size nav");
+  assert(slint.includes("gallery-size-caption"), "size name and dimensions");
+  assert(rust.includes('&["1x1", "1x2", "2x2"]'), "pi supports three sizes");
+
+  assert(css.includes("width: min(760px") && css.includes("height: min(540px"), "react panel is compact");
+  assert(css.includes("width: 240px") && css.includes("height: 240px"), "react stage is compact");
+  const dots = css.slice(css.indexOf(".wg-dot {"), css.indexOf(".wg-size-caption"));
+  assert(dots.includes("border-radius: 0"), "square dots");
+  assert(dots.includes("background: #8a8a8a"), "inactive gray");
+  assert(css.includes("background: #ffffff") || dots.includes("#ffffff"), "active white");
+  assert(!dots.includes("border-radius: 99px"), "dots are not pills");
+  assert(gallery.includes("gallerySwipeIndex") && gallery.includes("ArrowLeft"), "swipe and keyboard");
+  assert(gallery.includes("Add Widget") && gallery.includes("Cancel"), "add and cancel");
+  assert(gallery.includes("aria-label={gallerySizeCaption(s)}"), "dot accessible names");
+  assert(gallery.includes('role="dialog"'), "keyboard dialog");
+
+  assert(pkg.version === "0.2.18", "npm version");
+  assert(cargo.includes('version = "0.2.18"'), "crate version");
+  assert(tauri.version === "0.2.18", "tauri version");
 });
 
 function textHeightSafe(px: number) {

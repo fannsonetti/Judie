@@ -193,11 +193,8 @@ fn default_slots() -> Vec<Slot> {
     ]
 }
 
-pub fn supported_sizes(kind: &str) -> &'static [&'static str] {
-    match kind {
-        "climate" | "quickControls" | "server" | "timers" => &["1x1", "1x2"],
-        _ => &["1x1", "1x2", "2x2"],
-    }
+pub fn supported_sizes(_kind: &str) -> &'static [&'static str] {
+    &["1x1", "1x2", "2x2"]
 }
 
 pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
@@ -2051,6 +2048,34 @@ mod tests {
             let after = room.slots.len();
             room.confirm_remove();
             assert_eq!(room.slots.len(), after);
+        });
+    }
+
+    #[test]
+    fn gallery_offers_three_sizes_without_rewriting_placed_widgets() {
+        with_temp_room(|room| {
+            assert_eq!(supported_sizes("climate"), &["1x1", "1x2", "2x2"]);
+            assert_eq!(supported_sizes("timers").len(), 3);
+            let before: Vec<(String, String, i32, i32)> = room
+                .slots
+                .iter()
+                .map(|s| (s.id.clone(), s.size.clone(), s.col, s.row))
+                .collect();
+            room.gallery_kind = "climate".into();
+            room.gallery_size = "1x1".into();
+            room.cycle_gallery_size(1);
+            assert_eq!(room.gallery_size, "1x2");
+            room.cycle_gallery_size(1);
+            assert_eq!(room.gallery_size, "2x2");
+            room.cycle_gallery_size(-1);
+            assert_eq!(room.gallery_size, "1x2");
+            let _ = room.gallery_add_selected();
+            for (id, size, col, row) in before {
+                let now = room.slots.iter().find(|s| s.id == id).unwrap();
+                assert_eq!(now.size, size);
+                assert_eq!(now.col, col);
+                assert_eq!(now.row, row);
+            }
         });
     }
 }

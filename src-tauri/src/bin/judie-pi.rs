@@ -274,16 +274,20 @@ fn push_ui(ui: &MainWindow) {
         ui.set_creator_selected(room.creator_selected.clone().into());
         ui.set_creator_selected_kind(room.selected_creator_kind_label().into());
         ui.set_creator_node_text(room.selected_creator_text().into());
-        let desc = if room.gallery_kind == "custom" {
-            "A widget from Widget Creator."
+        let title = if room.gallery_kind == "custom" {
+            room.custom
+                .iter()
+                .find(|c| c.id == room.gallery_custom_id)
+                .map(|c| c.name.clone())
+                .unwrap_or_else(|| "Custom".into())
         } else {
             pi_room::gallery_kinds()
                 .iter()
                 .find(|(k, _, _)| *k == room.gallery_kind)
-                .map(|(_, _, d)| *d)
-                .unwrap_or("")
+                .map(|(_, label, _)| (*label).to_string())
+                .unwrap_or_else(|| room.gallery_kind.clone())
         };
-        ui.set_gallery_desc(desc.into());
+        ui.set_gallery_desc(title.into());
 
         let hours: Vec<HourRow> = room
             .hours

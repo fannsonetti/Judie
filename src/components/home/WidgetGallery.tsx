@@ -3,8 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   WidgetType,
   WIDGET_LABELS,
-  WIDGET_SUPPORTED_SIZES,
-  SIZE_LABELS,
 } from "../../types/widgets";
 import { useLayoutStore } from "../../store/layoutStore";
 import { useCustomWidgetStore } from "../../store/customWidgetStore";
@@ -12,7 +10,14 @@ import { parseWidgetFile } from "../../slopbox/export";
 import { filledSizes } from "../../slopbox/schema";
 import { useSlopStore } from "../../slopbox/store";
 import { overlayTransition } from "../../lib/performance";
-import { liveFrame, liveShellSize } from "../../lib/widgetGrid";
+import {
+  GALLERY_SIZE_ORDER,
+  galleryIndexForSize,
+  galleryPreviewBox,
+  gallerySizeAt,
+  gallerySizeCaption,
+  gallerySwipeIndex,
+} from "../../lib/gallerySizes";
 import { WidgetFace } from "../widgets/WidgetFace";
 import { WidgetDemoProvider } from "../widgets/demo";
 import { FieldTap } from "../chrome/FieldTap";
@@ -20,20 +25,6 @@ import { ConfirmSheet } from "../chrome/ConfirmSheet";
 import { useChromeStore } from "../../store/chromeStore";
 
 const PREVIEW_SOURCE: "live" | "image" = "live";
-
-const DESCRIPTIONS: Record<Exclude<WidgetType, "custom">, string> = {
-  activity: "See a live feed of what Judie and your automations have been doing.",
-  calendar: "Keep track of your upcoming events and schedule at a glance.",
-  climate: "Monitor indoor temperature, humidity, and comfort levels in real time.",
-  lights: "Control your room lighting with quick toggles, brightness, and colour temperature.",
-  media: "See what's playing, adjust volume, and skip tracks without leaving the home screen.",
-  purifier: "Check air quality, AQI readings, and manage your air purifier settings.",
-  quickControls: "One-tap access to your favourite scenes and room presets.",
-  server: "Monitor the health and latency of local services and backend connections.",
-  timers: "View and manage running timers, alarms, and reminders.",
-  system: "Live CPU and memory from this computer, plus the processes using the most.",
-  weather: "Stay ahead of the forecast with real-time local weather conditions and upcoming predictions.",
-};
 
 type Sel = { kind: "builtin"; type: Exclude<WidgetType, "custom"> } | { kind: "custom"; id: string };
 
@@ -59,7 +50,6 @@ export function WidgetGallery() {
   const [selected, setSelected] = useState<Sel>({ kind: "builtin", type: types[0] });
   const [sizeIndex, setSizeIndex] = useState(0);
   const [query, setQuery] = useState("");
-  const [frame, setFrame] = useState(() => liveFrame());
   const [notice, setNotice] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
 
@@ -78,19 +68,12 @@ export function WidgetGallery() {
             : { kind: "builtin", type: types[0] };
 
   const custom = current.kind === "custom" ? customWidgets.find((w) => w.id === current.id) : null;
-  const sizes =
-    current.kind === "custom"
-      ? custom
-        ? filledSizes(custom)
-        : []
-      : WIDGET_SUPPORTED_SIZES[current.type];
-  const activeSize = sizes[Math.min(sizeIndex, Math.max(0, sizes.length - 1))] ?? sizes[0];
+  const sizes = GALLERY_SIZE_ORDER;
+  const activeSize = gallerySizeAt(sizeIndex);
   const name = current.kind === "custom" ? (custom?.name ?? "Custom") : WIDGET_LABELS[current.type];
-  const desc =
-    current.kind === "custom"
-      ? "Custom widget from Widget Creator. Swipe to pick a size, then add it to Home."
-      : DESCRIPTIONS[current.type];
   const selKey = current.kind === "custom" ? `c:${current.id}` : `b:${current.type}`;
+  const canAdd =
+    current.kind === "builtin" || (custom ? filledSizes(custom).includes(activeSize) : false);
 
   useEffect(() => {
     setSizeIndex(0);
@@ -103,13 +86,33 @@ export function WidgetGallery() {
       if (useChromeStore.getState().kbField === "gallery-query") {
         useChromeStore.getState().closeKeyboard();
       }
-      return;
     }
-    const sync = () => setFrame(liveFrame());
-    sync();
-    window.addEventListener("resize", sync);
-    return () => window.removeEventListener("resize", sync);
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (typing) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        go(sizeIndex - 1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        go(sizeIndex + 1);
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        addCurrent();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, sizeIndex, canAdd, current, activeSize]);
 
   const importFile = async (file: File | undefined) => {
     if (!file) return;
@@ -134,13 +137,12 @@ export function WidgetGallery() {
   };
 
   const go = (next: number) => {
-    if (sizes.length === 0) return;
-    setSizeIndex(Math.max(0, Math.min(sizes.length - 1, next)));
+    setSizeIndex(galleryIndexForSize(gallerySizeAt(next)));
     setDragX(0);
   };
 
   const addCurrent = () => {
-    if (!activeSize) return;
+    if (!canAdd || !activeSize) return;
     if (current.kind === "custom") addWidget("custom", activeSize, undefined, current.id);
     else addWidget(current.type, activeSize);
     setGalleryOpen(false);
@@ -152,21 +154,21 @@ export function WidgetGallery() {
   };
 
   const onSwipeMove = (e: React.PointerEvent) => {
-    if (!swipe.current || sizes.length < 2) return;
+    if (!swipe.current) return;
     setDragX(e.clientX - swipe.current.x);
   };
 
   const onSwipeUp = (e: React.PointerEvent) => {
     const start = swipe.current;
     swipe.current = null;
-    if (!start || sizes.length < 2) {
+    if (!start) {
       setDragX(0);
       return;
     }
     const dx = e.clientX - start.x;
     const dy = Math.abs(e.clientY - start.y);
-    if (Math.abs(dx) > 48 && Math.abs(dx) > dy) {
-      go(sizeIndex + (dx < 0 ? 1 : -1));
+    if (Math.abs(dx) > Math.abs(dy)) {
+      go(gallerySwipeIndex(sizeIndex, dx));
     } else {
       setDragX(0);
     }
@@ -184,6 +186,9 @@ export function WidgetGallery() {
         >
           <motion.div
             className="wg-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add Widget"
             initial={{ opacity: 0, y: 16, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -204,153 +209,109 @@ export function WidgetGallery() {
               <h2 className="wg-title">Add Widget</h2>
               <FieldTap label="Search" field="gallery-query" value={query} onCommit={setQuery} live />
               <div className="wg-list">
-                <button
-                  type="button"
-                  className="wg-list-item"
-                  onClick={() => openCreator()}
-                >
-                  <span className="wg-list-name">Open Widget Creator…</span>
+                <button type="button" className="wg-list-item" onClick={() => openCreator()}>
+                  <span className="wg-list-name">Creator</span>
                 </button>
-                <button
-                  type="button"
-                  className="wg-list-item"
-                  onClick={() => fileRef.current?.click()}
-                >
-                  <span className="wg-list-name">Import widget file…</span>
+                <button type="button" className="wg-list-item" onClick={() => fileRef.current?.click()}>
+                  <span className="wg-list-name">Import</span>
                 </button>
-                {visibleCustom.length > 0 && (
-                  <>
-                    <div className="wg-list-heading">Custom</div>
-                    {visibleCustom.map((w) => (
-                      <button
-                        key={w.id}
-                        type="button"
-                        className={`wg-list-item ${current.kind === "custom" && current.id === w.id ? "active" : ""}`}
-                        onClick={() => setSelected({ kind: "custom", id: w.id })}
-                      >
-                        <span className="wg-list-name">{w.name}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
-                {visible.length > 0 && (
-                  <>
-                    <div className="wg-list-heading">Built-in</div>
-                    {visible.map((type) => (
-                      <button
-                        key={type}
-                        type="button"
-                        className={`wg-list-item ${current.kind === "builtin" && type === current.type ? "active" : ""}`}
-                        onClick={() => setSelected({ kind: "builtin", type })}
-                      >
-                        <span className="wg-list-name">{WIDGET_LABELS[type]}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
+                {visibleCustom.length > 0 &&
+                  visibleCustom.map((w) => (
+                    <button
+                      key={w.id}
+                      type="button"
+                      className={`wg-list-item ${current.kind === "custom" && current.id === w.id ? "active" : ""}`}
+                      onClick={() => setSelected({ kind: "custom", id: w.id })}
+                    >
+                      <span className="wg-list-name">{w.name}</span>
+                    </button>
+                  ))}
+                {visible.map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`wg-list-item ${current.kind === "builtin" && type === current.type ? "active" : ""}`}
+                    onClick={() => setSelected({ kind: "builtin", type })}
+                  >
+                    <span className="wg-list-name">{WIDGET_LABELS[type]}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
             <div className="wg-detail">
-              <button
-                type="button"
-                className="wg-close"
-                onClick={() => setGalleryOpen(false)}
+              <h3 className="wg-detail-name">{name}</h3>
+              <div
+                className="wg-carousel"
+                onPointerDown={onSwipeDown}
+                onPointerMove={onSwipeMove}
+                onPointerUp={onSwipeUp}
+                onPointerCancel={() => {
+                  swipe.current = null;
+                  setDragX(0);
+                }}
               >
-                ✕
-              </button>
-
-              <div className="wg-detail-top">
-                <h3 className="wg-detail-name">{name}</h3>
-                <p className="wg-detail-desc">{desc}</p>
+                <div
+                  className="wg-track"
+                  style={{
+                    transform: `translate3d(calc(${-sizeIndex * 100}% + ${dragX}px), 0, 0)`,
+                    transition: swipe.current ? "none" : "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
+                  }}
+                >
+                  {sizes.map((s) => {
+                    const box = galleryPreviewBox(s);
+                    return (
+                      <div key={s} className="wg-slide">
+                        <div
+                          className="widget-shell wg-preview-shell"
+                          style={{ width: box.w, height: box.h }}
+                        >
+                          <div className="widget-face">
+                            {PREVIEW_SOURCE === "live" ? (
+                              <WidgetDemoProvider>
+                                <WidgetFace
+                                  type={current.kind === "custom" ? "custom" : current.type}
+                                  size={s}
+                                  customId={current.kind === "custom" ? current.id : undefined}
+                                />
+                              </WidgetDemoProvider>
+                            ) : (
+                              <img
+                                className="wg-thumb"
+                                alt=""
+                                src={`/previews/${current.kind === "custom" ? current.id : current.type}-${s}.png`}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              {sizes.length === 0 ? (
-                <p className="wg-hint">
-                  This widget has no completed sizes. Open Widget Creator and lay out at least one size.
-                </p>
-              ) : (
-                <>
-                  <div
-                    className="wg-carousel"
-                    onPointerDown={onSwipeDown}
-                    onPointerMove={onSwipeMove}
-                    onPointerUp={onSwipeUp}
-                    onPointerCancel={() => {
-                      swipe.current = null;
-                      setDragX(0);
-                    }}
-                  >
-                    <div
-                      className="wg-track"
-                      style={{
-                        transform: `translate3d(calc(${-Math.min(sizeIndex, Math.max(0, sizes.length - 1)) * 100}% + ${dragX}px), 0, 0)`,
-                        transition: swipe.current ? "none" : "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)",
-                      }}
-                    >
-                      {sizes.map((s) => {
-                        const box = liveShellSize(s, frame);
-                        return (
-                          <div key={s} className="wg-slide">
-                            <div
-                              className="widget-shell wg-preview-shell"
-                              style={{
-                                width: box.w,
-                                height: box.h,
-                              }}
-                            >
-                              <div className="widget-face">
-                                {PREVIEW_SOURCE === "live" ? (
-                                  <WidgetDemoProvider>
-                                    <WidgetFace
-                                      type={current.kind === "custom" ? "custom" : current.type}
-                                      size={s}
-                                      customId={current.kind === "custom" ? current.id : undefined}
-                                    />
-                                  </WidgetDemoProvider>
-                                ) : (
-                                  <img
-                                    className="wg-thumb"
-                                    alt=""
-                                    src={`/previews/${current.kind === "custom" ? current.id : current.type}-${s}.png`}
-                                  />
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="wg-dots" role="tablist" aria-label="Widget sizes">
-                    {sizes.map((s, i) => (
-                      <button
-                        key={s}
-                        type="button"
-                        role="tab"
-                        aria-selected={i === sizeIndex}
-                        className={`wg-dot ${i === sizeIndex ? "on" : ""}`}
-                        onClick={() => go(i)}
-                      />
-                    ))}
-                  </div>
-                  <p className="wg-size-caption">{activeSize ? SIZE_LABELS[activeSize] : ""}</p>
-                  <button type="button" className="wg-add" onClick={addCurrent}>
-                    Add to Home
-                  </button>
-                </>
-              )}
-
-              {current.kind === "custom" && (
-                <button
-                  type="button"
-                  className="wg-hint-btn"
-                  onClick={() => openCreator(current.id)}
-                >
-                  Edit in Widget Creator
+              <div className="wg-dots" role="tablist" aria-label="Widget sizes">
+                {sizes.map((s, i) => (
+                  <button
+                    key={s}
+                    type="button"
+                    role="tab"
+                    aria-selected={i === sizeIndex}
+                    aria-label={gallerySizeCaption(s)}
+                    className={`wg-dot ${i === sizeIndex ? "on" : ""}`}
+                    onClick={() => go(i)}
+                  />
+                ))}
+              </div>
+              <p className="wg-size-caption">{gallerySizeCaption(activeSize)}</p>
+              <div className="wg-actions">
+                <button type="button" className="wg-cancel" onClick={() => setGalleryOpen(false)}>
+                  Cancel
                 </button>
-              )}
+                <button type="button" className="wg-add" onClick={addCurrent} disabled={!canAdd}>
+                  Add Widget
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>
