@@ -65,6 +65,7 @@ export component MainWindow inherits Window {
     in-out property <[TimerRow]> timers: [];
 
     in-out property <bool> settings-open: false;
+    in-out property <bool> reduced-motion: false;
     in-out property <bool> palette-open: false;
     in-out property <bool> gallery-open: false;
     in-out property <bool> creator-open: false;
@@ -263,9 +264,18 @@ export component MainWindow inherits Window {
     property <length> swipe-x: 0px;
     property <float> settings-pull: 0;
     property <bool> settings-tracking: false;
+    property <bool> settings-armed: false;
     property <length> settings-start: 0px;
     property <float> settings-base: 0;
-    property <duration> settings-ease: 0ms;
+    property <float> settings-from: 0;
+    property <float> settings-goal: 0;
+    property <float> settings-anim-t: 1;
+    property <int> settings-anim-ms: 240;
+    property <bool> settings-animating: false;
+    property <float> settings-velocity: 0;
+    property <float> settings-prev-pull: 0;
+    property <int> settings-kind: 0;
+    property <float> settings-eased: 0;
     property <string> drag-id: "";
     property <length> drag-dx: 0px;
     property <length> drag-dy: 0px;
@@ -283,15 +293,91 @@ export component MainWindow inherits Window {
 
     property <duration> gallery-ease: 0ms;
 
-    animate settings-pull { duration: settings-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
     animate drag-dx { duration: drag-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
     animate drag-dy { duration: drag-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
     animate gallery-swipe { duration: gallery-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
 
-    changed settings-open => {
+    function settings-pos(area-y: length, local-y: length) -> length {
+        return area-y + local-y;
+    }
+
+    function settings-follow(window-y: length) {
+        root.settings-pull = max(0, min(1, root.settings-base + ((window-y - root.settings-start) / root.height)));
+    }
+
+    function settings-begin(kind: int, window-y: length) {
+        root.settings-animating = false;
+        root.settings-kind = kind;
+        root.settings-armed = false;
+        root.settings-tracking = true;
+        root.settings-start = window-y;
+        root.settings-base = root.settings-pull;
+        root.settings-prev-pull = root.settings-pull;
+        root.settings-velocity = 0;
+        root.net-menu-open = false;
+    }
+
+    function settings-commit() {
+        root.settings-animating = false;
+        root.settings-pull = root.settings-goal;
+        if root.settings-goal >= 0.5 {
+            root.open-settings();
+        } else {
+            root.close-overlay();
+        }
+    }
+
+    function settings-finish(cancelled: bool) {
+        if !root.settings-tracking && !root.settings-armed {
+            return;
+        }
+        root.settings-armed = false;
         if !root.settings-tracking {
-            root.settings-ease = 240ms;
-            root.settings-pull = root.settings-open ? 1.0 : 0.0;
+            return;
+        }
+        root.settings-tracking = false;
+        root.settings-from = root.settings-pull;
+        if cancelled {
+            root.settings-goal = root.settings-kind == 0 ? 0.0 : 1.0;
+        } else if root.settings-kind == 0 {
+            if root.settings-pull < 0.06 {
+                root.settings-goal = 0.0;
+            } else if root.settings-velocity > 0.85 {
+                root.settings-goal = 1.0;
+            } else if root.settings-velocity < -0.85 {
+                root.settings-goal = 0.0;
+            } else if root.settings-pull >= 0.32 {
+                root.settings-goal = 1.0;
+            } else {
+                root.settings-goal = 0.0;
+            }
+        } else if (1.0 - root.settings-pull) < 0.06 {
+            root.settings-goal = 1.0;
+        } else if root.settings-velocity < -0.85 {
+            root.settings-goal = 0.0;
+        } else if root.settings-velocity > 0.85 {
+            root.settings-goal = 1.0;
+        } else if root.settings-pull <= 0.68 {
+            root.settings-goal = 0.0;
+        } else {
+            root.settings-goal = 1.0;
+        }
+        if abs(root.settings-goal - root.settings-from) < 0.001 {
+            root.settings-commit();
+        } else {
+            root.settings-anim-t = 0;
+            root.settings-anim-ms = root.reduced-motion ? 90 : 240;
+            root.settings-animating = true;
+        }
+    }
+
+    changed settings-open => {
+        if !root.settings-tracking && !root.settings-animating && abs(root.settings-pull - (root.settings-open ? 1.0 : 0.0)) >= 0.001 {
+            root.settings-from = root.settings-pull;
+            root.settings-goal = root.settings-open ? 1.0 : 0.0;
+            root.settings-anim-t = 0;
+            root.settings-anim-ms = root.reduced-motion ? 90 : 240;
+            root.settings-animating = true;
         }
     }
 
@@ -333,34 +419,34 @@ export component MainWindow inherits Window {
                 width: 48px;
                 height: 100%;
                 clicked => {
-                    if root.settings-pull < 0.08 && !root.settings-tracking {
+                    if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open {
                         if root.net-menu-open { root.close-net-menu(); } else { root.open-net-menu(); }
                     }
                 }
                 pointer-event(ev) => {
                     if ev.kind == PointerEventKind.down {
-                        root.settings-start = self.mouse-y;
-                    }
-                    if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
-                        if root.settings-tracking {
-                            root.settings-tracking = false;
-                            root.settings-ease = 240ms;
-                            if root.settings-pull > 0.32 {
-                                root.settings-pull = 1.0;
-                                root.open-settings();
-                            } else {
-                                root.settings-pull = 0;
-                                root.close-overlay();
-                            }
+                        if !root.settings-open && root.settings-pull < 0.08 {
+                            root.settings-armed = true;
+                            root.settings-kind = 0;
+                            root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
+                            root.settings-base = root.settings-pull;
                         }
+                    }
+                    if ev.kind == PointerEventKind.up {
+                        root.settings-finish(false);
+                    }
+                    if ev.kind == PointerEventKind.cancel {
+                        root.settings-finish(true);
                     }
                 }
                 moved => {
-                    if self.pressed && (root.settings-tracking || self.mouse-y - root.settings-start > 18px) {
-                        root.settings-tracking = true;
-                        root.net-menu-open = false;
-                        root.settings-ease = 0ms;
-                        root.settings-pull = max(0, min(1, self.mouse-y / root.height));
+                    if self.pressed && !root.settings-open && (root.settings-tracking || root.settings-armed) {
+                        if !root.settings-tracking && root.settings-pos(self.absolute-position.y, self.mouse-y) - root.settings-start > 18px {
+                            root.settings-begin(0, root.settings-start);
+                        }
+                        if root.settings-tracking {
+                            root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+                        }
                     }
                 }
                 NetGlyph {
@@ -376,26 +462,28 @@ export component MainWindow inherits Window {
                 height: 100%;
                 pointer-event(ev) => {
                     if ev.kind == PointerEventKind.down {
-                        root.settings-tracking = true;
-                        root.settings-ease = 0ms;
-                    }
-                    if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
-                        if root.settings-tracking {
-                            root.settings-tracking = false;
-                            root.settings-ease = 240ms;
-                            if root.settings-pull > 0.32 {
-                                root.settings-pull = 1.0;
-                                root.open-settings();
-                            } else {
-                                root.settings-pull = 0;
-                                root.close-overlay();
-                            }
+                        if !root.settings-open && root.settings-pull < 0.08 {
+                            root.settings-armed = true;
+                            root.settings-kind = 0;
+                            root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
+                            root.settings-base = root.settings-pull;
                         }
+                    }
+                    if ev.kind == PointerEventKind.up {
+                        root.settings-finish(false);
+                    }
+                    if ev.kind == PointerEventKind.cancel {
+                        root.settings-finish(true);
                     }
                 }
                 moved => {
-                    if root.settings-tracking && self.pressed {
-                        root.settings-pull = max(0, min(1, self.mouse-y / root.height));
+                    if self.pressed && !root.settings-open && (root.settings-tracking || root.settings-armed) {
+                        if !root.settings-tracking && root.settings-pos(self.absolute-position.y, self.mouse-y) - root.settings-start > 18px {
+                            root.settings-begin(0, root.settings-start);
+                        }
+                        if root.settings-tracking {
+                            root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+                        }
                     }
                 }
             }
@@ -675,20 +763,41 @@ export component MainWindow inherits Window {
 
     if root.settings-tracking: TouchArea {
         pointer-event(ev) => {
-            if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
-                root.settings-tracking = false;
-                root.settings-ease = 240ms;
-                if root.settings-pull > 0.32 {
-                    root.settings-pull = 1.0;
-                    root.open-settings();
-                } else {
-                    root.settings-pull = 0;
-                    root.close-overlay();
-                }
+            if ev.kind == PointerEventKind.up {
+                root.settings-finish(false);
+            }
+            if ev.kind == PointerEventKind.cancel {
+                root.settings-finish(true);
             }
         }
         moved => {
-            root.settings-pull = max(0, min(1, self.mouse-y / parent.height));
+            root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+        }
+    }
+
+    Timer {
+        interval: 16ms;
+        running: root.settings-tracking;
+        triggered => {
+            root.settings-velocity = (root.settings-pull - root.settings-prev-pull) / 0.016;
+            root.settings-prev-pull = root.settings-pull;
+        }
+    }
+
+    Timer {
+        interval: 16ms;
+        running: root.settings-animating;
+        triggered => {
+            root.settings-anim-t = min(1.0, root.settings-anim-t + 16.0 / root.settings-anim-ms);
+            if root.reduced-motion {
+                root.settings-eased = root.settings-anim-t;
+            } else {
+                root.settings-eased = 1.0 - (1.0 - root.settings-anim-t) * (1.0 - root.settings-anim-t) * (1.0 - root.settings-anim-t);
+            }
+            root.settings-pull = root.settings-from + (root.settings-goal - root.settings-from) * root.settings-eased;
+            if root.settings-anim-t >= 1 {
+                root.settings-commit();
+            }
         }
     }
 
@@ -697,35 +806,6 @@ export component MainWindow inherits Window {
         width: 100%;
         height: 100%;
         background: #000000;
-        TouchArea {
-            height: 36px;
-            pointer-event(ev) => {
-                if ev.kind == PointerEventKind.down {
-                    root.settings-tracking = true;
-                    root.settings-ease = 0ms;
-                    root.settings-start = self.mouse-y;
-                    root.settings-base = root.settings-pull;
-                }
-                if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
-                    if root.settings-tracking {
-                        root.settings-tracking = false;
-                        root.settings-ease = 240ms;
-                        if root.settings-pull > 0.32 {
-                            root.settings-pull = 1.0;
-                            root.open-settings();
-                        } else {
-                            root.settings-pull = 0;
-                            root.close-overlay();
-                        }
-                    }
-                }
-            }
-            moved => {
-                if self.pressed {
-                    root.settings-pull = max(0, min(1, root.settings-base + ((self.mouse-y - root.settings-start) / root.height)));
-                }
-            }
-        }
         VerticalLayout {
             padding-left: 28px;
             padding-right: 28px;
@@ -758,6 +838,7 @@ export component MainWindow inherits Window {
             Flickable {
                 vertical-stretch: 1;
                 viewport-height: 1400px;
+                interactive: !root.settings-tracking;
                 VerticalLayout {
                     spacing: 14px;
                     if root.settings-tab == 0: VerticalLayout {
@@ -1041,6 +1122,37 @@ export component MainWindow inherits Window {
                         Pill { label: "Connect"; on: true; clicked => { root.connect-wifi(); } }
                     }
                     Text { text: root.wifi-status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+                }
+            }
+        }
+        TouchArea {
+            y: parent.height - 28px;
+            width: 100%;
+            height: 28px;
+            pointer-event(ev) => {
+                if ev.kind == PointerEventKind.down {
+                    if root.settings-open || root.settings-pull > 0.92 {
+                        root.settings-armed = true;
+                        root.settings-kind = 1;
+                        root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
+                        root.settings-base = root.settings-pull;
+                    }
+                }
+                if ev.kind == PointerEventKind.up {
+                    root.settings-finish(false);
+                }
+                if ev.kind == PointerEventKind.cancel {
+                    root.settings-finish(true);
+                }
+            }
+            moved => {
+                if self.pressed && (root.settings-tracking || root.settings-armed) && root.settings-kind == 1 {
+                    if !root.settings-tracking && root.settings-start - root.settings-pos(self.absolute-position.y, self.mouse-y) > 18px {
+                        root.settings-begin(1, root.settings-start);
+                    }
+                    if root.settings-tracking {
+                        root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+                    }
                 }
             }
         }

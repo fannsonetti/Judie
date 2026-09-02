@@ -4,6 +4,15 @@ import { useSettingsStore } from "../../store/settingsStore";
 import { useRoomStore } from "../../store/roomStore";
 import { useLayoutStore } from "../../store/layoutStore";
 import { useChromeStore } from "../../store/chromeStore";
+import { useVisualSettingsPull } from "../../hooks/useSettingsPull";
+import {
+  beginSettingsDrag,
+  inCloseEdge,
+  moveSettingsDrag,
+  settleTarget,
+  shouldCompleteSettings,
+  type SettingsDrag,
+} from "../../lib/settingsSheet";
 import { relaunchJudie, quitJudie } from "../../lib/windowControls";
 import {
   confirmInstallBody,
@@ -56,16 +65,19 @@ export function SettingsOverlay() {
   const [refreshStatus, setRefreshStatus] = useState("");
   const [powerStatus, setPowerStatus] = useState("");
   const busyRef = useRef(false);
+  const closeDrag = useRef<SettingsDrag | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const [routineName, setRoutineName] = useState("");
   const [routinePhrase, setRoutinePhrase] = useState("");
   const [routineCommand, setRoutineCommand] = useState("");
 
-  const visible = open || pull > 0.01;
-  const t = tracking ? pull : open ? 1 : pull;
+  const displayed = useVisualSettingsPull(pull, tracking);
+  const visible = open || tracking || displayed > 0.01 || pull > 0.01;
 
   useEffect(() => {
-    if (open) setPull(1);
-  }, [open, setPull]);
+    if (tracking) return;
+    setPull(open ? 1 : 0);
+  }, [open, tracking, setPull]);
 
   useEffect(() => {
     if (!visible) {
@@ -116,8 +128,23 @@ export function SettingsOverlay() {
   }, [visible, tab]);
 
   const close = () => {
+    useChromeStore.getState().settleSettings(0);
     setOpen(false);
-    setPull(0);
+  };
+
+  const finishCloseDrag = (y: number, cancelled: boolean) => {
+    const drag = closeDrag.current;
+    closeDrag.current = null;
+    const body = bodyRef.current;
+    if (body) body.style.overflowY = "";
+    if (!drag?.locked) {
+      useChromeStore.getState().setSettingsTracking(false);
+      return;
+    }
+    const moved = moveSettingsDrag(drag, y, window.innerHeight || 1, performance.now());
+    const target = settleTarget(moved.kind, shouldCompleteSettings(moved, cancelled));
+    useChromeStore.getState().settleSettings(target);
+    setOpen(target === 1);
   };
 
   const saveRoutine = () => {
@@ -225,36 +252,43 @@ export function SettingsOverlay() {
     <div className="settings-backdrop" onClick={close}>
       <div
         className={`settings-sheet os-sheet${tracking ? " tracking" : ""}`}
-        style={{ transform: `translate3d(0, ${(t - 1) * 100}%, 0)` }}
+        style={{ transform: `translate3d(0, ${(displayed - 1) * 100}%, 0)` }}
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          if (closeDrag.current) return;
+          if (!open && pull < 0.92) return;
+          if (!inCloseEdge(e.clientY, window.innerHeight || 1)) return;
+          closeDrag.current = beginSettingsDrag("close", e.clientY, displayed, performance.now());
+          const move = (ev: PointerEvent) => {
+            const drag = closeDrag.current;
+            if (!drag) return;
+            const next = moveSettingsDrag(drag, ev.clientY, window.innerHeight || 1, performance.now());
+            closeDrag.current = next;
+            if (!next.locked) return;
+            ev.preventDefault();
+            useChromeStore.getState().setSettingsTracking(true);
+            useChromeStore.getState().setSettingsPull(next.pull);
+            const body = bodyRef.current;
+            if (body) body.style.overflowY = "hidden";
+          };
+          const up = (ev: PointerEvent) => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+            window.removeEventListener("pointercancel", cancel);
+            finishCloseDrag(ev.clientY, false);
+          };
+          const cancel = (ev: PointerEvent) => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+            window.removeEventListener("pointercancel", cancel);
+            finishCloseDrag(ev.clientY, true);
+          };
+          window.addEventListener("pointermove", move, { passive: false });
+          window.addEventListener("pointerup", up);
+          window.addEventListener("pointercancel", cancel);
+        }}
       >
-        <div
-          className="settings-handle"
-          onPointerDown={(e) => {
-            const start = e.clientY;
-            const base = t;
-            const move = (ev: PointerEvent) => {
-              const dy = ev.clientY - start;
-              const next = Math.max(0, Math.min(1, base + dy / window.innerHeight));
-              useChromeStore.getState().setSettingsTracking(true);
-              setPull(next);
-            };
-            const up = (ev: PointerEvent) => {
-              window.removeEventListener("pointermove", move);
-              window.removeEventListener("pointerup", up);
-              useChromeStore.getState().setSettingsTracking(false);
-              const dy = ev.clientY - start;
-              const next = Math.max(0, Math.min(1, base + dy / window.innerHeight));
-              if (next < 0.68) close();
-              else {
-                setPull(1);
-                setOpen(true);
-              }
-            };
-            window.addEventListener("pointermove", move);
-            window.addEventListener("pointerup", up);
-          }}
-        />
+        <div className="settings-handle" />
         <header className="settings-header">
           <h2>Settings</h2>
         </header>
@@ -265,7 +299,7 @@ export function SettingsOverlay() {
             </button>
           ))}
         </nav>
-        <div className="settings-body os-body">
+        <div className="settings-body os-body" ref={bodyRef}>
           {tab === "general" && (
             <>
               <p className="os-kicker">Profile</p>

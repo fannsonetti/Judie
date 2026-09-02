@@ -6,6 +6,15 @@ import { formatClock } from "../../lib/time";
 import { JUDIE_VERSION } from "../../lib/version";
 import { NetGlyph } from "../chrome/NetGlyph";
 import { networkLink, type NetworkLink } from "../../lib/network";
+import {
+  beginSettingsDrag,
+  canBeginOpen,
+  inOpenZone,
+  moveSettingsDrag,
+  settleTarget,
+  shouldCompleteSettings,
+  type SettingsDrag,
+} from "../../lib/settingsSheet";
 
 export function StatusBar({ link }: { link: NetworkLink }) {
   const [now, setNow] = useState(() => new Date());
@@ -14,6 +23,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
   const setServices = useRoomStore((s) => s.setServices);
   const pointer = useRef<{ y: number; x: number } | null>(null);
   const dragged = useRef(false);
+  const openDrag = useRef<SettingsDrag | null>(null);
 
   useEffect(() => {
     let id = 0;
@@ -73,49 +83,53 @@ export function StatusBar({ link }: { link: NetworkLink }) {
 
   const inRightThird = (clientX: number) => {
     const w = typeof window !== "undefined" ? window.innerWidth : 1;
-    return clientX >= (w * 2) / 3;
+    return inOpenZone(clientX, w);
+  };
+
+  const finishOpenDrag = (y: number, cancelled: boolean) => {
+    const drag = openDrag.current;
+    openDrag.current = null;
+    pointer.current = null;
+    if (!drag?.locked) {
+      useChromeStore.getState().setSettingsTracking(false);
+      return;
+    }
+    const moved = moveSettingsDrag(drag, y, window.innerHeight || 1, performance.now());
+    const target = settleTarget(moved.kind, shouldCompleteSettings(moved, cancelled));
+    useChromeStore.getState().settleSettings(target);
+    useAssistantStore.getState().setSettingsOpen(target === 1);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (!inRightThird(e.clientX)) {
+    const chrome = useChromeStore.getState();
+    const open = useAssistantStore.getState().settingsOpen;
+    if (!canBeginOpen(open, chrome.settingsPull) || !inRightThird(e.clientX)) {
       pointer.current = null;
+      openDrag.current = null;
       return;
     }
     dragged.current = false;
     pointer.current = { y: e.clientY, x: e.clientX };
-    useChromeStore.getState().setSettingsTracking(false);
+    openDrag.current = beginSettingsDrag("open", e.clientY, chrome.settingsPull, performance.now());
+    chrome.setSettingsTracking(false);
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    const start = pointer.current;
-    if (!start) return;
-    const dy = e.clientY - start.y;
-    const h = window.innerHeight || 1;
-    if (dy > 12 || useChromeStore.getState().settingsTracking) {
-      dragged.current = true;
-      useChromeStore.getState().setSettingsTracking(true);
-      useChromeStore.getState().setNetMenuOpen(false);
-      useChromeStore.getState().setSettingsPull(Math.max(0, Math.min(1, e.clientY / h)));
-    }
+    const drag = openDrag.current;
+    if (!drag) return;
+    const next = moveSettingsDrag(drag, e.clientY, window.innerHeight || 1, performance.now());
+    openDrag.current = next;
+    if (!next.locked) return;
+    dragged.current = true;
+    const chrome = useChromeStore.getState();
+    chrome.setSettingsTracking(true);
+    chrome.setNetMenuOpen(false);
+    chrome.setSettingsPull(next.pull);
   };
 
-  const onPointerUp = (_e: React.PointerEvent) => {
-    const start = pointer.current;
-    pointer.current = null;
-    const chrome = useChromeStore.getState();
-    if (chrome.settingsTracking) {
-      chrome.setSettingsTracking(false);
-      if (chrome.settingsPull > 0.32) {
-        chrome.setSettingsPull(1);
-        useAssistantStore.getState().setSettingsOpen(true);
-      } else {
-        chrome.setSettingsPull(0);
-        useAssistantStore.getState().setSettingsOpen(false);
-      }
-      return;
-    }
-    if (!start) return;
+  const onPointerUp = (e: React.PointerEvent) => {
+    finishOpenDrag(e.clientY, false);
   };
 
   return (
@@ -124,15 +138,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={() => {
-        pointer.current = null;
-        const chrome = useChromeStore.getState();
-        if (chrome.settingsTracking) {
-          chrome.setSettingsTracking(false);
-          chrome.setSettingsPull(chrome.settingsPull > 0.32 ? 1 : 0);
-          useAssistantStore.getState().setSettingsOpen(chrome.settingsPull > 0.32);
-        }
-      }}
+      onPointerCancel={(e) => finishOpenDrag(e.clientY, true)}
     >
       <div className="status-left">
         <span className="status-version" aria-hidden>

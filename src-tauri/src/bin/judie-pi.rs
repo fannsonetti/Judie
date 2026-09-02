@@ -27,6 +27,13 @@ fn framebuffer_size() -> Option<slint::PhysicalSize> {
     (w >= 320 && h >= 240).then_some(slint::PhysicalSize::new(w, h))
 }
 
+fn prefers_reduced_motion() -> bool {
+    match std::env::var("JUDIE_REDUCED_MOTION") {
+        Ok(v) => matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes"),
+        Err(_) => matches!(std::env::var("GTK_ENABLE_ANIMATIONS").as_deref(), Ok("0")),
+    }
+}
+
 fn apply_kiosk_geometry(ui: &MainWindow) {
     if let Some(size) = framebuffer_size() {
         ui.window().set_size(size);
@@ -1555,6 +1562,7 @@ fn main() {
         }
     };
     apply_kiosk_geometry(&ui);
+    ui.set_reduced_motion(prefers_reduced_motion());
     ui.set_version_text(releases::display_version().into());
     ui.set_selected_release(format!("v{}", releases::display_version()).into());
     bind(&ui);

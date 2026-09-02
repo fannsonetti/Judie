@@ -15,6 +15,18 @@ import { exportHookCode, parseWidgetFile, serializeWidget } from "../slopbox/exp
 import { sanitizeSvg } from "../slopbox/svg";
 import { overlayTransition } from "../lib/performance";
 import { isLinuxWebview } from "../lib/platform";
+import {
+  SETTINGS_CLOSE_EDGE_PX,
+  beginSettingsDrag,
+  canBeginOpen,
+  inCloseEdge,
+  inOpenZone,
+  interpolatePull,
+  moveSettingsDrag,
+  pullFromPointer,
+  settleTarget,
+  shouldCompleteSettings,
+} from "../lib/settingsSheet";
 import { monthCells } from "../components/widgets/chrome";
 import { readFileSync } from "node:fs";
 import { compatibleReleaseTags, confirmInstallBody, generateUninstallChallenge, isNewerVersion, isSameVersion, releaseLabel, versionChange, type ReleaseInfo } from "../lib/install";
@@ -617,6 +629,54 @@ test("calendar month fills adjacent-month days", () => {
 test("linux motion helpers are inert in node", () => {
   assert(!isLinuxWebview(), "node is not a linux webview");
   assert(overlayTransition().duration === 0.18, "desktop overlay duration");
+});
+
+test("settings sheet follows the pointer without jumping", () => {
+  const h = 1200;
+  assert(inOpenZone(1920 * 0.8, 1920), "top-right opens");
+  assert(!inOpenZone(200, 1920), "left side does not open");
+  assert(canBeginOpen(false, 0), "home can open");
+  assert(!canBeginOpen(true, 1), "settings cannot re-open");
+  assert(!canBeginOpen(false, 0.5), "mid-pull does not start a second open");
+  assert(inCloseEdge(1180, h), "bottom edge closes");
+  assert(!inCloseEdge(600, h), "mid-page is not the close edge");
+  assert(h - SETTINGS_CLOSE_EDGE_PX === 1172, "28px close edge at 1200");
+
+  assert(pullFromPointer(0, 0, 600, h) === 0.5, "open drag is 1:1");
+  assert(pullFromPointer(1, 1180, 580, h) === 0.5, "close drag is 1:1 the other way");
+  assert(interpolatePull(0.5, 1, 0, false) === 0.5, "settle starts at the current pull");
+  assert(interpolatePull(0.5, 0, 0, false) === 0.5, "cancel starts at the current pull");
+  assert(interpolatePull(0.5, 1, 1, false) === 1, "settle ends at the target");
+  assert(interpolatePull(0.4, 1, 0.5, true) === 0.7, "reduced motion is linear");
+
+  let open = beginSettingsDrag("open", 10, 0, 0);
+  open = moveSettingsDrag(open, 22, h, 16);
+  assert(!open.locked, "short open stays unlocked");
+  assert(!shouldCompleteSettings(open, false), "accidental short open does not complete");
+  open = moveSettingsDrag(open, 500, h, 800);
+  assert(open.locked, "open locks after slop");
+  assert(shouldCompleteSettings(open, false), "halfway-plus open completes");
+  assert(settleTarget("open", true) === 1, "open completes to 1");
+  assert(settleTarget("open", false) === 0, "open cancel to 0");
+
+  let close = beginSettingsDrag("close", 1180, 1, 0);
+  close = moveSettingsDrag(close, 1170, h, 16);
+  assert(!close.locked, "short close stays unlocked");
+  assert(!shouldCompleteSettings(close, false), "accidental short close does not complete");
+  close = moveSettingsDrag(close, 700, h, 400);
+  assert(close.locked, "close locks after upward slop");
+  assert(shouldCompleteSettings(close, false), "far enough close completes");
+  assert(settleTarget("close", true) === 0, "close completes to 0");
+  assert(settleTarget("close", false) === 1, "close cancel to 1");
+  assert(!shouldCompleteSettings(close, true), "touch cancel never completes");
+
+  let flick = beginSettingsDrag("close", 1180, 1, 0);
+  flick = moveSettingsDrag(flick, 1000, h, 20);
+  flick = moveSettingsDrag(flick, 900, h, 36);
+  assert(shouldCompleteSettings(flick, false), "upward flick can complete");
+  let nudge = beginSettingsDrag("close", 1180, 1, 0);
+  nudge = moveSettingsDrag(nudge, 1172, h, 200);
+  assert(!shouldCompleteSettings(nudge, false), "tiny slow close does not dismiss");
 });
 
 test("release labels mark the running copy", () => {

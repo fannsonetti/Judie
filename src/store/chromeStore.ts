@@ -24,6 +24,7 @@ interface ChromeState {
 
   setSettingsPull: (n: number) => void;
   setSettingsTracking: (on: boolean) => void;
+  settleSettings: (settingsPull: number) => void;
   setNetMenuOpen: (open: boolean) => void;
   openKeyboard: (field: string, seed: string) => void;
   closeKeyboard: () => void;
@@ -48,6 +49,7 @@ export const useChromeStore = create<ChromeState>((set, get) => ({
 
   setSettingsPull: (settingsPull) => set({ settingsPull }),
   setSettingsTracking: (settingsTracking) => set({ settingsTracking }),
+  settleSettings: (settingsPull) => set({ settingsTracking: false, settingsPull }),
   setNetMenuOpen: (netMenuOpen) => set({ netMenuOpen }),
   openKeyboard: (kbField, seed) =>
     set({ kbOpen: true, kbField, kbText: seed, kbShift: false, kbFn: false }),
