@@ -712,7 +712,10 @@ test("settings units are three complete presets with migration", () => {
   assert(slint.includes("Celsius and kilometres"), slint.includes("Celsius") ? "pi labels" : "missing");
   assert(slint.includes("Fahrenheit and miles"), "pi fahrenheit preset");
   assert(!slint.includes("Nautical miles"), "pi nautical miles removed");
-  assert(/viewport-height: 8200px/.test(slint), "settings scroll viewport reaches the bottom");
+  assert(slint.includes("viewport-height: settings-scroll.preferred-height"), "settings scroll viewport matches content");
+  assert(slint.includes("settings-scroll := VerticalLayout"), "settings scroll content is named for preferred-height");
+  assert(/settings-scroll := VerticalLayout \{\s*alignment: start;/.test(slint), "settings scroll packs from the top");
+  assert(!slint.includes("viewport-height: 8200px"), "hardcoded 8200px settings viewport is gone");
 });
 
 test("settings sheet follows the pointer without jumping", () => {

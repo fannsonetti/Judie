@@ -1004,13 +1004,17 @@ export component MainWindow inherits Window {
             }
             Flickable {
                 vertical-stretch: 1;
-                viewport-height: 8200px;
+                // Size the scroll surface to content. A huge fixed height made
+                // VerticalLayout distribute leftover space between rows.
+                viewport-height: settings-scroll.preferred-height;
                 interactive: !root.settings-tracking;
-                VerticalLayout {
+                settings-scroll := VerticalLayout {
+                    alignment: start;
                     spacing: 14px;
                     if root.settings-tab == 0: HorizontalLayout {
                         alignment: center;
                         VerticalLayout {
+                            alignment: start;
                             width: root.general-col;
                             spacing: 18px;
                             padding-bottom: 80px;
@@ -1105,6 +1109,7 @@ export component MainWindow inherits Window {
                     if root.settings-tab == 1: HorizontalLayout {
                         alignment: center;
                         VerticalLayout {
+                            alignment: start;
                             width: root.general-col;
                             spacing: 10px;
                             padding-bottom: 80px;
@@ -1210,6 +1215,7 @@ export component MainWindow inherits Window {
                         }
                     }
                     if root.settings-tab == 2: VerticalLayout {
+                        alignment: start;
                         spacing: 6px;
                         HorizontalLayout {
                             spacing: 8px;
