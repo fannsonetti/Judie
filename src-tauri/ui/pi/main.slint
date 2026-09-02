@@ -389,32 +389,57 @@ export component MainWindow inherits Window {
         spacing: 0;
 
         Rectangle {
-            height: 52px;
+            height: Dy.header-h;
             background: #000000;
-            Text {
+            HorizontalLayout {
                 x: root.pad;
                 y: 0;
                 height: 100%;
-                text: "v" + root.version-text;
-                color: #ffffff;
-                opacity: 0.1;
-                font-size: 13px;
-                font-family: Dy.mono;
-                vertical-alignment: center;
+                width: parent.width / 3 - root.pad * 2;
+                spacing: 10px;
+                Text {
+                    text: "v" + root.version-text;
+                    color: #ffffff;
+                    opacity: 0.1;
+                    font-size: Dy.type-status;
+                    font-family: Dy.mono;
+                    vertical-alignment: center;
+                }
+                if root.dnd: Text {
+                    text: "DND";
+                    color: #ffffff;
+                    font-size: Dy.type-status;
+                    font-family: Dy.mono;
+                    vertical-alignment: center;
+                }
             }
             TouchArea {
                 x: parent.width / 3;
                 width: parent.width / 3;
                 height: 100%;
                 clicked => { root.open-palette(); }
-                Text {
-                    text: root.clock;
-                    color: #ffffff;
-                    font-size: 22px;
-                    font-weight: 600;
-                    font-family: Dy.mono;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+                VerticalLayout {
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    spacing: 2px;
+                    alignment: center;
+                    Text {
+                        text: root.clock;
+                        color: #ffffff;
+                        font-size: Dy.type-clock;
+                        font-weight: 700;
+                        font-family: Dy.mono;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.date-text;
+                        color: #8a8a8a;
+                        font-size: Dy.type-status;
+                        font-family: Dy.mono;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                    }
                 }
             }
             net-btn := TouchArea {

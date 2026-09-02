@@ -3,6 +3,18 @@ import { applyContextFromResult } from "../assistant/process";
 import { RoomSnapshot } from "../assistant/types";
 import { packWidgets, placeWidgets, canPlaceWidget, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
 import { homeScaleFor, measureWidgetGrid, novaShellSize, NOVA_FRAME } from "../lib/widgetGrid";
+import {
+  HOME_CLOCK_PX,
+  HOME_FRAME,
+  HOME_HEADER_H,
+  PREVIOUS_CLOCK_PX,
+  TYPE,
+  assertReadableHierarchy,
+  boxesOverlap,
+  centerContentFits,
+  homeHeaderBoxes,
+} from "../lib/homeReadability";
+import { formatClock, formatDateLong } from "../lib/time";
 import { DEMO_ACTIVITY, DEMO_HOST_STATS, DEMO_MEDIA, DEMO_TIMERS, DEMO_WEATHER } from "../lib/demoStats";
 import { GRID_COLS, GRID_ROWS, WidgetInstance, WIDGET_LABELS } from "../types/widgets";
 import { normalizeForSpeech } from "../lib/tts";
@@ -886,6 +898,63 @@ test("routine editor validates, statuses, migrates, and duplicates", () => {
   assert(copy.name.startsWith("Copy of "), copy.name);
   assert(!copy.builtin);
 });
+
+test("home clock is exactly twice the previous size and stays strongest", () => {
+  assert(HOME_CLOCK_PX === PREVIOUS_CLOCK_PX * 2, `${HOME_CLOCK_PX} !== 2×${PREVIOUS_CLOCK_PX}`);
+  assert(assertReadableHierarchy(), "type scale hierarchy");
+  assert(TYPE.clock > TYPE.hero, "clock stronger than weather/calendar heroes");
+  assert(TYPE.value >= 28, "primary values have a distance-readable floor");
+  assert(TYPE.title >= 16 && TYPE.control >= 16, "titles and controls share a floor");
+  assert(TYPE.secondary >= 14 && TYPE.status >= 14, "secondary and status share a floor");
+});
+
+test("home header fits 12h, 24h, long dates, and large values at 1920x1200", () => {
+  const clocks = ["00:00", "09:05", "23:59", "12:59 AM", "11:59 PM"];
+  const dates = ["Wednesday 30 September", "Monday 1 May", "Sat 2 Sep"];
+  for (const clock of clocks) {
+    assert(centerContentFits(clock, TYPE.clock), `clock overflow: ${clock}`);
+    for (const date of dates) {
+      assert(centerContentFits(date, TYPE.status), `date overflow: ${date}`);
+      const boxes = homeHeaderBoxes(clock, date);
+      assert(!boxesOverlap(boxes.clockBox, boxes.dateBox), `${clock} vs ${date}`);
+      assert(!boxesOverlap(boxes.clockBox, boxes.statusBox), "clock vs version/DND");
+      assert(!boxesOverlap(boxes.clockBox, boxes.settingsBox), "clock vs settings gesture");
+      assert(!boxesOverlap(boxes.dateBox, boxes.settingsBox), "date vs settings");
+      assert(!boxesOverlap(boxes.clockBox, boxes.widgetsBox), "clock vs widgets");
+      assert(!boxesOverlap(boxes.dateBox, boxes.widgetsBox), "date vs widgets");
+      assert(boxes.clockBox.y >= 0, "clock stays in header");
+      assert(boxes.dateBox.y + boxes.dateBox.h <= HOME_HEADER_H, "date stays in header");
+      assert(boxes.clockBox.x >= boxes.cols.center.x, "clock stays in center third");
+      assert(boxes.clockBox.x + boxes.clockBox.w <= boxes.cols.center.x + boxes.cols.center.w, "clock right edge");
+    }
+  }
+  const large = homeHeaderBoxes("23:59", "Wednesday 30 September");
+  assert(textHeightSafe(TYPE.hero) < textHeightSafe(TYPE.clock), "hero values stay below the clock");
+  assert(large.widgetsBox.y === HOME_HEADER_H, "widgets start under the header");
+  assert(HOME_FRAME.w === 1920 && HOME_FRAME.h === 1200, "target display");
+  assert(formatClock(new Date(2026, 8, 2, 23, 59), false).includes("23"), "24-hour");
+  assert(/am|pm/i.test(formatClock(new Date(2026, 8, 2, 23, 59), true)), "12-hour");
+  assert(formatDateLong(new Date(2026, 8, 30)).toLowerCase().includes("wednesday"), formatDateLong(new Date(2026, 8, 30)));
+});
+
+test("slint and css home type scale match the readability constants", () => {
+  const slint = readFileSync("src-tauri/ui/pi/cards.slint", "utf8") + readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  const faces = readFileSync("src-tauri/ui/pi/faces.slint", "utf8");
+  const css = readFileSync("src/styles/global.css", "utf8");
+  assert(slint.includes("type-clock: 44px"), "slint clock is 2×22");
+  assert(slint.includes("header-h: 88px"), "slint header grew for clock+date");
+  assert(slint.includes("root.date-text"), "date is in the header");
+  assert(slint.includes("font-size: Dy.type-clock"), "header clock uses the type scale");
+  assert(css.includes("--type-clock: 44px"), "css clock");
+  assert(css.includes("--status-h: 88px"), "css header");
+  assert(faces.includes("Dy.type-clock") === false, "clock lives in the header, not widget faces");
+  assert(faces.includes("Dy.type-value") && faces.includes("Dy.type-title"), "widget faces use the type scale");
+  assert(!/font-size:\s*(8|9|10|11)px/.test(faces), "faces dropped sub-12px copy");
+});
+
+function textHeightSafe(px: number) {
+  return px * 1.15;
+}
 
 if (failed) {
   console.log(`\n${failed} failed`);

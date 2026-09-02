@@ -1,7 +1,7 @@
 import { GRID_COLS, GRID_ROWS, SIZE_DIMS, WidgetSize } from "../types/widgets";
 
 export const NOVA_FRAME = { w: 1920, h: 1200 };
-export const NOVA_STATUS_H = 56;
+export const NOVA_STATUS_H = 88;
 export const NOVA_SAFE_BOTTOM = 20;
 export const NOVA_PAGE_TOP = 4;
 

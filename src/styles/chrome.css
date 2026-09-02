@@ -570,7 +570,7 @@ select.settings-input {
   border: none;
   color: inherit;
 }
-.status-date { display: none; }
+.status-bar .status-date { display: block; }
 
 .settings-sheet.os-sheet {
   background: #000;

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRoomStore } from "../../store/roomStore";
 import { useAssistantStore } from "../../store/assistantStore";
 import { useChromeStore } from "../../store/chromeStore";
-import { formatClock } from "../../lib/time";
+import { formatClock, formatDateLong } from "../../lib/time";
 import { JUDIE_VERSION } from "../../lib/version";
 import { NetGlyph } from "../chrome/NetGlyph";
 import { networkLink, type NetworkLink } from "../../lib/network";
@@ -155,6 +155,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
         }}
       >
         <div className="status-time">{formatClock(now)}</div>
+        <div className="status-date">{formatDateLong(now)}</div>
       </button>
       <div className="status-right">
         <button

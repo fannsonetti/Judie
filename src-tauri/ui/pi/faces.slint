@@ -167,17 +167,17 @@ export component WidgetFace inherits Rectangle {
                 border-width: 2px; border-color: #ffffff; background: #000000;
                 VerticalLayout {
                     alignment: center;
-                    Text { text: root.t-in; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
-                    Text { text: "NOW"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; horizontal-alignment: center; }
+                    Text { text: root.t-in; color: #ffffff; font-size: Dy.type-value; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                    Text { text: "NOW"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; horizontal-alignment: center; }
                 }
             }
             VerticalLayout {
                 alignment: center; spacing: 6px;
-                Text { text: "HUMIDITY"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
-                Text { text: root.t-hum; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                Text { text: "OUTDOOR"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
-                Text { text: root.t-out; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                if root.size == "1x2": Text { text: root.t-comfort; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                Text { text: "HUMIDITY"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                Text { text: root.t-hum; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
+                Text { text: "OUTDOOR"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                Text { text: root.t-out; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
+                if root.size == "1x2": Text { text: root.t-comfort; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
             }
         }
 
@@ -185,37 +185,37 @@ export component WidgetFace inherits Rectangle {
             spacing: 10px;
             if root.size != "1x1": VerticalLayout {
                 spacing: 4px; horizontal-stretch: 1;
-                Text { text: "Today"; color: #8a8a8a; font-size: 12px; }
+                Text { text: "Today"; color: #8a8a8a; font-size: Dy.type-title; }
                 for ev in root.sample ? root.demo-events : root.events: HorizontalLayout {
                     spacing: 6px;
                     Rectangle { width: 4px; height: 18px; background: #ffffff; }
                     VerticalLayout {
-                        Text { text: ev.title; color: #ffffff; font-size: 12px; font-weight: 600; overflow: elide; }
-                        Text { text: ev.time + (ev.detail == "" ? "" : " · " + ev.detail); color: #8a8a8a; font-size: 10px; overflow: elide; }
+                        Text { text: ev.title; color: #ffffff; font-size: Dy.type-title; font-weight: 600; overflow: elide; }
+                        Text { text: ev.time + (ev.detail == "" ? "" : " · " + ev.detail); color: #8a8a8a; font-size: Dy.type-secondary; overflow: elide; }
                     }
                 }
             }
             VerticalLayout {
                 spacing: 4px; horizontal-stretch: 1;
-                Text { text: root.t-month; color: #8a8a8a; font-size: 12px; }
+                Text { text: root.t-month; color: #8a8a8a; font-size: Dy.type-title; }
                 HorizontalLayout {
                     spacing: 0;
                     for d in ["S", "M", "T", "W", "T", "F", "S"]: Text {
-                        text: d; color: #555555; font-size: 9px; horizontal-alignment: center; horizontal-stretch: 1;
+                        text: d; color: #555555; font-size: Dy.type-dense; horizontal-alignment: center; horizontal-stretch: 1;
                     }
                 }
                 GridLayout {
                     spacing: 2px;
                     for cell[i] in root.sample ? root.demo-cal : root.cal-cells: Rectangle {
                         row: floor(i / 7); col: mod(i, 7);
-                        height: 16px;
+                        height: 18px;
                         border-width: cell.today ? 1.5px : 0px;
                         border-color: #ffffff;
                         background: #00000000;
                         Text {
                             text: cell.label;
                             color: cell.today ? #ffffff : #e6e6e6;
-                            font-size: 10px;
+                            font-size: Dy.type-dense;
                             font-weight: cell.today ? 700 : 400;
                             font-family: Dy.mono;
                             horizontal-alignment: center;
@@ -235,8 +235,8 @@ export component WidgetFace inherits Rectangle {
                     border-width: 2px; border-color: #ffffff; background: #000000;
                     VerticalLayout {
                         alignment: center;
-                        Text { text: root.t-aq; color: #ffffff; font-size: 16px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
-                        Text { text: "AIR QUALITY"; color: #8a8a8a; font-size: 9px; font-family: Dy.mono; horizontal-alignment: center; }
+                        Text { text: root.t-aq; color: #ffffff; font-size: Dy.type-value; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                        Text { text: "AIR QUALITY"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; horizontal-alignment: center; }
                     }
                 }
                 VerticalLayout {
@@ -246,9 +246,9 @@ export component WidgetFace inherits Rectangle {
                         border-width: 1.5px; border-color: Dy.border;
                         VerticalLayout {
                             padding: 8px;
-                            Text { text: "PM2.5"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
-                            Text { text: "7 µg/m³"; color: #ffffff; font-size: 14px; font-weight: 700; font-family: Dy.mono; }
-                            Text { text: "Fine particles"; color: #555555; font-size: 10px; font-family: Dy.mono; }
+                            Text { text: "PM2.5"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                            Text { text: "7 µg/m³"; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
+                            Text { text: "Fine particles"; color: #555555; font-size: Dy.type-secondary; font-family: Dy.mono; }
                         }
                     }
                     Rectangle {
@@ -256,21 +256,21 @@ export component WidgetFace inherits Rectangle {
                         border-width: 1.5px; border-color: Dy.border;
                         VerticalLayout {
                             padding: 8px;
-                            Text { text: "ALLERGENS"; color: #8a8a8a; font-size: 10px; font-family: Dy.mono; }
-                            Text { text: "4/12"; color: #ffffff; font-size: 14px; font-weight: 700; font-family: Dy.mono; }
-                            Text { text: "Allergen level"; color: #555555; font-size: 10px; font-family: Dy.mono; }
+                            Text { text: "ALLERGENS"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                            Text { text: "4/12"; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
+                            Text { text: "Allergen level"; color: #555555; font-size: Dy.type-secondary; font-family: Dy.mono; }
                         }
                     }
                 }
             }
             if root.size == "1x1": VerticalLayout {
-                Text { text: "7"; color: #ffffff; font-size: 28px; font-weight: 700; }
-                Text { text: "PM2.5 · " + root.t-aq; color: #8a8a8a; font-size: 12px; }
+                Text { text: "7"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
+                Text { text: "PM2.5 · " + root.t-aq; color: #8a8a8a; font-size: Dy.type-secondary; }
             }
-            if root.size == "2x2": Text { text: "Filter: Clean soon. Dust can cut performance. Clean the filter for the best air."; color: #8a8a8a; font-size: 11px; wrap: word-wrap; }
-            Text { text: "Filter"; color: #8a8a8a; font-size: 11px; }
+            if root.size == "2x2": Text { text: "Filter: Clean soon. Dust can cut performance. Clean the filter for the best air."; color: #8a8a8a; font-size: Dy.type-secondary; wrap: word-wrap; }
+            Text { text: "Filter"; color: #8a8a8a; font-size: Dy.type-secondary; }
             Bar { level: root.t-filter / 100; fill: #ffffff; }
-            Text { text: root.t-filter + "%"; color: #ffffff; font-size: 12px; }
+            Text { text: root.t-filter + "%"; color: #ffffff; font-size: Dy.type-secondary; }
             if root.size == "2x2": HorizontalLayout {
                 spacing: 8px;
                 Pill { label: "Auto"; on: root.t-pmode == "Auto"; clicked => { if !root.sample { root.set-purifier-mode("Auto"); } } }
@@ -282,38 +282,38 @@ export component WidgetFace inherits Rectangle {
         if root.kind == "activity": VerticalLayout {
             for a in root.sample ? root.demo-activity : root.activity: HorizontalLayout {
                 spacing: 8px;
-                if root.size == "2x2": Text { text: a.time; color: #8a8a8a; font-size: 12px; min-width: 44px; }
-                Text { text: a.title; color: #ffffff; font-size: 13px; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
-                if root.size == "2x2": Text { text: a.source; color: #8a8a8a; font-size: 11px; }
+                if root.size == "2x2": Text { text: a.time; color: #8a8a8a; font-size: Dy.type-secondary; min-width: 52px; }
+                Text { text: a.title; color: #ffffff; font-size: Dy.type-title; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                if root.size == "2x2": Text { text: a.source; color: #8a8a8a; font-size: Dy.type-secondary; }
             }
         }
 
         if root.kind == "server": VerticalLayout {
             spacing: 4px;
-            Text { text: root.sample ? "6 ms" : "122 ms"; color: #ffffff; font-size: 28px; font-weight: 700; }
-            Text { text: root.sample ? "4/5 up" : "4/5 up"; color: #8a8a8a; font-size: 12px; }
+            Text { text: root.sample ? "6 ms" : "122 ms"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
+            Text { text: root.sample ? "4/5 up" : "4/5 up"; color: #8a8a8a; font-size: Dy.type-secondary; }
             if root.size != "1x1": VerticalLayout {
                 spacing: 4px;
                 for s in root.sample ? root.demo-services : root.services: HorizontalLayout {
                     spacing: 8px;
                     Rectangle { width: 8px; height: 8px; background: s.online ? #ffffff : #4a4a4a; y: 4px; }
-                    Text { text: s.name; color: #ffffff; font-size: 13px; }
+                    Text { text: s.name; color: #ffffff; font-size: Dy.type-title; }
                     Rectangle { horizontal-stretch: 1; }
-                    Text { text: s.status; color: #8a8a8a; font-size: 12px; }
+                    Text { text: s.status; color: #8a8a8a; font-size: Dy.type-secondary; }
                 }
             }
         }
 
         if root.kind == "weather": VerticalLayout {
             HorizontalLayout {
-                Text { text: root.t-loc; color: #8a8a8a; font-size: 12px; overflow: elide; horizontal-stretch: 1; }
-                if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: 11px; }
+                Text { text: root.t-loc; color: #8a8a8a; font-size: Dy.type-title; overflow: elide; horizontal-stretch: 1; }
+                if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: Dy.type-secondary; }
             }
             HorizontalLayout {
                 VerticalLayout {
-                    Text { text: root.t-temp; color: #ffffff; font-size: 32px; font-weight: 700; }
-                    Text { text: root.t-cond; color: #ffffff; font-size: 14px; }
-                    Text { text: root.t-range; color: #8a8a8a; font-size: 12px; }
+                    Text { text: root.t-temp; color: #ffffff; font-size: Dy.type-hero; font-weight: 700; }
+                    Text { text: root.t-cond; color: #ffffff; font-size: Dy.type-title; }
+                    Text { text: root.t-range; color: #8a8a8a; font-size: Dy.type-secondary; }
                 }
                 Rectangle { horizontal-stretch: 1; }
                 Rectangle {
@@ -322,13 +322,13 @@ export component WidgetFace inherits Rectangle {
                     Text { text: "*"; color: #f0a030; font-size: 18px; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
                 }
             }
-            if root.size == "2x2": Text { text: root.t-note; color: #ffffff; font-size: 12px; wrap: word-wrap; }
+            if root.size == "2x2": Text { text: root.t-note; color: #ffffff; font-size: Dy.type-secondary; wrap: word-wrap; }
             if root.size != "1x1": HorizontalLayout {
                 spacing: 8px;
                 for h in root.sample ? root.demo-hours : root.hours: VerticalLayout {
-                    Text { text: h.hour; color: #555555; font-size: 10px; horizontal-alignment: center; }
-                    Text { text: h.temp; color: #ffffff; font-size: 13px; font-weight: 700; horizontal-alignment: center; }
-                    Text { text: h.precip; color: #8a8a8a; font-size: 10px; horizontal-alignment: center; }
+                    Text { text: h.hour; color: #555555; font-size: Dy.type-dense; horizontal-alignment: center; }
+                    Text { text: h.temp; color: #ffffff; font-size: Dy.type-title; font-weight: 700; horizontal-alignment: center; }
+                    Text { text: h.precip; color: #8a8a8a; font-size: Dy.type-dense; horizontal-alignment: center; }
                 }
             }
         }
@@ -336,11 +336,11 @@ export component WidgetFace inherits Rectangle {
         if root.kind == "lights": VerticalLayout {
             spacing: 6px;
             HorizontalLayout {
-                Text { text: root.t-scene; color: #8a8a8a; font-size: 12px; vertical-alignment: center; }
+                Text { text: root.t-scene; color: #8a8a8a; font-size: Dy.type-title; vertical-alignment: center; }
                 Rectangle { horizontal-stretch: 1; }
                 Toggle { on: root.t-master; toggled => { if !root.sample { root.toggle-master(); } } }
             }
-            Text { text: root.t-master ? root.t-bright + "%" : "Off"; color: #ffffff; font-size: 28px; font-weight: 700; }
+            Text { text: root.t-master ? root.t-bright + "%" : "Off"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
             Slider { minimum: 0; maximum: 100; value: root.t-bright; changed(v) => { if !root.sample { root.brightness-changed(round(v)); } } }
             HorizontalLayout {
                 spacing: 8px;
@@ -357,7 +357,7 @@ export component WidgetFace inherits Rectangle {
                 spacing: 8px;
                 for light[i] in root.sample ? root.demo-lights : root.lights: Rectangle {
                     row: floor(i / 2); col: mod(i, 2);
-                    background: #000000; height: 44px;
+                    background: #000000; height: 48px;
                     border-width: 1.5px; border-color: Dy.border;
                     HorizontalLayout {
                         spacing: 0px;
@@ -366,8 +366,8 @@ export component WidgetFace inherits Rectangle {
                             clicked => { if !root.sample { root.toggle-light(light.id); } }
                             VerticalLayout {
                                 padding: 6px;
-                                Text { text: light.name; color: #ffffff; font-size: 11px; font-family: Dy.mono; overflow: elide; }
-                                Text { text: light.brightness; color: #8a8a8a; font-size: 11px; font-family: Dy.mono; }
+                                Text { text: light.name; color: #ffffff; font-size: Dy.type-secondary; font-family: Dy.mono; overflow: elide; }
+                                Text { text: light.brightness; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
                             }
                         }
                     }
@@ -376,9 +376,9 @@ export component WidgetFace inherits Rectangle {
         }
 
         if root.kind == "media": VerticalLayout {
-            Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: 12px; }
-            Text { text: root.t-track; color: #ffffff; font-size: 16px; font-weight: 600; overflow: elide; }
-            if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: 12px; overflow: elide; }
+            Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: Dy.type-secondary; }
+            Text { text: root.t-track; color: #ffffff; font-size: Dy.type-title; font-weight: 600; overflow: elide; }
+            if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: Dy.type-secondary; overflow: elide; }
             if root.size != "1x1": Bar { level: root.t-prog; fill: #ffffff; }
             HorizontalLayout {
                 spacing: 8px;
@@ -386,27 +386,27 @@ export component WidgetFace inherits Rectangle {
                 IconBtn { glyph: root.t-play ? "❚❚" : "▶"; primary: true; clicked => { if !root.sample { root.toggle-play(); } } }
                 if root.size != "1x1": IconBtn { glyph: "⟩"; clicked => { if !root.sample { root.next-track(); } } }
                 if root.size == "2x2": Rectangle { horizontal-stretch: 1; }
-                if root.size == "2x2": Text { text: root.t-vol + "%"; color: #8a8a8a; font-size: 12px; vertical-alignment: center; }
+                if root.size == "2x2": Text { text: root.t-vol + "%"; color: #8a8a8a; font-size: Dy.type-secondary; vertical-alignment: center; }
             }
             if root.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.t-vol; changed(v) => { if !root.sample { root.volume-changed(round(v)); } } }
         }
 
         if root.kind == "system": VerticalLayout {
-            Text { text: "CPU"; color: #8a8a8a; font-size: 12px; }
-            Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: 24px; font-weight: 700; }
+            Text { text: "CPU"; color: #8a8a8a; font-size: Dy.type-secondary; }
+            Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
             Bar { level: root.t-cpu / 100; fill: #ffffff; }
-            if root.size != "1x1": Text { text: "Memory"; color: #8a8a8a; font-size: 12px; }
-            if root.size != "1x1": Text { text: round(root.t-mem) + "%"; color: #ffffff; font-size: 24px; font-weight: 700; }
+            if root.size != "1x1": Text { text: "Memory"; color: #8a8a8a; font-size: Dy.type-secondary; }
+            if root.size != "1x1": Text { text: round(root.t-mem) + "%"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
             if root.size != "1x1": Bar { level: root.t-mem / 100; fill: #ffffff; }
-            if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: 12px; }
-            if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: 12px; }
+            if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: Dy.type-secondary; }
+            if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: Dy.type-secondary; }
         }
 
         if root.kind == "timers": VerticalLayout {
             for t in root.sample ? root.demo-timers : root.timers: HorizontalLayout {
-                Text { text: t.label; color: #ffffff; font-size: 13px; }
+                Text { text: t.label; color: #ffffff; font-size: Dy.type-title; }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: t.remain; color: #8a8a8a; font-size: 13px; }
+                Text { text: t.remain; color: #8a8a8a; font-size: Dy.type-title; }
             }
         }
 
@@ -425,7 +425,7 @@ export component WidgetFace inherits Rectangle {
                 Text {
                     text: n.text;
                     color: rgb(n.r, n.g, n.b);
-                    font-size: n.kind == "metric" ? 28px : 12px;
+                    font-size: n.kind == "metric" ? Dy.type-value : Dy.type-secondary;
                     font-weight: n.kind == "metric" ? 700 : 500;
                     overflow: elide;
                     vertical-alignment: center;

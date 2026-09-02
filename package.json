@@ -1,7 +1,7 @@
 {
   "name": "judie",
   "private": true,
-  "version": "0.2.14",
+  "version": "0.2.15",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "tsx src/__tests__/run.ts",
+    "test:visual": "node scripts/visual-home.mjs",
     "installer:pi": "bash scripts/build-pi.sh"
   },
   "dependencies": {

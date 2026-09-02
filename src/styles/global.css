@@ -17,10 +17,18 @@
   --radius-md: 22px;
   --radius-lg: 28px;
   --radius-xl: 32px;
-  --status-h: 56px;
+  --status-h: 88px;
   --page-pad: clamp(16px, 2.2vw, 36px);
   --grid-gap: clamp(12px, 1.2vw, 20px);
   --safe-bottom: 20px;
+  --type-clock: 44px;
+  --type-hero: 32px;
+  --type-value: 28px;
+  --type-title: 16px;
+  --type-control: 16px;
+  --type-secondary: 14px;
+  --type-status: 14px;
+  --type-dense: 12px;
   color-scheme: dark;
   font-family: Inter, Geist, "Segoe UI", system-ui, -apple-system, sans-serif;
   font-synthesis: none;
@@ -128,7 +136,7 @@ input:focus-visible {
 }
 
 .status-version {
-  font-size: 13px;
+  font-size: var(--type-status);
   font-weight: 500;
   letter-spacing: 0.04em;
   color: #fff;
@@ -139,18 +147,29 @@ input:focus-visible {
 
 .status-center {
   text-align: center;
+  max-width: 33%;
+  min-width: 0;
 }
 
 .status-time {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: var(--type-clock);
+  font-weight: 700;
   letter-spacing: 0.02em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-date {
-  font-size: 12px;
+  font-size: var(--type-status);
   color: var(--text-muted);
   margin-top: 2px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-right {
@@ -158,7 +177,7 @@ input:focus-visible {
   justify-content: flex-end;
   align-items: center;
   gap: 14px;
-  font-size: 12px;
+  font-size: var(--type-status);
   color: var(--text-muted);
 }
 
@@ -933,7 +952,7 @@ input:focus-visible {
 }
 
 .wx-app-name {
-  font-size: 12px;
+  font-size: var(--type-title);
   font-weight: 650;
   letter-spacing: 0.01em;
   color: rgba(255, 255, 255, 0.88);
@@ -959,43 +978,43 @@ input:focus-visible {
 .wx-spacer { flex: 1; }
 
 .wx-muted {
-  font-size: 11px;
+  font-size: var(--type-secondary);
   color: var(--text-muted);
 }
 
 .wx-metric {
-  font-size: clamp(32px, 4vw, 48px);
+  font-size: var(--type-hero);
   font-weight: 650;
   letter-spacing: -0.04em;
   line-height: 0.95;
 }
 
 .wx-metric.sm {
-  font-size: clamp(22px, 2.4vw, 32px);
+  font-size: var(--type-value);
 }
 
 .wx-accent-title {
-  font-size: 12px;
+  font-size: var(--type-title);
   font-weight: 650;
   color: #ffffff;
   text-transform: none;
 }
 
 .wx-condition {
-  font-size: 14px;
+  font-size: var(--type-title);
   font-weight: 550;
   margin-top: 2px;
 }
 
 .wx-nav,
 .wx-pill {
-  min-width: 28px;
-  height: 24px;
-  padding: 0 8px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--type-control);
   font-weight: 600;
 }
 
@@ -1007,7 +1026,7 @@ input:focus-visible {
 .wx-row { display: flex; align-items: center; gap: 8px; }
 .wx-row.between { justify-content: space-between; }
 .wx-kicker {
-  font-size: 10px;
+  font-size: var(--type-secondary);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1017,11 +1036,11 @@ input:focus-visible {
 .wx-link {
   margin-top: auto;
   color: #ffffff;
-  font-size: 12px;
+  font-size: var(--type-title);
   font-weight: 650;
   text-align: left;
 }
-.wx-accent-title.caps { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; }
+.wx-accent-title.caps { text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--type-secondary); }
 
 .wx-dot,
 .wx-mark {
@@ -1040,10 +1059,10 @@ input:focus-visible {
 }
 
 .wx-event.stacked { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.wx-event-title { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wx-event-time { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.wx-event-meta { font-size: 11px; color: var(--text-dim); }
-.wx-event-kicker { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.wx-event-title { font-size: var(--type-title); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wx-event-time { font-size: var(--type-secondary); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.wx-event-meta { font-size: var(--type-secondary); color: var(--text-dim); }
+.wx-event-kicker { font-size: var(--type-secondary); color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
 
 .wx-month {
   flex: 1;
@@ -1058,7 +1077,7 @@ input:focus-visible {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-.wx-month-week { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+.wx-month-week { font-size: var(--type-dense); color: var(--text-dim); margin-bottom: 4px; }
 .wx-month-grid {
   flex: 1;
   justify-items: center;
@@ -1076,7 +1095,7 @@ input:focus-visible {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: var(--type-dense);
   line-height: 1;
   color: var(--text);
   cursor: pointer;
@@ -1102,7 +1121,7 @@ input:focus-visible {
 }
 
 .cal-month-name {
-  font-size: 13px;
+  font-size: var(--type-title);
   font-weight: 650;
   letter-spacing: -0.01em;
   margin-bottom: 2px;
@@ -1115,15 +1134,15 @@ input:focus-visible {
   gap: 4px;
 }
 .wx-host.size-1x1 .cal-month-name {
-  font-size: 12px;
+  font-size: var(--type-title);
 }
 .wx-host.size-1x1 .wx-month-week {
-  font-size: 8px;
+  font-size: var(--type-dense);
   margin-bottom: 1px;
 }
 .wx-host.size-1x1 .wx-day-btn {
-  max-width: 16px;
-  font-size: 9px;
+  max-width: 18px;
+  font-size: var(--type-dense);
 }
 
 .cal-split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; min-height: 0; }
@@ -1136,8 +1155,8 @@ input:focus-visible {
   overflow: hidden;
 }
 .cal-hero { display: grid; grid-template-columns: 0.7fr 1.3fr; gap: 10px; align-items: center; }
-.cal-dow { font-size: 14px; color: #ffffff; font-weight: 650; }
-.cal-num { font-size: 48px; font-weight: 700; letter-spacing: -0.06em; line-height: 0.9; }
+.cal-dow { font-size: var(--type-title); color: #ffffff; font-weight: 650; }
+.cal-num { font-size: var(--type-hero); font-weight: 700; letter-spacing: -0.06em; line-height: 0.9; }
 .cal-quad {
   flex: 1;
   min-height: 0;
@@ -1212,9 +1231,9 @@ input:focus-visible {
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
 }
-.media-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.media-title.center { text-align: center; font-size: 13px; }
-.media-sub { font-size: 12px; color: var(--text-muted); }
+.media-title { font-size: var(--type-title); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.media-title.center { text-align: center; font-size: var(--type-title); }
+.media-sub { font-size: var(--type-secondary); color: var(--text-muted); }
 .media-controls { display: flex; align-items: center; justify-content: center; gap: 2px; }
 .media-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
 .media-mid { display: flex; gap: 12px; flex: 1; min-height: 0; align-items: stretch; }
@@ -1244,12 +1263,12 @@ input:focus-visible {
   text-align: center;
   gap: 1px;
 }
-.wx-gauge-inner strong { font-size: 16px; }
+.wx-gauge-inner strong { font-size: var(--type-value); }
 
-.aq-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.aq-status { display: flex; align-items: center; gap: 6px; font-size: var(--type-secondary); }
 .aq-list { display: flex; flex-direction: column; gap: 5px; }
-.aq-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--text-muted); }
-.aq-row strong { color: var(--text); font-size: 12px; }
+.aq-row { display: flex; justify-content: space-between; gap: 8px; font-size: var(--type-secondary); color: var(--text-muted); }
+.aq-row strong { color: var(--text); font-size: var(--type-title); }
 .aq-ico { opacity: 0.7; }
 .aq-device {
   width: 18px;
@@ -1269,18 +1288,18 @@ input:focus-visible {
   padding: 8px 10px;
   min-width: 0;
 }
-.wx-card strong { display: block; font-size: 13px; }
+.wx-card strong { display: block; font-size: var(--type-title); }
 .wx-card.warn { background: rgba(217, 149, 63, 0.14); }
 .wx-card.span2 { grid-column: 1 / -1; }
 .aq-filter { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
 .aq-modes { display: flex; align-items: center; gap: 8px; }
 .wx-mode {
-  height: 28px;
-  padding: 0 10px;
+  height: 36px;
+  padding: 0 12px;
   border-radius: 999px;
   background: transparent;
   border: 1px solid rgba(255,255,255,0.12);
-  font-size: 12px;
+  font-size: var(--type-control);
   color: var(--text-muted);
 }
 .wx-mode.on { background: var(--accent); border-color: transparent; color: #fff; }
@@ -1317,10 +1336,10 @@ input:focus-visible {
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  font-size: 10px;
+  font-size: var(--type-dense);
   color: var(--text-muted);
 }
-.wx-hour strong { font-size: 13px; color: var(--text); }
+.wx-hour strong { font-size: var(--type-title); color: var(--text); }
 .wx-hour em { font-style: normal; color: var(--accent); }
 .wx-days {
   display: flex;
@@ -1336,11 +1355,11 @@ input:focus-visible {
   grid-template-columns: 40px 18px 1fr auto auto;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--type-secondary);
   min-height: 0;
 }
 .wx-weather-note {
-  font-size: 12px;
+  font-size: var(--type-secondary);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -1375,7 +1394,7 @@ input:focus-visible {
   border-radius: 12px;
   background: rgba(255,255,255,0.05);
   border-left: 3px solid transparent;
-  font-size: 12px;
+  font-size: var(--type-title);
   min-width: 0;
 }
 .light-chip span {
@@ -1383,12 +1402,12 @@ input:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.light-chip em { font-style: normal; color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
+.light-chip em { font-style: normal; color: var(--text-muted); font-size: var(--type-secondary); flex-shrink: 0; }
 .light-chip.on { background: rgba(255,255,255,0.08); }
 
 .climate-hero { display: flex; align-items: center; gap: 12px; min-height: 0; }
 .climate-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.climate-side strong { font-size: 18px; }
+.climate-side strong { font-size: var(--type-title); }
 
 .aq-hero { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
 
@@ -1399,7 +1418,7 @@ input:focus-visible {
   grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
-  font-size: 12px;
+  font-size: var(--type-title);
   color: var(--text-muted);
 }
 .wx-host.size-1x1 .act-row {
@@ -1412,7 +1431,7 @@ input:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.act-row em, .svc-row em { font-style: normal; font-size: 11px; }
+.act-row em, .svc-row em { font-style: normal; font-size: var(--type-secondary); }
 
 .quick-grid {
   display: grid;
@@ -1429,7 +1448,7 @@ input:focus-visible {
   padding: 8px;
   border-radius: 16px;
   background: rgba(255,255,255,0.05);
-  font-size: 11px;
+  font-size: var(--type-control);
   font-weight: 600;
   text-align: center;
   min-height: 0;
@@ -1455,7 +1474,7 @@ input:focus-visible {
   align-items: center;
   padding: 8px 6px;
   gap: 4px;
-  font-size: 10px;
+  font-size: var(--type-control);
   text-align: center;
 }
 .quick-grid.tiny .quick-btn span:last-child {
@@ -1475,7 +1494,7 @@ input:focus-visible {
 }
 
 .w-label {
-  font-size: 12px;
+  font-size: var(--type-title);
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.04em;
@@ -1483,14 +1502,14 @@ input:focus-visible {
 }
 
 .w-value {
-  font-size: clamp(28px, 3.2vw, 42px);
+  font-size: var(--type-hero);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.05;
 }
 
 .w-secondary {
-  font-size: 14px;
+  font-size: var(--type-secondary);
   color: var(--text-muted);
 }
 
@@ -1651,7 +1670,7 @@ input:focus-visible {
 
 .status-state,
 .status-dnd {
-  font-size: 11px;
+  font-size: var(--type-status);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1936,14 +1955,14 @@ input:focus-visible {
 }
 
 .tm-label {
-  font-size: 13px;
+  font-size: var(--type-title);
   font-weight: 500;
   color: var(--text);
   line-height: 1.1;
 }
 
 .tm-value {
-  font-size: clamp(22px, 3.4vw, 34px);
+  font-size: var(--type-hero);
   font-weight: 300;
   letter-spacing: -0.05em;
   line-height: 1.05;
@@ -1952,7 +1971,7 @@ input:focus-visible {
 }
 
 .tm-detail {
-  font-size: 11px;
+  font-size: var(--type-secondary);
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
   margin: -2px 0 4px;

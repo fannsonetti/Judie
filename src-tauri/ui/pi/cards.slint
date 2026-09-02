@@ -125,6 +125,16 @@ export global Dy {
     out property <color> muted: #8a8a8a;
     out property <color> dim: #4a4a4a;
     out property <string> mono: "DejaVu Sans Mono";
+    // Home-screen type scale. Clock stays the strongest text (2× the previous 22px).
+    out property <length> type-clock: 44px;
+    out property <length> type-hero: 32px;
+    out property <length> type-value: 28px;
+    out property <length> type-title: 16px;
+    out property <length> type-control: 16px;
+    out property <length> type-secondary: 14px;
+    out property <length> type-status: 14px;
+    out property <length> type-dense: 12px;
+    out property <length> header-h: 88px;
 }
 
 export component Card inherits Rectangle {
@@ -162,7 +172,7 @@ export component Pill inherits Rectangle {
     Text {
         text: root.label;
         color: root.on ? Dy.text : Dy.muted;
-        font-size: 13px;
+        font-size: Dy.type-control;
         font-weight: 600;
         font-family: Dy.mono;
         horizontal-alignment: center;
@@ -527,14 +537,14 @@ export component QuickTask inherits Rectangle {
         Text {
             text: root.glyph;
             color: Dy.text;
-            font-size: 16px;
+            font-size: Dy.type-title;
             font-family: Dy.mono;
             horizontal-alignment: center;
         }
         Text {
             text: root.label;
             color: Dy.text;
-            font-size: 10px;
+            font-size: Dy.type-control;
             font-weight: 600;
             font-family: Dy.mono;
             horizontal-alignment: center;
