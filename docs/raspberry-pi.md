@@ -18,6 +18,25 @@ Linux **armhf** releases ship a **native Slint home screen** — weather, lights
 
 **Windows is unsupported beginning with v0.2.14.** Releases publish only the Raspberry Pi Debian package. There is no Windows installer, executable, or substitute client.
 
+## Network (Raspberry Pi OS)
+
+The Lite image already uses **NetworkManager**. Judie talks to it through `/usr/lib/judie/wifi` (`nmcli` terse APIs and a 0600 NetworkManager keyfile for new Wi-Fi secrets). It does not install another network manager. Wi-Fi passwords are never stored in Judie data, never logged, and never passed as helper command arguments.
+
+## Physical Raspberry Pi checks
+
+Automation covers widget fixtures, Settings layout, gesture physics, and mocked NetworkManager states. The following still need a real Pi + display + access point:
+
+1. Open Settings → Network and confirm the current Ethernet or Wi-Fi row (type, iface, SSID, IPs, gateway, DNS, MAC, speed, internet vs local).
+2. Refresh / rescan nearby Wi-Fi. Confirm scanning, empty, and error copy. The sheet must stay scrollable while a scan runs.
+3. Join an open network and a WPA2 network. Enter a wrong password and confirm “Incorrect password.” without the secret appearing in `journalctl -u judie`.
+4. Join a hidden SSID from “Join hidden network”.
+5. Disconnect, reconnect, then Forget (confirm dialog) the current network. Reboot and confirm forgotten networks stay gone and user-created Settings still load.
+6. Ethernet-only: unplug Wi-Fi / prefer Ethernet. Confirm the page says Ethernet, not internet, until NM connectivity is `full`.
+7. Break gateway, DNS, and internet separately (bad default route, bad resolver, upstream down). Diagnostics must show independent Passed / Failed / Timed out rows.
+8. Scroll a long Settings page from mid-content without closing. Swipe up from the bottom 28px edge and confirm the sheet follows the finger, then settles closed.
+9. Power: Restart / Shut Down / Uninstall stay in one short row and still confirm. Software version switching still works.
+10. Add-widget editor: Small / Medium / Large previews stay sharp at 1920×1200, keep 1:1 / 2:1 / 1:1, and match the widget that lands on the home grid.
+
 ## Requirements
 
 - **32-bit Raspberry Pi OS Lite** (Bookworm or Trixie) — the GitHub `.deb` is `armhf`

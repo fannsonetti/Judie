@@ -11,6 +11,7 @@ export component WidgetFace inherits Rectangle {
     in property <string> size: "1x1";
     in property <bool> sample: false;
     in property <string> source: "live";
+    in property <float> face-scale: 1.0;
     in property <image> thumb;
     in property <string> widget-id: "";
 
@@ -152,70 +153,70 @@ export component WidgetFace inherits Rectangle {
         background: transparent;
 
         if root.kind == "quickControls": GridLayout {
-            spacing: 8px;
+            spacing: 8px * root.face-scale;
             padding: 0px;
-            QuickTask { row: 0; col: 0; glyph: "☾"; label: "Good Night"; clicked => { if !root.sample { root.quick("goodNight"); } } }
-            QuickTask { row: 0; col: 1; glyph: "○"; label: "Lights Off"; clicked => { if !root.sample { root.quick("lightsOff"); } } }
-            QuickTask { row: 1; col: 0; glyph: "⊘"; label: "Do Not Disturb"; on: root.t-dnd; clicked => { if !root.sample { root.quick("dnd"); } } }
-            QuickTask { row: 1; col: 1; glyph: "▶"; label: "Movie Mode"; clicked => { if !root.sample { root.quick("movie"); } } }
+            QuickTask { row: 0; col: 0; zoom: root.face-scale; glyph: "☾"; label: "Good Night"; clicked => { if !root.sample { root.quick("goodNight"); } } }
+            QuickTask { row: 0; col: 1; zoom: root.face-scale; glyph: "○"; label: "Lights Off"; clicked => { if !root.sample { root.quick("lightsOff"); } } }
+            QuickTask { row: 1; col: 0; zoom: root.face-scale; glyph: "⊘"; label: "Do Not Disturb"; on: root.t-dnd; clicked => { if !root.sample { root.quick("dnd"); } } }
+            QuickTask { row: 1; col: 1; zoom: root.face-scale; glyph: "▶"; label: "Movie Mode"; clicked => { if !root.sample { root.quick("movie"); } } }
         }
 
         if root.kind == "climate": HorizontalLayout {
-            spacing: 10px;
+            spacing: 10px * root.face-scale;
             Rectangle {
-                width: 72px; height: 72px;
-                border-width: 2px; border-color: #ffffff; background: #000000;
+                width: 72px * root.face-scale; height: 72px * root.face-scale;
+                border-width: max(1px, 2px * root.face-scale); border-color: #ffffff; background: #000000;
                 VerticalLayout {
                     alignment: center;
-                    Text { text: root.t-in; color: #ffffff; font-size: Dy.type-value; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
-                    Text { text: "NOW"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; horizontal-alignment: center; }
+                    Text { text: root.t-in; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                    Text { text: "NOW"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; }
                 }
             }
             VerticalLayout {
-                alignment: center; spacing: 6px;
-                Text { text: "HUMIDITY"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
-                Text { text: root.t-hum; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
-                Text { text: "OUTDOOR"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
-                Text { text: root.t-out; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
-                if root.size == "1x2": Text { text: root.t-comfort; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                alignment: center; spacing: 6px * root.face-scale;
+                Text { text: "HUMIDITY"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+                Text { text: root.t-hum; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+                Text { text: "OUTDOOR"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+                Text { text: root.t-out; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+                if root.size == "1x2": Text { text: root.t-comfort; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
             }
         }
 
         if root.kind == "calendar": HorizontalLayout {
-            spacing: 10px;
+            spacing: 10px * root.face-scale;
             if root.size != "1x1": VerticalLayout {
-                spacing: 4px; horizontal-stretch: 1;
-                Text { text: "Today"; color: #8a8a8a; font-size: Dy.type-title; }
+                spacing: 4px * root.face-scale; horizontal-stretch: 1;
+                Text { text: "Today"; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; }
                 for ev in root.sample ? root.demo-events : root.events: HorizontalLayout {
-                    spacing: 6px;
-                    Rectangle { width: 4px; height: 18px; background: #ffffff; }
+                    spacing: 6px * root.face-scale;
+                    Rectangle { width: 4px * root.face-scale; height: 18px * root.face-scale; background: #ffffff; }
                     VerticalLayout {
-                        Text { text: ev.title; color: #ffffff; font-size: Dy.type-title; font-weight: 600; overflow: elide; }
-                        Text { text: ev.time + (ev.detail == "" ? "" : " · " + ev.detail); color: #8a8a8a; font-size: Dy.type-secondary; overflow: elide; }
+                        Text { text: ev.title; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 600; overflow: elide; }
+                        Text { text: ev.time + (ev.detail == "" ? "" : " · " + ev.detail); color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; overflow: elide; }
                     }
                 }
             }
             VerticalLayout {
-                spacing: 4px; horizontal-stretch: 1;
-                Text { text: root.t-month; color: #8a8a8a; font-size: Dy.type-title; }
+                spacing: 4px * root.face-scale; horizontal-stretch: 1;
+                Text { text: root.t-month; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; }
                 HorizontalLayout {
                     spacing: 0;
                     for d in ["S", "M", "T", "W", "T", "F", "S"]: Text {
-                        text: d; color: #555555; font-size: Dy.type-dense; horizontal-alignment: center; horizontal-stretch: 1;
+                        text: d; color: #555555; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; horizontal-stretch: 1;
                     }
                 }
                 GridLayout {
-                    spacing: 2px;
+                    spacing: 2px * root.face-scale;
                     for cell[i] in root.sample ? root.demo-cal : root.cal-cells: Rectangle {
                         row: floor(i / 7); col: mod(i, 7);
-                        height: 18px;
+                        height: 18px * root.face-scale;
                         border-width: cell.today ? 1.5px : 0px;
                         border-color: #ffffff;
                         background: #00000000;
                         Text {
                             text: cell.label;
                             color: cell.today ? #ffffff : #e6e6e6;
-                            font-size: Dy.type-dense;
+                            font-size: Dy.type-dense * root.face-scale;
                             font-weight: cell.today ? 700 : 400;
                             font-family: Dy.mono;
                             horizontal-alignment: center;
@@ -227,28 +228,28 @@ export component WidgetFace inherits Rectangle {
         }
 
         if root.kind == "purifier": VerticalLayout {
-            spacing: 8px;
+            spacing: 8px * root.face-scale;
             if root.size != "1x1": HorizontalLayout {
-                spacing: 10px;
+                spacing: 10px * root.face-scale;
                 Rectangle {
-                    width: 88px; height: 88px;
-                    border-width: 2px; border-color: #ffffff; background: #000000;
+                    width: 88px * root.face-scale; height: 88px * root.face-scale;
+                    border-width: max(1px, 2px * root.face-scale); border-color: #ffffff; background: #000000;
                     VerticalLayout {
                         alignment: center;
-                        Text { text: root.t-aq; color: #ffffff; font-size: Dy.type-value; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
-                        Text { text: "AIR QUALITY"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; horizontal-alignment: center; }
+                        Text { text: root.t-aq; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                        Text { text: "AIR QUALITY"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; }
                     }
                 }
                 VerticalLayout {
-                    spacing: 6px;
+                    spacing: 6px * root.face-scale;
                     Rectangle {
                         background: #000000;
-                        border-width: 1.5px; border-color: Dy.border;
+                        border-width: max(1px, 1.5px * root.face-scale); border-color: Dy.border;
                         VerticalLayout {
-                            padding: 8px;
-                            Text { text: "PM2.5"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
-                            Text { text: "7 µg/m³"; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
-                            Text { text: "Fine particles"; color: #555555; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                            padding: 8px * root.face-scale;
+                            Text { text: "PM2.5"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+                            Text { text: "7 µg/m³"; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+                            Text { text: "Fine particles"; color: #555555; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
                         }
                     }
                     Rectangle {
@@ -256,79 +257,79 @@ export component WidgetFace inherits Rectangle {
                         border-width: 1.5px; border-color: Dy.border;
                         VerticalLayout {
                             padding: 8px;
-                            Text { text: "ALLERGENS"; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
-                            Text { text: "4/12"; color: #ffffff; font-size: Dy.type-title; font-weight: 700; font-family: Dy.mono; }
-                            Text { text: "Allergen level"; color: #555555; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                            Text { text: "ALLERGENS"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+                            Text { text: "4/12"; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+                            Text { text: "Allergen level"; color: #555555; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
                         }
                     }
                 }
             }
             if root.size == "1x1": VerticalLayout {
-                Text { text: "7"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
-                Text { text: "PM2.5 · " + root.t-aq; color: #8a8a8a; font-size: Dy.type-secondary; }
+                Text { text: "7"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+                Text { text: "PM2.5 · " + root.t-aq; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
             }
-            if root.size == "2x2": Text { text: "Filter: Clean soon. Dust can cut performance. Clean the filter for the best air."; color: #8a8a8a; font-size: Dy.type-secondary; wrap: word-wrap; }
-            Text { text: "Filter"; color: #8a8a8a; font-size: Dy.type-secondary; }
-            Bar { level: root.t-filter / 100; fill: #ffffff; }
-            Text { text: root.t-filter + "%"; color: #ffffff; font-size: Dy.type-secondary; }
+            if root.size == "2x2": Text { text: "Filter: Clean soon. Dust can cut performance. Clean the filter for the best air."; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; wrap: word-wrap; }
+            Text { text: "Filter"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+            Bar { level: root.t-filter / 100; fill: #ffffff; zoom: root.face-scale; }
+            Text { text: root.t-filter + "%"; color: #ffffff; font-size: Dy.type-secondary * root.face-scale; }
             if root.size == "2x2": HorizontalLayout {
-                spacing: 8px;
-                Pill { label: "Auto"; on: root.t-pmode == "Auto"; clicked => { if !root.sample { root.set-purifier-mode("Auto"); } } }
-                Pill { label: "Sleep"; on: root.t-pmode == "Sleep"; clicked => { if !root.sample { root.set-purifier-mode("Sleep"); } } }
-                Pill { label: "Boost"; on: root.t-pmode == "Manual"; clicked => { if !root.sample { root.set-purifier-mode("Manual"); } } }
+                spacing: 8px * root.face-scale;
+                Pill { label: "Auto"; zoom: root.face-scale; on: root.t-pmode == "Auto"; clicked => { if !root.sample { root.set-purifier-mode("Auto"); } } }
+                Pill { label: "Sleep"; zoom: root.face-scale; on: root.t-pmode == "Sleep"; clicked => { if !root.sample { root.set-purifier-mode("Sleep"); } } }
+                Pill { label: "Boost"; zoom: root.face-scale; on: root.t-pmode == "Manual"; clicked => { if !root.sample { root.set-purifier-mode("Manual"); } } }
             }
         }
 
         if root.kind == "activity": VerticalLayout {
             for a in root.sample ? root.demo-activity : root.activity: HorizontalLayout {
                 spacing: 8px;
-                if root.size == "2x2": Text { text: a.time; color: #8a8a8a; font-size: Dy.type-secondary; min-width: 52px; }
-                Text { text: a.title; color: #ffffff; font-size: Dy.type-title; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
-                if root.size == "2x2": Text { text: a.source; color: #8a8a8a; font-size: Dy.type-secondary; }
+                if root.size == "2x2": Text { text: a.time; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; min-width: 52px; }
+                Text { text: a.title; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                if root.size == "2x2": Text { text: a.source; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
             }
         }
 
         if root.kind == "server": VerticalLayout {
             spacing: 4px;
-            Text { text: root.sample ? "6 ms" : "122 ms"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
-            Text { text: root.sample ? "4/5 up" : "4/5 up"; color: #8a8a8a; font-size: Dy.type-secondary; }
+            Text { text: root.sample ? "6 ms" : "122 ms"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+            Text { text: root.sample ? "4/5 up" : "4/5 up"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
             if root.size != "1x1": VerticalLayout {
                 spacing: 4px;
                 for s in root.sample ? root.demo-services : root.services: HorizontalLayout {
                     spacing: 8px;
                     Rectangle { width: 8px; height: 8px; background: s.online ? #ffffff : #4a4a4a; y: 4px; }
-                    Text { text: s.name; color: #ffffff; font-size: Dy.type-title; }
+                    Text { text: s.name; color: #ffffff; font-size: Dy.type-title * root.face-scale; }
                     Rectangle { horizontal-stretch: 1; }
-                    Text { text: s.status; color: #8a8a8a; font-size: Dy.type-secondary; }
+                    Text { text: s.status; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
                 }
             }
         }
 
         if root.kind == "weather": VerticalLayout {
             HorizontalLayout {
-                Text { text: root.t-loc; color: #8a8a8a; font-size: Dy.type-title; overflow: elide; horizontal-stretch: 1; }
-                if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: Dy.type-secondary; }
+                Text { text: root.t-loc; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; overflow: elide; horizontal-stretch: 1; }
+                if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
             }
             HorizontalLayout {
                 VerticalLayout {
-                    Text { text: root.t-temp; color: #ffffff; font-size: Dy.type-hero; font-weight: 700; }
-                    Text { text: root.t-cond; color: #ffffff; font-size: Dy.type-title; }
-                    Text { text: root.t-range; color: #8a8a8a; font-size: Dy.type-secondary; }
+                    Text { text: root.t-temp; color: #ffffff; font-size: Dy.type-hero * root.face-scale; font-weight: 700; }
+                    Text { text: root.t-cond; color: #ffffff; font-size: Dy.type-title * root.face-scale; }
+                    Text { text: root.t-range; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
                 }
                 Rectangle { horizontal-stretch: 1; }
                 Rectangle {
-                    width: 36px; height: 36px; background: #000000; y: 8px;
-                    border-width: 1px; border-color: #f0a030;
-                    Text { text: "*"; color: #f0a030; font-size: 18px; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
+                    width: 36px * root.face-scale; height: 36px * root.face-scale; background: #000000; y: 8px * root.face-scale;
+                    border-width: max(1px, 1px * root.face-scale); border-color: #f0a030;
+                    Text { text: "*"; color: #f0a030; font-size: 18px * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
                 }
             }
-            if root.size == "2x2": Text { text: root.t-note; color: #ffffff; font-size: Dy.type-secondary; wrap: word-wrap; }
+            if root.size == "2x2": Text { text: root.t-note; color: #ffffff; font-size: Dy.type-secondary * root.face-scale; wrap: word-wrap; }
             if root.size != "1x1": HorizontalLayout {
                 spacing: 8px;
                 for h in root.sample ? root.demo-hours : root.hours: VerticalLayout {
-                    Text { text: h.hour; color: #555555; font-size: Dy.type-dense; horizontal-alignment: center; }
-                    Text { text: h.temp; color: #ffffff; font-size: Dy.type-title; font-weight: 700; horizontal-alignment: center; }
-                    Text { text: h.precip; color: #8a8a8a; font-size: Dy.type-dense; horizontal-alignment: center; }
+                    Text { text: h.hour; color: #555555; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; }
+                    Text { text: h.temp; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; horizontal-alignment: center; }
+                    Text { text: h.precip; color: #8a8a8a; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; }
                 }
             }
         }
@@ -336,22 +337,22 @@ export component WidgetFace inherits Rectangle {
         if root.kind == "lights": VerticalLayout {
             spacing: 6px;
             HorizontalLayout {
-                Text { text: root.t-scene; color: #8a8a8a; font-size: Dy.type-title; vertical-alignment: center; }
+                Text { text: root.t-scene; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; vertical-alignment: center; }
                 Rectangle { horizontal-stretch: 1; }
-                Toggle { on: root.t-master; toggled => { if !root.sample { root.toggle-master(); } } }
+                Toggle { on: root.t-master; zoom: root.face-scale; toggled => { if !root.sample { root.toggle-master(); } } }
             }
-            Text { text: root.t-master ? root.t-bright + "%" : "Off"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
+            Text { text: root.t-master ? root.t-bright + "%" : "Off"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
             Slider { minimum: 0; maximum: 100; value: root.t-bright; changed(v) => { if !root.sample { root.brightness-changed(round(v)); } } }
             HorizontalLayout {
                 spacing: 8px;
-                Swatch { swatch: #ff5a5a; on: root.t-color == "#FF5A5A"; clicked => { if !root.sample { root.set-color("#FF5A5A"); } } }
-                Swatch { swatch: #ff8c42; on: root.t-color == "#FF8C42"; clicked => { if !root.sample { root.set-color("#FF8C42"); } } }
-                Swatch { swatch: #ffd166; on: root.t-color == "#FFD166"; clicked => { if !root.sample { root.set-color("#FFD166"); } } }
-                Swatch { swatch: #7cf29c; on: root.t-color == "#7CF29C"; clicked => { if !root.sample { root.set-color("#7CF29C"); } } }
-                Swatch { swatch: #5ce1ff; on: root.t-color == "#2D7BFF"; clicked => { if !root.sample { root.set-color("#2D7BFF"); } } }
-                if root.size != "1x1": Swatch { swatch: #7b61ff; on: root.t-color == "#7B61FF"; clicked => { if !root.sample { root.set-color("#7B61FF"); } } }
-                if root.size != "1x1": Swatch { swatch: #ff6bcb; on: root.t-color == "#FF6BCB"; clicked => { if !root.sample { root.set-color("#FF6BCB"); } } }
-                if root.size != "1x1": Swatch { swatch: #ffffff; on: root.t-color == "#FFFFFF"; clicked => { if !root.sample { root.set-color("#FFFFFF"); } } }
+                Swatch { swatch: #ff5a5a; zoom: root.face-scale; on: root.t-color == "#FF5A5A"; clicked => { if !root.sample { root.set-color("#FF5A5A"); } } }
+                Swatch { swatch: #ff8c42; zoom: root.face-scale; on: root.t-color == "#FF8C42"; clicked => { if !root.sample { root.set-color("#FF8C42"); } } }
+                Swatch { swatch: #ffd166; zoom: root.face-scale; on: root.t-color == "#FFD166"; clicked => { if !root.sample { root.set-color("#FFD166"); } } }
+                Swatch { swatch: #7cf29c; zoom: root.face-scale; on: root.t-color == "#7CF29C"; clicked => { if !root.sample { root.set-color("#7CF29C"); } } }
+                Swatch { swatch: #5ce1ff; zoom: root.face-scale; on: root.t-color == "#2D7BFF"; clicked => { if !root.sample { root.set-color("#2D7BFF"); } } }
+                if root.size != "1x1": Swatch { swatch: #7b61ff; zoom: root.face-scale; on: root.t-color == "#7B61FF"; clicked => { if !root.sample { root.set-color("#7B61FF"); } } }
+                if root.size != "1x1": Swatch { swatch: #ff6bcb; zoom: root.face-scale; on: root.t-color == "#FF6BCB"; clicked => { if !root.sample { root.set-color("#FF6BCB"); } } }
+                if root.size != "1x1": Swatch { swatch: #ffffff; zoom: root.face-scale; on: root.t-color == "#FFFFFF"; clicked => { if !root.sample { root.set-color("#FFFFFF"); } } }
             }
             if root.size == "2x2": GridLayout {
                 spacing: 8px;
@@ -366,8 +367,8 @@ export component WidgetFace inherits Rectangle {
                             clicked => { if !root.sample { root.toggle-light(light.id); } }
                             VerticalLayout {
                                 padding: 6px;
-                                Text { text: light.name; color: #ffffff; font-size: Dy.type-secondary; font-family: Dy.mono; overflow: elide; }
-                                Text { text: light.brightness; color: #8a8a8a; font-size: Dy.type-secondary; font-family: Dy.mono; }
+                                Text { text: light.name; color: #ffffff; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; overflow: elide; }
+                                Text { text: light.brightness; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
                             }
                         }
                     }
@@ -376,37 +377,37 @@ export component WidgetFace inherits Rectangle {
         }
 
         if root.kind == "media": VerticalLayout {
-            Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: Dy.type-secondary; }
-            Text { text: root.t-track; color: #ffffff; font-size: Dy.type-title; font-weight: 600; overflow: elide; }
-            if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: Dy.type-secondary; overflow: elide; }
-            if root.size != "1x1": Bar { level: root.t-prog; fill: #ffffff; }
+            Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+            Text { text: root.t-track; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 600; overflow: elide; }
+            if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; overflow: elide; }
+            if root.size != "1x1": Bar { level: root.t-prog; fill: #ffffff; zoom: root.face-scale; }
             HorizontalLayout {
                 spacing: 8px;
-                if root.size != "1x1": IconBtn { glyph: "⟨"; clicked => { if !root.sample { root.prev-track(); } } }
-                IconBtn { glyph: root.t-play ? "❚❚" : "▶"; primary: true; clicked => { if !root.sample { root.toggle-play(); } } }
-                if root.size != "1x1": IconBtn { glyph: "⟩"; clicked => { if !root.sample { root.next-track(); } } }
+                if root.size != "1x1": IconBtn { glyph: "⟨"; zoom: root.face-scale; clicked => { if !root.sample { root.prev-track(); } } }
+                IconBtn { glyph: root.t-play ? "❚❚" : "▶"; primary: true; zoom: root.face-scale; clicked => { if !root.sample { root.toggle-play(); } } }
+                if root.size != "1x1": IconBtn { glyph: "⟩"; zoom: root.face-scale; clicked => { if !root.sample { root.next-track(); } } }
                 if root.size == "2x2": Rectangle { horizontal-stretch: 1; }
-                if root.size == "2x2": Text { text: root.t-vol + "%"; color: #8a8a8a; font-size: Dy.type-secondary; vertical-alignment: center; }
+                if root.size == "2x2": Text { text: root.t-vol + "%"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; vertical-alignment: center; }
             }
             if root.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.t-vol; changed(v) => { if !root.sample { root.volume-changed(round(v)); } } }
         }
 
         if root.kind == "system": VerticalLayout {
-            Text { text: "CPU"; color: #8a8a8a; font-size: Dy.type-secondary; }
-            Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
-            Bar { level: root.t-cpu / 100; fill: #ffffff; }
-            if root.size != "1x1": Text { text: "Memory"; color: #8a8a8a; font-size: Dy.type-secondary; }
-            if root.size != "1x1": Text { text: round(root.t-mem) + "%"; color: #ffffff; font-size: Dy.type-value; font-weight: 700; }
-            if root.size != "1x1": Bar { level: root.t-mem / 100; fill: #ffffff; }
-            if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: Dy.type-secondary; }
-            if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: Dy.type-secondary; }
+            Text { text: "CPU"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+            Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+            Bar { level: root.t-cpu / 100; fill: #ffffff; zoom: root.face-scale; }
+            if root.size != "1x1": Text { text: "Memory"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+            if root.size != "1x1": Text { text: round(root.t-mem) + "%"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+            if root.size != "1x1": Bar { level: root.t-mem / 100; fill: #ffffff; zoom: root.face-scale; }
+            if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+            if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
         }
 
         if root.kind == "timers": VerticalLayout {
             for t in root.sample ? root.demo-timers : root.timers: HorizontalLayout {
-                Text { text: t.label; color: #ffffff; font-size: Dy.type-title; }
+                Text { text: t.label; color: #ffffff; font-size: Dy.type-title * root.face-scale; }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: t.remain; color: #8a8a8a; font-size: Dy.type-title; }
+                Text { text: t.remain; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; }
             }
         }
 

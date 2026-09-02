@@ -1,7 +1,8 @@
 import { ScrollView, Slider, Button } from "std-widgets.slint";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
+import { WidgetPreview } from "preview.slint";
 
 export component MainWindow inherits Window {
     title: "Judie";
@@ -145,6 +146,21 @@ export component MainWindow inherits Window {
     in-out property <string> refresh-status: "";
     in-out property <string> preview-source: "live";
     in-out property <string> wifi-detail: "";
+    in-out property <string> net-iface: "—";
+    in-out property <string> net-security: "—";
+    in-out property <string> net-ipv6: "—";
+    in-out property <string> net-gateway: "—";
+    in-out property <string> net-dns: "—";
+    in-out property <string> net-mac: "—";
+    in-out property <string> net-speed: "—";
+    in-out property <string> net-reach: "none";
+    in-out property <string> net-signal: "—";
+    in-out property <string> net-headline: "Disconnected";
+    in-out property <string> wifi-scan-state: "";
+    in-out property <string> hidden-ssid: "";
+    in-out property <bool> hidden-open: false;
+    in-out property <string> forget-ssid: "";
+    in-out property <[DiagRow]> diags: [];
     in-out property <[SlopNode]> gallery-nodes: [];
     in-out property <string> pending-routine-id: "";
     in-out property <string> pending-routine-name: "";
@@ -198,6 +214,7 @@ export component MainWindow inherits Window {
     callback duplicate-routine(string);
     callback toggle-routine(string);
     callback ask-delete-routine(string);
+    callback delete-routine(string);
     callback set-page(int);
     callback expand(string);
     callback collapse();
@@ -235,6 +252,10 @@ export component MainWindow inherits Window {
     callback pick-wifi(string);
     callback connect-wifi();
     callback disconnect-wifi();
+    callback forget-wifi();
+    callback ask-forget-wifi(string);
+    callback connect-hidden();
+    callback run-diag();
     callback reboot-now();
     callback shutdown-now();
     callback open-keyboard(string);
@@ -948,17 +969,21 @@ export component MainWindow inherits Window {
         width: 100%;
         height: 100%;
         background: #000000;
+        clip: true;
         VerticalLayout {
             padding-left: 28px;
             padding-right: 28px;
-            padding-top: 28px;
-            padding-bottom: 20px;
-            spacing: 18px;
-            Rectangle {
+            padding-top: 20px;
+            padding-bottom: 28px;
+            spacing: 12px;
+            HorizontalLayout {
                 height: 4px;
-                width: 48px;
-                x: (parent.width - 48px) / 2;
-                background: #3a3a3a;
+                alignment: center;
+                Rectangle {
+                    height: 4px;
+                    width: 48px;
+                    background: #3a3a3a;
+                }
             }
             HorizontalLayout {
                 spacing: 28px;
@@ -989,7 +1014,6 @@ export component MainWindow inherits Window {
                             width: root.general-col;
                             spacing: 18px;
                             padding-bottom: 80px;
-                            Text { text: "Profile"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
                             FieldTap { label: "Username"; value: root.room-name; active: root.kb-field == "room-name"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("room-name"); } }
                             Text { text: "Location"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
                             FieldTap { label: "Location name"; value: root.weather-loc; active: root.kb-field == "location"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("location"); } }
@@ -1074,33 +1098,121 @@ export component MainWindow inherits Window {
                                 cancel => { root.cancel-routine(r.id); }
                                 duplicate => { root.duplicate-routine(r.id); }
                                 toggle-enabled => { root.toggle-routine(r.id); }
-                                delete => { root.ask-delete-routine(r.id); }
+                                delete => { root.delete-routine(r.id); }
                             }
                         }
                     }
-                    if root.settings-tab == 1: VerticalLayout {
-                        spacing: 16px;
-                        Text { text: "Connection"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        Text { text: "Preferred interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            Pill { label: "Ethernet"; on: root.preferred-net == "ethernet"; clicked => { root.set-preferred-net("ethernet"); } }
-                            Pill { label: "Wi-Fi"; on: root.preferred-net == "wifi"; clicked => { root.set-preferred-net("wifi"); } }
+                    if root.settings-tab == 1: HorizontalLayout {
+                        alignment: center;
+                        VerticalLayout {
+                            width: root.general-col;
+                            spacing: 10px;
+                            padding-bottom: 80px;
+                            Text { text: root.net-headline; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                            Text { text: "Type"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-kind; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-iface; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "SSID"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.wifi-ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                            Text { text: "State"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.wifi-state; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Signal"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-signal; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Security"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-security; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "IPv4"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.wifi-ip; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "IPv6"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-ipv6; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+                            Text { text: "Gateway"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-gateway; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "DNS"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-dns; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+                            Text { text: "MAC"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-mac; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Link speed"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-speed; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Preferred interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Pill { label: "Ethernet"; on: root.preferred-net == "ethernet"; clicked => { root.set-preferred-net("ethernet"); } }
+                                Pill { label: "Wi-Fi"; on: root.preferred-net == "wifi"; clicked => { root.set-preferred-net("wifi"); } }
+                            }
+                            HorizontalLayout {
+                                Text { text: "DHCP"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Toggle { on: root.dhcp-on; toggled => { root.toggle-dhcp(); } }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Pill { label: "Reconnect"; on: true; clicked => { root.reconnect-net(); } }
+                                if root.net-kind == "wifi": Pill { label: "Disconnect Wi-Fi"; clicked => { root.disconnect-wifi(); } }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: "Nearby Wi-Fi"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Pill { label: root.wifi-busy ? "Scanning…" : "Refresh"; on: true; clicked => { if !root.wifi-busy { root.scan-wifi(); } } }
+                            }
+                            Text {
+                                text: root.wifi-scan-state == "" ? root.wifi-status : root.wifi-scan-state;
+                                color: #8a8a8a;
+                                font-size: 12px;
+                                font-family: Dy.mono;
+                                wrap: word-wrap;
+                            }
+                            for net in root.wifi-nets: Rectangle {
+                                height: 52px;
+                                border-width: 1.5px;
+                                border-color: net.connected ? #ffffff : #2a2a2a;
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    spacing: 10px;
+                                    NetGlyph { kind: "wifi"; bars: net.bars; }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        horizontal-stretch: 1;
+                                        Text { text: net.ssid + (net.connected ? "  · connected" : ""); color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                                        Text { text: net.security + (net.saved ? "  · saved" : ""); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; overflow: elide; }
+                                    }
+                                    if !net.connected: Pill {
+                                        label: "Join";
+                                        on: true;
+                                        clicked => { root.pick-wifi(net.ssid); root.connect-wifi(); }
+                                    }
+                                    if net.saved: Pill {
+                                        label: "Forget";
+                                        clicked => { root.ask-forget-wifi(net.ssid); }
+                                    }
+                                }
+                            }
+                            Pill { label: root.hidden-open ? "Hide hidden network" : "Join hidden network"; clicked => { root.hidden-open = !root.hidden-open; } }
+                            if root.hidden-open: VerticalLayout {
+                                spacing: 8px;
+                                FieldTap { label: "Network name"; value: root.hidden-ssid; active: root.kb-field == "hidden-ssid"; label-size: 13px; value-size: 16px; tap-height: 56px; tapped => { root.open-keyboard("hidden-ssid"); } }
+                                FieldTap { label: "Password"; value: root.wifi-pass == "" ? "" : "••••••••"; active: root.kb-field == "wifi-pass"; label-size: 13px; value-size: 16px; tap-height: 56px; tapped => { root.open-keyboard("wifi-pass"); } }
+                                Pill { label: "Connect hidden"; on: true; clicked => { root.connect-hidden(); } }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Text { text: "Diagnostics"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Pill { label: "Run checks"; on: true; clicked => { root.run-diag(); } }
+                            }
+                            for d in root.diags: HorizontalLayout {
+                                height: 28px;
+                                Text { text: d.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                                Rectangle { horizontal-stretch: 1; }
+                                Text { text: d.state + (d.detail == "" ? "" : "  " + d.detail); color: #8a8a8a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                            }
                         }
-                        Text { text: "Automatic Configuration"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            Text { text: "DHCP"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.dhcp-on; toggled => { root.toggle-dhcp(); } }
-                        }
-                        Text { text: "Reconnect"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        Pill { label: "Reconnect"; on: true; clicked => { root.reconnect-net(); } }
                     }
                     if root.settings-tab == 2: VerticalLayout {
-                        spacing: 14px;
-                        Text { text: "Device"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        spacing: 6px;
                         HorizontalLayout {
-                            spacing: 12px;
+                            spacing: 8px;
                             PowerAction {
                                 label: "Restart";
                                 glyph: "↻";
@@ -1127,7 +1239,6 @@ export component MainWindow inherits Window {
                             font-family: Dy.mono;
                             wrap: word-wrap;
                         }
-                        Rectangle { height: 8px; }
                         Rectangle { height: 1.5px; background: #2a2a2a; }
                         Text { text: "Software"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
                         HorizontalLayout {
@@ -1135,40 +1246,19 @@ export component MainWindow inherits Window {
                             Rectangle { horizontal-stretch: 1; }
                             Text { text: "v" + root.version-text; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
                         }
-                        HorizontalLayout {
-                            Text { text: "Selected version"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Text {
-                                text: root.selected-release == "" ? "—" : root.selected-release;
-                                color: #ffffff;
-                                font-size: 16px;
-                                font-family: Dy.mono;
-                                vertical-alignment: center;
-                            }
+                        if root.update-label != "": Text {
+                            text: root.update-label;
+                            color: #ffffff;
+                            font-size: 14px;
+                            font-family: Dy.mono;
+                            wrap: word-wrap;
                         }
-                        HorizontalLayout {
-                            Text { text: "Update status"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: top; }
-                            Rectangle { width: 16px; }
-                            Text {
-                                text: root.update-label == "" ? "Not checked yet." : root.update-label;
-                                color: #ffffff;
-                                font-size: 14px;
-                                font-family: Dy.mono;
-                                wrap: word-wrap;
-                                horizontal-stretch: 1;
-                            }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Last refresh"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: top; }
-                            Rectangle { width: 16px; }
-                            Text {
-                                text: root.refresh-status == "" ? "Open this page or tap Check for updates." : root.refresh-status;
-                                color: #8a8a8a;
-                                font-size: 13px;
-                                font-family: Dy.mono;
-                                wrap: word-wrap;
-                                horizontal-stretch: 1;
-                            }
+                        if root.refresh-status != "": Text {
+                            text: root.refresh-status;
+                            color: #8a8a8a;
+                            font-size: 13px;
+                            font-family: Dy.mono;
+                            wrap: word-wrap;
                         }
                         Text { text: "Switch version"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
                         Rectangle {
@@ -1241,6 +1331,37 @@ export component MainWindow inherits Window {
                 }
             }
         }
+        TouchArea {
+            y: parent.height - 28px;
+            width: 100%;
+            height: 28px;
+            pointer-event(ev) => {
+                if ev.kind == PointerEventKind.down {
+                    if root.settings-open || root.settings-pull > 0.92 {
+                        root.settings-armed = true;
+                        root.settings-kind = 1;
+                        root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
+                        root.settings-base = root.settings-pull;
+                    }
+                }
+                if ev.kind == PointerEventKind.up {
+                    root.settings-finish(false);
+                }
+                if ev.kind == PointerEventKind.cancel {
+                    root.settings-finish(true);
+                }
+            }
+            moved => {
+                if self.pressed && (root.settings-tracking || root.settings-armed) && root.settings-kind == 1 {
+                    if !root.settings-tracking && root.settings-start - root.settings-pos(self.absolute-position.y, self.mouse-y) > 18px {
+                        root.settings-begin(1, root.settings-start);
+                    }
+                    if root.settings-tracking {
+                        root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+                    }
+                }
+            }
+        }
     }
 
     if root.net-menu-open: Rectangle {
@@ -1307,43 +1428,12 @@ export component MainWindow inherits Window {
                 }
             }
         }
-        TouchArea {
-            y: parent.height - 28px;
-            width: 100%;
-            height: 28px;
-            pointer-event(ev) => {
-                if ev.kind == PointerEventKind.down {
-                    if root.settings-open || root.settings-pull > 0.92 {
-                        root.settings-armed = true;
-                        root.settings-kind = 1;
-                        root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
-                        root.settings-base = root.settings-pull;
-                    }
-                }
-                if ev.kind == PointerEventKind.up {
-                    root.settings-finish(false);
-                }
-                if ev.kind == PointerEventKind.cancel {
-                    root.settings-finish(true);
-                }
-            }
-            moved => {
-                if self.pressed && (root.settings-tracking || root.settings-armed) && root.settings-kind == 1 {
-                    if !root.settings-tracking && root.settings-start - root.settings-pos(self.absolute-position.y, self.mouse-y) > 18px {
-                        root.settings-begin(1, root.settings-start);
-                    }
-                    if root.settings-tracking {
-                        root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
-                    }
-                }
-            }
-        }
     }
 
-    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "delete-routine": ConfirmSheet {
+    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi": ConfirmSheet {
         title: root.confirm-title;
         body: root.confirm-body;
-        primary: root.confirm-kind == "delete-routine" ? "Delete" : "Continue";
+        primary: root.confirm-kind == "forget-wifi" ? "Forget" : "Continue";
         secondary: "Cancel";
         accept => { root.accept-confirm(); }
         dismiss => { root.cancel-confirm(); }
@@ -1532,65 +1622,44 @@ export component MainWindow inherits Window {
                             Rectangle {
                                 width: 240px;
                                 height: 240px;
-                                Rectangle {
-                                    x: 60px;
-                                    y: 60px;
-                                    width: 120px;
-                                    height: 120px;
-                                    border-width: 1px;
-                                    border-color: #2a2a2a;
-                                    background: #000000;
-                                    clip: true;
-                                    WidgetFace {
-                                        kind: root.gallery-custom ? "custom" : root.gallery-kind;
-                                        size: "1x1";
-                                        sample: true;
-                                        source: root.preview-source;
-                                        widget-id: root.gallery-custom-id;
-                                        slop-nodes: root.gallery-nodes;
-                                    }
+                                WidgetPreview {
+                                    x: (240px - self.width) / 2;
+                                    y: (240px - self.height) / 2;
+                                    kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                    size: "1x1";
+                                    preview-scale: 0.5;
+                                    sample: true;
+                                    source: root.preview-source;
+                                    widget-id: root.gallery-custom-id;
+                                    slop-nodes: root.gallery-nodes;
                                 }
                             }
                             Rectangle {
                                 width: 240px;
                                 height: 240px;
-                                Rectangle {
-                                    x: 0px;
-                                    y: 60px;
-                                    width: 240px;
-                                    height: 120px;
-                                    border-width: 1px;
-                                    border-color: #2a2a2a;
-                                    background: #000000;
-                                    clip: true;
-                                    WidgetFace {
-                                        kind: root.gallery-custom ? "custom" : root.gallery-kind;
-                                        size: "1x2";
-                                        sample: true;
-                                        source: root.preview-source;
-                                        widget-id: root.gallery-custom-id;
-                                        slop-nodes: root.gallery-nodes;
-                                    }
+                                WidgetPreview {
+                                    x: (240px - self.width) / 2;
+                                    y: (240px - self.height) / 2;
+                                    kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                    size: "1x2";
+                                    preview-scale: 0.5;
+                                    sample: true;
+                                    source: root.preview-source;
+                                    widget-id: root.gallery-custom-id;
+                                    slop-nodes: root.gallery-nodes;
                                 }
                             }
                             Rectangle {
                                 width: 240px;
                                 height: 240px;
-                                Rectangle {
-                                    width: 240px;
-                                    height: 240px;
-                                    border-width: 1px;
-                                    border-color: #2a2a2a;
-                                    background: #000000;
-                                    clip: true;
-                                    WidgetFace {
-                                        kind: root.gallery-custom ? "custom" : root.gallery-kind;
-                                        size: "2x2";
-                                        sample: true;
-                                        source: root.preview-source;
-                                        widget-id: root.gallery-custom-id;
-                                        slop-nodes: root.gallery-nodes;
-                                    }
+                                WidgetPreview {
+                                    kind: root.gallery-custom ? "custom" : root.gallery-kind;
+                                    size: "2x2";
+                                    preview-scale: 0.5;
+                                    sample: true;
+                                    source: root.preview-source;
+                                    widget-id: root.gallery-custom-id;
+                                    slop-nodes: root.gallery-nodes;
                                 }
                             }
                         }
@@ -1892,7 +1961,7 @@ export component MainWindow inherits Window {
         width: 100%;
         height: 400px;
         field: root.kb-field;
-        preview: root.kb-text;
+        preview: root.kb-field == "wifi-pass" ? (root.kb-text == "" ? "" : "••••••••") : root.kb-text;
         shift <=> root.kb-shift;
         typed(ch) => { root.keyboard-key(ch); }
         command(cmd) => { root.keyboard-command(cmd); }

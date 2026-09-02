@@ -29,6 +29,14 @@ export function canBeginOpen(settingsOpen: boolean, pull: number): boolean {
   return !settingsOpen && pull < 0.08;
 }
 
+export function canBeginClose(settingsOpen: boolean, pull: number): boolean {
+  return settingsOpen || pull > 0.92;
+}
+
+export function isPageScroll(y: number, height: number, edgePx = SETTINGS_CLOSE_EDGE_PX): boolean {
+  return !inCloseEdge(y, height, edgePx);
+}
+
 export function inOpenZone(x: number, width: number): boolean {
   return width > 0 && x >= (width * 2) / 3;
 }

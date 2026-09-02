@@ -7,6 +7,9 @@ mod host;
 mod pi_room;
 #[path = "../pi_ctl.rs"]
 mod pi_ctl;
+#[path = "../widget_preview.rs"]
+#[allow(dead_code)]
+mod widget_preview;
 #[path = "../releases.rs"]
 mod releases;
 
@@ -473,6 +476,7 @@ fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
             ui.set_palette_query(text.into());
         }
         "wifi-pass" => ui.set_wifi_pass(text.into()),
+        "hidden-ssid" => ui.set_hidden_ssid(text.into()),
         "math" => ui.set_math_typed(text.into()),
         "verify" => ui.set_verify_typed(text.into()),
         "creator-name" => {
@@ -579,6 +583,7 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
         "assistant-url" => ui.get_assistant_url().to_string(),
         "palette" => ui.get_palette_query().to_string(),
         "wifi-pass" => ui.get_wifi_pass().to_string(),
+        "hidden-ssid" => ui.get_hidden_ssid().to_string(),
         "math" => ui.get_math_typed().to_string(),
         "verify" => ui.get_verify_typed().to_string(),
         "creator-name" => ui.get_creator_name().to_string(),
@@ -605,12 +610,28 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
 }
 
 fn load_link(ui: &MainWindow) {
-    let link = pi_ctl::link_status();
-    ui.set_net_kind(link.kind.clone().into());
-    ui.set_net_bars(link.bars);
-    ui.set_wifi_ssid(link.ssid.into());
-    ui.set_wifi_ip(link.ip.into());
-    ui.set_wifi_state(link.state.into());
+    let d = pi_ctl::connection_detail();
+    ui.set_net_kind(d.conn_type.clone().into());
+    ui.set_net_iface(d.iface.clone().into());
+    ui.set_net_bars(
+        d.signal
+            .trim_end_matches('%')
+            .parse()
+            .map(|n: i32| if n >= 80 { 4 } else if n >= 55 { 3 } else if n >= 30 { 2 } else if n >= 1 { 1 } else { 0 })
+            .unwrap_or(0),
+    );
+    ui.set_wifi_ssid(d.ssid.clone().into());
+    ui.set_wifi_ip(d.ipv4.clone().into());
+    ui.set_wifi_state(d.state.clone().into());
+    ui.set_net_security(d.security.clone().into());
+    ui.set_net_ipv6(d.ipv6.clone().into());
+    ui.set_net_gateway(d.gateway.clone().into());
+    ui.set_net_dns(d.dns.clone().into());
+    ui.set_net_mac(d.mac.clone().into());
+    ui.set_net_speed(d.speed.clone().into());
+    ui.set_net_reach(d.reach.clone().into());
+    ui.set_net_signal(d.signal.clone().into());
+    ui.set_net_headline(pi_ctl::connection_headline(&d).into());
     ui.set_dhcp_on(pi_ctl::dhcp_enabled());
     ui.set_preferred_net(pi_ctl::preferred_iface().into());
 }
@@ -857,6 +878,8 @@ fn bind(ui: &MainWindow) {
         if let Some(ui) = weak.upgrade() {
             load_wifi_status(&ui);
             load_releases(&ui);
+            ui.invoke_scan_wifi();
+            ui.invoke_run_diag();
         }
     });
     let r = refresh.clone();
@@ -1202,6 +1225,11 @@ fn bind(ui: &MainWindow) {
         });
         r();
     });
+    let r = refresh.clone();
+    ui.on_delete_routine(move |id| {
+        pi_room::with(|room| room.remove_routine(id.as_str()));
+        r();
+    });
     let weak = ui.as_weak();
     ui.on_ask_delete_routine(move |id| {
         let Some(ui) = weak.upgrade() else { return };
@@ -1255,6 +1283,7 @@ fn bind(ui: &MainWindow) {
     ui.on_scan_wifi(move || {
         let Some(ui) = weak.upgrade() else { return };
         ui.set_wifi_busy(true);
+        ui.set_wifi_scan_state("Scanning…".into());
         ui.set_wifi_status("Scanning…".into());
         let weak = ui.as_weak();
         std::thread::spawn(move || {
@@ -1274,12 +1303,22 @@ fn bind(ui: &MainWindow) {
                                 secured: n.secured,
                                 saved: n.saved,
                                 connected: n.connected,
+                                security: n.security.into(),
                             })
                             .collect();
+                        let state = if model.is_empty() {
+                            "No nearby networks."
+                        } else {
+                            ""
+                        };
+                        ui.set_wifi_scan_state(state.into());
                         ui.set_wifi_status(format!("{} networks", model.len()).into());
                         ui.set_wifi_nets(ModelRc::new(VecModel::from(model)));
                     }
-                    Err(err) => ui.set_wifi_status(err.into()),
+                    Err(err) => {
+                        ui.set_wifi_scan_state(err.clone().into());
+                        ui.set_wifi_status(err.into());
+                    }
                 }
             });
         });
@@ -1289,10 +1328,8 @@ fn bind(ui: &MainWindow) {
         if let Some(ui) = weak.upgrade() {
             ui.set_wifi_pick(ssid.clone());
             ui.set_wifi_detail(ssid.clone());
-            ui.set_wifi_auto(pi_ctl::wants_autoconnect(ssid.as_str()));
-            if let Some(pass) = pi_ctl::remembered_password(ssid.as_str()) {
-                ui.set_wifi_pass(pass.into());
-            }
+            ui.set_wifi_auto(true);
+            ui.set_wifi_pass("".into());
             ui.set_wifi_status("Available network".into());
         }
     });
@@ -1303,20 +1340,24 @@ fn bind(ui: &MainWindow) {
         if ssid.is_empty() {
             return;
         }
-        let mut pass = ui.get_wifi_pass().to_string();
-        if pass.is_empty() {
-            pass = pi_ctl::remembered_password(&ssid).unwrap_or_default();
-        }
-        let secured = {
+        let pass = ui.get_wifi_pass().to_string();
+        ui.set_wifi_pass("".into());
+        let (secured, saved) = {
             let model = ui.get_wifi_nets();
-            (0..model.row_count()).any(|i| {
-                model
-                    .row_data(i)
-                    .map(|n| n.ssid.as_str() == ssid && n.secured)
-                    .unwrap_or(false)
-            })
+            let mut secured = false;
+            let mut saved = false;
+            for i in 0..model.row_count() {
+                if let Some(n) = model.row_data(i) {
+                    if n.ssid.as_str() == ssid {
+                        secured = n.secured;
+                        saved = n.saved;
+                        break;
+                    }
+                }
+            }
+            (secured, saved)
         };
-        if secured && pass.is_empty() {
+        if secured && pass.is_empty() && !saved {
             let seed = kb_seed(&ui, "wifi-pass");
             ui.set_kb_field("wifi-pass".into());
             ui.set_kb_text(seed.into());
@@ -1355,6 +1396,105 @@ fn bind(ui: &MainWindow) {
                 }
             });
         });
+    });
+    let weak = ui.as_weak();
+    ui.on_ask_forget_wifi(move |ssid| {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_forget_ssid(ssid.clone());
+            ui.set_confirm_title("Forget this network?".into());
+            ui.set_confirm_body(format!("Remove saved settings for {ssid}? The password is not shown.").into());
+            ui.set_confirm_kind("forget-wifi".into());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_forget_wifi(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let ssid = ui.get_forget_ssid().to_string();
+        ui.set_forget_ssid("".into());
+        ui.set_wifi_busy(true);
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let result = pi_ctl::wifi_forget(&ssid);
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(ui) = weak.upgrade() else { return };
+                ui.set_wifi_busy(false);
+                load_wifi_status(&ui);
+                ui.set_wifi_status(match result {
+                    Ok(()) => "Forgotten.".into(),
+                    Err(err) => err.into(),
+                });
+                ui.invoke_scan_wifi();
+            });
+        });
+    });
+    let weak = ui.as_weak();
+    ui.on_connect_hidden(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let ssid = ui.get_hidden_ssid().to_string();
+        let pass = ui.get_wifi_pass().to_string();
+        ui.set_wifi_pass("".into());
+        if ssid.trim().is_empty() {
+            ui.set_wifi_status("Enter a hidden network name.".into());
+            return;
+        }
+        ui.set_wifi_busy(true);
+        ui.set_wifi_status("Connecting…".into());
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let result = pi_ctl::wifi_connect_hidden(&ssid, &pass);
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(ui) = weak.upgrade() else { return };
+                ui.set_wifi_busy(false);
+                load_wifi_status(&ui);
+                ui.set_wifi_status(match result {
+                    Ok(()) => "Connected.".into(),
+                    Err(err) => err.into(),
+                });
+                ui.invoke_scan_wifi();
+            });
+        });
+    });
+    let weak = ui.as_weak();
+    ui.on_run_diag(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        let waiting: Vec<DiagRow> = pi_ctl::DIAG_IDS
+            .iter()
+            .map(|id| {
+                let label = match *id {
+                    "hostname" => "Hostname",
+                    "local" => "Local link",
+                    "gateway" => "Gateway",
+                    "dns" => "DNS",
+                    _ => "Internet",
+                };
+                DiagRow {
+                    id: (*id).into(),
+                    label: label.into(),
+                    state: "checking".into(),
+                    detail: "".into(),
+                }
+            })
+            .collect();
+        ui.set_diags(ModelRc::new(VecModel::from(waiting)));
+        for id in pi_ctl::DIAG_IDS {
+            let id = (*id).to_string();
+            let weak = ui.as_weak();
+            std::thread::spawn(move || {
+                let row = pi_ctl::run_probe(&id);
+                let _ = slint::invoke_from_event_loop(move || {
+                    let Some(ui) = weak.upgrade() else { return };
+                    let model = ui.get_diags();
+                    let mut rows: Vec<DiagRow> = (0..model.row_count())
+                        .filter_map(|i| model.row_data(i))
+                        .collect();
+                    if let Some(existing) = rows.iter_mut().find(|r| r.id == row.id) {
+                        existing.state = row.state.into();
+                        existing.detail = row.detail.into();
+                    }
+                    ui.set_diags(ModelRc::new(VecModel::from(rows)));
+                });
+            });
+        }
     });
     let weak = ui.as_weak();
     ui.on_reboot_now(move || {
@@ -1401,7 +1541,11 @@ fn bind(ui: &MainWindow) {
         let field = ui.get_kb_field().to_string();
         ui.set_kb_open(false);
         if field == "wifi-pass" {
-            ui.invoke_connect_wifi();
+            if ui.get_hidden_open() {
+                ui.invoke_connect_hidden();
+            } else {
+                ui.invoke_connect_wifi();
+            }
         }
     });
     let weak = ui.as_weak();
@@ -1543,6 +1687,7 @@ fn bind(ui: &MainWindow) {
         if let Some(ui) = weak.upgrade() {
             ui.set_confirm_kind("".into());
             ui.set_pending_routine_id("".into());
+            ui.set_forget_ssid("".into());
             ui.set_math_typed("".into());
             ui.set_verify_typed("".into());
         }
@@ -1551,6 +1696,11 @@ fn bind(ui: &MainWindow) {
     let r = refresh.clone();
     ui.on_accept_confirm(move || {
         let Some(ui) = weak.upgrade() else { return };
+        if ui.get_confirm_kind() == "forget-wifi" {
+            ui.set_confirm_kind("".into());
+            ui.invoke_forget_wifi();
+            return;
+        }
         if ui.get_confirm_kind() == "delete-routine" {
             let id = ui.get_pending_routine_id().to_string();
             ui.set_confirm_kind("".into());
@@ -1741,6 +1891,7 @@ fn main() {
                                     secured: n.secured,
                                     saved: n.saved,
                                     connected: n.connected,
+                                    security: n.security.into(),
                                 })
                                 .collect();
                             ui.set_wifi_nets(ModelRc::new(VecModel::from(model)));

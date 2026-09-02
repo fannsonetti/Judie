@@ -115,6 +115,14 @@ export struct WifiNet {
     secured: bool,
     saved: bool,
     connected: bool,
+    security: string,
+}
+
+export struct DiagRow {
+    id: string,
+    label: string,
+    state: string,
+    detail: string,
 }
 
 export global Dy {
@@ -161,18 +169,19 @@ export component Card inherits Rectangle {
 export component Pill inherits Rectangle {
     in property <string> label;
     in property <bool> on: false;
+    in property <float> zoom: 1.0;
     callback clicked;
     border-radius: 0px;
-    border-width: 1.5px;
+    border-width: max(1px, 1.5px * root.zoom);
     border-color: root.on ? Dy.text : Dy.border;
     background: Dy.canvas;
-    height: 44px;
-    min-width: 72px;
+    height: 44px * root.zoom;
+    min-width: 72px * root.zoom;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.label;
         color: root.on ? Dy.text : Dy.muted;
-        font-size: Dy.type-control;
+        font-size: Dy.type-control * root.zoom;
         font-weight: 600;
         font-family: Dy.mono;
         horizontal-alignment: center;
@@ -183,11 +192,12 @@ export component Pill inherits Rectangle {
 
 export component Toggle inherits Rectangle {
     in-out property <bool> on;
+    in property <float> zoom: 1.0;
     callback toggled;
-    width: 56px;
-    height: 28px;
+    width: 56px * root.zoom;
+    height: 28px * root.zoom;
     border-radius: 0px;
-    border-width: 1.5px;
+    border-width: max(1px, 1.5px * root.zoom);
     border-color: root.on ? Dy.text : Dy.border;
     background: Dy.canvas;
     TouchArea {
@@ -197,10 +207,10 @@ export component Toggle inherits Rectangle {
         }
     }
     Rectangle {
-        x: root.on ? parent.width - 22px : 4px;
-        y: 4px;
-        width: 18px;
-        height: 18px;
+        x: root.on ? parent.width - 22px * root.zoom : 4px * root.zoom;
+        y: 4px * root.zoom;
+        width: 18px * root.zoom;
+        height: 18px * root.zoom;
         background: root.on ? Dy.text : Dy.muted;
     }
 }
@@ -208,12 +218,13 @@ export component Toggle inherits Rectangle {
 export component Swatch inherits Rectangle {
     in property <color> swatch;
     in property <bool> on;
+    in property <float> zoom: 1.0;
     callback clicked;
-    width: 16px;
-    height: 16px;
+    width: 16px * root.zoom;
+    height: 16px * root.zoom;
     border-radius: 0px;
     background: root.swatch;
-    border-width: 2px;
+    border-width: max(1px, 2px * root.zoom);
     border-color: root.on ? Dy.text : Dy.border;
     TouchArea { clicked => { root.clicked(); } }
 }
@@ -221,18 +232,19 @@ export component Swatch inherits Rectangle {
 export component IconBtn inherits Rectangle {
     in property <string> glyph;
     in property <bool> primary: false;
+    in property <float> zoom: 1.0;
     callback clicked;
-    width: 48px;
-    height: 48px;
+    width: 48px * root.zoom;
+    height: 48px * root.zoom;
     border-radius: 0px;
-    border-width: 1.5px;
+    border-width: max(1px, 1.5px * root.zoom);
     border-color: root.primary ? Dy.text : Dy.border;
     background: root.primary ? Dy.text : Dy.canvas;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.glyph;
         color: root.primary ? Dy.canvas : Dy.text;
-        font-size: 18px;
+        font-size: 18px * root.zoom;
         font-weight: 700;
         font-family: Dy.mono;
         horizontal-alignment: center;
@@ -249,32 +261,32 @@ export component PowerAction inherits Rectangle {
     border-width: 1.5px;
     border-color: Dy.border-hi;
     background: Dy.canvas;
-    min-height: 108px;
+    height: 56px;
     horizontal-stretch: 1;
     opacity: root.enabled ? 1 : 0.35;
     TouchArea {
         enabled: root.enabled;
         clicked => { root.clicked(); }
     }
-    VerticalLayout {
-        padding: 10px;
+    HorizontalLayout {
+        padding: 8px;
         spacing: 8px;
         alignment: center;
         Text {
             text: root.glyph;
             color: Dy.text;
-            font-size: 22px;
+            font-size: 16px;
             font-weight: 700;
             font-family: Dy.mono;
-            horizontal-alignment: center;
+            vertical-alignment: center;
         }
         Text {
             text: root.label;
             color: Dy.text;
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 700;
             font-family: Dy.mono;
-            horizontal-alignment: center;
+            vertical-alignment: center;
         }
     }
 }
@@ -378,28 +390,26 @@ export component RoutineCard inherits Rectangle {
     border-color: Dy.border;
     background: Dy.canvas;
     VerticalLayout {
-        padding: 16px;
-        spacing: 12px;
+        padding: 10px;
+        spacing: 8px;
         HorizontalLayout {
-            spacing: 12px;
-            Text {
-                text: root.item.name == "" ? "New routine" : root.item.name;
-                color: Dy.text;
-                font-size: 18px;
-                font-weight: 700;
-                font-family: Dy.mono;
-                overflow: elide;
-                vertical-alignment: center;
-            }
-            Rectangle { horizontal-stretch: 1; }
+            spacing: 8px;
+            height: 44px;
             Text {
                 text: root.item.status;
                 color: Dy.muted;
-                font-size: 14px;
+                font-size: 13px;
                 font-family: Dy.mono;
                 vertical-alignment: center;
-                horizontal-alignment: right;
+                overflow: elide;
             }
+            Rectangle { horizontal-stretch: 1; }
+            Pill { label: "Duplicate"; clicked => { root.duplicate(); } }
+            Pill {
+                label: root.item.enabled ? "Disable" : "Enable";
+                clicked => { root.toggle-enabled(); }
+            }
+            Pill { label: "Delete"; clicked => { root.delete(); } }
         }
         FieldTap {
             label: "Routine name";
@@ -407,9 +417,9 @@ export component RoutineCard inherits Rectangle {
             error: root.item.name-error;
             active: root.kb-field == "routine-name:" + root.item.id;
             locked: root.item.builtin;
-            label-size: 15px;
-            value-size: 22px;
-            tap-height: 78px;
+            label-size: 13px;
+            value-size: 18px;
+            tap-height: 56px;
             tapped => { root.edit-name(); }
         }
         FieldTap {
@@ -418,9 +428,9 @@ export component RoutineCard inherits Rectangle {
             error: root.item.phrase-error;
             active: root.kb-field == "routine-phrase:" + root.item.id;
             locked: root.item.builtin;
-            label-size: 15px;
-            value-size: 22px;
-            tap-height: 78px;
+            label-size: 13px;
+            value-size: 18px;
+            tap-height: 56px;
             tapped => { root.edit-phrase(); }
         }
         FieldTap {
@@ -429,13 +439,14 @@ export component RoutineCard inherits Rectangle {
             error: root.item.command-error;
             active: root.kb-field == "routine-command:" + root.item.id;
             locked: root.item.builtin;
-            label-size: 15px;
-            value-size: 22px;
-            tap-height: 78px;
+            label-size: 13px;
+            value-size: 18px;
+            tap-height: 56px;
             tapped => { root.edit-command(); }
         }
         HorizontalLayout {
-            spacing: 10px;
+            spacing: 8px;
+            height: 44px;
             Pill {
                 label: "Save";
                 on: true;
@@ -447,16 +458,6 @@ export component RoutineCard inherits Rectangle {
                 opacity: (root.item.dirty || root.item.is-new) ? 1 : 0.35;
                 clicked => { root.cancel(); }
             }
-            Rectangle { horizontal-stretch: 1; }
-        }
-        HorizontalLayout {
-            spacing: 10px;
-            Pill { label: "Duplicate"; clicked => { root.duplicate(); } }
-            Pill {
-                label: root.item.enabled ? "Disable" : "Enable";
-                clicked => { root.toggle-enabled(); }
-            }
-            if !root.item.builtin: Pill { label: "Delete"; clicked => { root.delete(); } }
             Rectangle { horizontal-stretch: 1; }
         }
     }
@@ -508,7 +509,8 @@ export component KeyBtn inherits Rectangle {
 export component Bar inherits Rectangle {
     in property <float> level;
     in property <color> fill: #ffffff;
-    height: 3px;
+    in property <float> zoom: 1.0;
+    height: max(1px, 3px * root.zoom);
     border-radius: 0px;
     background: #1a1a1a;
     border-width: 0px;
@@ -524,27 +526,28 @@ export component QuickTask inherits Rectangle {
     in property <string> label;
     in property <string> glyph;
     in property <bool> on: false;
+    in property <float> zoom: 1.0;
     callback clicked;
-    border-width: 1.5px;
+    border-width: max(1px, 1.5px * root.zoom);
     border-color: root.on ? Dy.text : Dy.border;
     background: Dy.canvas;
     clip: true;
     TouchArea { clicked => { root.clicked(); } }
     VerticalLayout {
-        padding: 8px;
-        spacing: 4px;
+        padding: 8px * root.zoom;
+        spacing: 4px * root.zoom;
         alignment: center;
         Text {
             text: root.glyph;
             color: Dy.text;
-            font-size: Dy.type-title;
+            font-size: Dy.type-title * root.zoom;
             font-family: Dy.mono;
             horizontal-alignment: center;
         }
         Text {
             text: root.label;
             color: Dy.text;
-            font-size: Dy.type-control;
+            font-size: Dy.type-control * root.zoom;
             font-weight: 600;
             font-family: Dy.mono;
             horizontal-alignment: center;

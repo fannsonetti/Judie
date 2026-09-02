@@ -151,6 +151,8 @@ struct Persist {
     speak: Option<bool>,
     #[serde(default)]
     routines: Vec<Routine>,
+    #[serde(default)]
+    deleted_builtin_ids: Vec<String>,
 }
 
 pub const GRID_COLS: i32 = 6;
@@ -404,6 +406,7 @@ fn save_persist(room: &Room) {
             .filter(|r| !r.builtin || !r.enabled)
             .cloned()
             .collect(),
+        deleted_builtin_ids: room.deleted_builtin_ids.clone(),
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
@@ -590,8 +593,16 @@ pub fn routine_status_label(edit: &RoutineEdit, saved: Option<&Routine>) -> Stri
     parts.join(" · ")
 }
 
-pub fn merge_persisted_routines(mut list: Vec<Routine>, persisted: Vec<Routine>) -> Vec<Routine> {
+pub fn merge_persisted_routines(
+    mut list: Vec<Routine>,
+    persisted: Vec<Routine>,
+    deleted_builtin_ids: &[String],
+) -> Vec<Routine> {
+    list.retain(|r| !r.builtin || !deleted_builtin_ids.iter().any(|id| id == &r.id));
     for r in persisted {
+        if deleted_builtin_ids.iter().any(|id| id == &r.id) {
+            continue;
+        }
         if let Some(existing) = list.iter_mut().find(|x| x.id == r.id) {
             if existing.builtin {
                 existing.enabled = r.enabled;
@@ -709,6 +720,7 @@ pub struct Room {
     pub activity: Vec<Activity>,
     pub timers: Vec<TimerItem>,
     pub routines: Vec<Routine>,
+    pub deleted_builtin_ids: Vec<String>,
     pub routine_edits: Vec<RoutineEdit>,
     pub expanded: Expanded,
 }
@@ -836,9 +848,14 @@ impl Default for Room {
                 TimerItem { label: "Laundry".into(), remain: "18:00".into() },
             ],
             routines: {
-                let list = merge_persisted_routines(default_routines(), persist.routines);
+                let list = merge_persisted_routines(
+                    default_routines(),
+                    persist.routines,
+                    &persist.deleted_builtin_ids,
+                );
                 list
             },
+            deleted_builtin_ids: persist.deleted_builtin_ids,
             routine_edits: Vec::new(),
             expanded: Expanded::None,
         };
@@ -1860,8 +1877,13 @@ impl Room {
     }
 
     pub fn remove_routine(&mut self, id: &str) {
-        self.routines.retain(|r| r.builtin || r.id != id);
-        self.routine_edits.retain(|e| e.builtin || e.id != id);
+        if let Some(r) = self.routines.iter().find(|r| r.id == id) {
+            if r.builtin && !self.deleted_builtin_ids.iter().any(|x| x == id) {
+                self.deleted_builtin_ids.push(id.to_string());
+            }
+        }
+        self.routines.retain(|r| r.id != id);
+        self.routine_edits.retain(|e| e.id != id);
         self.persist();
     }
 
@@ -1951,9 +1973,24 @@ mod tests {
                 enabled: true,
             },
         ];
-        let list = merge_persisted_routines(default_routines(), persisted);
+        let list = merge_persisted_routines(default_routines(), persisted.clone(), &[]);
         assert!(!list.iter().find(|r| r.id == "goodNight").unwrap().enabled);
         assert!(list.iter().any(|r| r.id == "r-1" && r.name == "Focus"));
+        let deleted = merge_persisted_routines(default_routines(), persisted, &["goodNight".into()]);
+        assert!(!deleted.iter().any(|r| r.id == "goodNight"));
+    }
+
+    #[test]
+    fn builtin_delete_is_immediate_and_survives_reload() {
+        with_temp_room(|room| {
+            assert!(room.routines.iter().any(|r| r.id == "goodNight" && r.builtin));
+            room.remove_routine("goodNight");
+            assert!(!room.routines.iter().any(|r| r.id == "goodNight"));
+            room.save();
+            let reloaded = Room::default();
+            assert!(!reloaded.routines.iter().any(|r| r.id == "goodNight"));
+            assert!(reloaded.deleted_builtin_ids.iter().any(|id| id == "goodNight"));
+        });
     }
 
     #[test]

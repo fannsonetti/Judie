@@ -43,9 +43,11 @@ import { applyUnitsPreset, migrateUnitsPreset, UNITS_PRESETS, unitsPresetFromCon
 import {
   SETTINGS_CLOSE_EDGE_PX,
   beginSettingsDrag,
+  canBeginClose,
   canBeginOpen,
   inCloseEdge,
   inOpenZone,
+  isPageScroll,
   interpolatePull,
   moveSettingsDrag,
   pullFromPointer,
@@ -56,6 +58,8 @@ import { monthCells } from "../components/widgets/chrome";
 import { readFileSync } from "node:fs";
 import { compatibleReleaseTags, confirmInstallBody, generateUninstallChallenge, isNewerVersion, isSameVersion, releaseLabel, versionChange, type ReleaseInfo } from "../lib/install";
 import { allowedPowerAction, uninstallWarning } from "../lib/power";
+import { CANONICAL_SIZE, PREVIEW_KINDS, PREVIEW_STAGE_SCALE, diffRenders, placedRender, previewRender, scaledPreviewQuality, widgetFixture } from "../lib/widgetPreview";
+import { classifyWifiError, connectionHeadline, dedupeScan, neverPersistSecrets, reachFromNm, redactSecret, sanitizeSsid, wifiErrorMessage, type ConnectionDetail } from "../lib/piNetwork";
 
 function snap(): RoomSnapshot {
   return {
@@ -718,9 +722,10 @@ test("settings sheet follows the pointer without jumping", () => {
   assert(canBeginOpen(false, 0), "home can open");
   assert(!canBeginOpen(true, 1), "settings cannot re-open");
   assert(!canBeginOpen(false, 0.5), "mid-pull does not start a second open");
-  assert(inCloseEdge(1180, h), "bottom edge closes");
-  assert(!inCloseEdge(600, h), "mid-page is not the close edge");
-  assert(h - SETTINGS_CLOSE_EDGE_PX === 1172, "28px close edge at 1200");
+  assert(canBeginClose(true, 1), "open settings can close from the bottom");
+  assert(!canBeginClose(false, 0), "home does not start a close gesture");
+  assert(isPageScroll(600, h), "mid-page scroll is not a close");
+  assert(!isPageScroll(1180, h), "bottom edge is the close activation");
 
   assert(pullFromPointer(0, 0, 600, h) === 0.5, "open drag is 1:1");
   assert(pullFromPointer(1, 1180, 580, h) === 0.5, "close drag is 1:1 the other way");
@@ -1024,7 +1029,7 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
   assert(slint.includes("in-out property <int> drop-col"), "drop-col is writable from rust");
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-  assert(pkg.version === "0.2.18", "package version is 0.2.18");
+  assert(pkg.version === "0.2.19", "package version is 0.2.19");
 });
 
 test("edit-mode widget delete control is a square white X", () => {
@@ -1115,9 +1120,9 @@ test("edit-mode widget delete control is a square white X", () => {
   assert(left.x + left.size > leftShellLeft + leftShellWidth, "badge occupies the gutter toward the next widget");
   assert(overlayAt > tilesAt, "adjacent widgets cannot paint over the X");
 
-  assert(pkg.version === "0.2.18", "npm version");
-  assert(cargo.includes('version = "0.2.18"'), "crate version");
-  assert(tauri.version === "0.2.18", "tauri version");
+  assert(pkg.version === "0.2.19", "npm version");
+  assert(cargo.includes('version = "0.2.19"'), "crate version");
+  assert(tauri.version === "0.2.19", "tauri version");
 });
 
 test("widget editor size carousel is compact and has three sizes", () => {
@@ -1159,7 +1164,8 @@ test("widget editor size carousel is compact and has three sizes", () => {
 
   assert(slint.includes("width: 760px") && slint.includes("height: 540px"), "panel does not cover the home screen");
   assert(slint.includes("width: 240px") && slint.includes("height: 240px"), "compact 240 stage");
-  assert(slint.includes("width: 120px") && slint.includes("height: 120px"), "small preview is scaled 1:1");
+  assert(slint.includes("WidgetPreview") && slint.includes("preview-scale: 0.5"), "gallery scales the shared WidgetFace");
+  assert(!slint.includes("x: 60px"), "small preview is no longer a nested 120 box");
   assert(!slint.includes("width: 280px; height: 280px"), "large must not enlarge the preview stage");
   assert(!slint.includes("vertical-stretch: 1;\n                        clip: true;"), "carousel is not a stretching pane");
   assert(slint.includes("label: \"Add Widget\""), "Add Widget is obvious");
@@ -1184,14 +1190,99 @@ test("widget editor size carousel is compact and has three sizes", () => {
   assert(gallery.includes("aria-label={gallerySizeCaption(s)}"), "dot accessible names");
   assert(gallery.includes('role="dialog"'), "keyboard dialog");
 
-  assert(pkg.version === "0.2.18", "npm version");
-  assert(cargo.includes('version = "0.2.18"'), "crate version");
-  assert(tauri.version === "0.2.18", "tauri version");
+  assert(pkg.version === "0.2.19", "npm version");
+  assert(cargo.includes('version = "0.2.19"'), "crate version");
+  assert(tauri.version === "0.2.19", "tauri version");
 });
 
 function textHeightSafe(px: number) {
   return px * 1.15;
 }
+
+test("shared widget preview matches placed widgets at 1:1 for every kind and size", () => {
+  const faces = readFileSync("src-tauri/ui/pi/faces.slint", "utf8");
+  const preview = readFileSync("src-tauri/ui/pi/preview.slint", "utf8");
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  assert(preview.includes("import { WidgetFace }"), "preview layer wraps WidgetFace");
+  assert(preview.includes("face-scale: root.zs"), "preview applies one uniform scale");
+  assert(faces.includes("in property <float> face-scale"), "shared face owns scale");
+  assert(slint.includes("WidgetPreview"), "gallery uses the preview layer");
+  assert(!slint.includes("handwritten-preview"), "no second preview markup");
+  for (const kind of PREVIEW_KINDS) {
+    for (const size of ["1x1", "1x2", "2x2"] as const) {
+      const diffs = diffRenders(placedRender(kind, size), previewRender(kind, size, 1));
+      assert(diffs.length === 0, `${kind} ${size} 1:1 mismatch ${JSON.stringify(diffs)}`);
+      const q = scaledPreviewQuality(size);
+      assert(q.aspectOk && q.noStretch && q.pixelAligned && q.fitsStage && q.uniformScale, `${kind} ${size} scaled quality`);
+      const fixture = widgetFixture(kind);
+      assert(fixture.monthName === "March", "calendar month is frozen");
+      assert(fixture.hours.length === 4, "graph points are frozen");
+    }
+  }
+  assert(CANONICAL_SIZE["1x1"].w / CANONICAL_SIZE["1x1"].h === 1, "small 1:1");
+  assert(CANONICAL_SIZE["1x2"].w / CANONICAL_SIZE["1x2"].h === 2, "medium 2:1");
+  assert(PREVIEW_STAGE_SCALE === 0.5, "stage scale is half-linear");
+});
+
+test("settings compact power, routines, general, and close gesture live on the sheet", () => {
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  const cards = readFileSync("src-tauri/ui/pi/cards.slint", "utf8");
+  assert(!/\n\s+Text \{ text: "Profile"/.test(slint), "Profile heading is gone");
+  assert(!slint.includes("Selected version"), "duplicate selected version row is gone");
+  assert(cards.includes("height: 56px") && cards.includes("export component PowerAction"), "power actions are short");
+  assert(!cards.includes("min-height: 108px"), "old tall power buttons are gone");
+  assert(!cards.includes("New routine"), "duplicate routine title is gone");
+  assert(cards.includes('Pill { label: "Delete"; clicked => { root.delete(); } }'), "all routines can be deleted");
+  assert(slint.includes("root.delete-routine(r.id)"), "routine delete is immediate");
+  assert(!slint.includes("x: (parent.width - 48px) / 2"), "misplaced handle is gone");
+  assert(slint.includes("clip: true"), "settings sheet clips stray chrome");
+  const start = slint.indexOf("if root.settings-pull > 0.001");
+  const end = slint.indexOf("if root.net-menu-open: Rectangle");
+  const sheet = slint.slice(start, end);
+  assert(sheet.includes("y: parent.height - 28px"), "close edge is on the settings sheet");
+  assert(slint.includes("interactive: !root.settings-tracking"), "page scroll stays when the close edge is unused");
+  assert(slint.includes("Join hidden network"), "hidden network flow exists");
+  assert(slint.includes("Run checks"), "diagnostics exist");
+  assert(slint.includes("Nearby Wi-Fi"), "scan list exists");
+  assert(slint.includes('kb-field == "wifi-pass"'), "password keyboard preview is masked");
+});
+
+test("pi network helpers never leak credentials and classify failures", () => {
+  assert(sanitizeSsid("") === null);
+  assert(sanitizeSsid("Home") === "Home");
+  assert(sanitizeSsid("a".repeat(33)) === null);
+  assert(classifyWifiError("Secrets were required") === "bad-password");
+  assert(wifiErrorMessage("bad-password") === "Incorrect password.");
+  assert(classifyWifiError("No network with SSID") === "unavailable");
+  assert(classifyWifiError("Not authorized") === "permission");
+  assert(classifyWifiError("a password is required") === "permission");
+  assert(classifyWifiError("timed out") === "timeout");
+  assert(classifyWifiError("unsupported security") === "unsupported");
+  assert(classifyWifiError("no nmcli") === "backend");
+  assert(classifyWifiError("scan failed") === "scan");
+  const redacted = redactSecret("psk=hunter2 boom", "hunter2");
+  assert(!redacted.includes("hunter2"));
+  const nets = dedupeScan([
+    { ssid: "Cafe", signal: 10, bars: 1, security: "WPA2", saved: false, connected: false },
+    { ssid: "Cafe", signal: 80, bars: 4, security: "WPA2", saved: true, connected: true },
+    { ssid: "Other", signal: 50, bars: 2, security: "open", saved: false, connected: false },
+  ]);
+  assert(nets[0].ssid === "Cafe" && nets[0].connected && nets[0].signal === 80);
+  const ethernet: ConnectionDetail = {
+    connType: "ethernet", iface: "eth0", ssid: "eth0", state: "up", signal: "—", security: "—",
+    ipv4: "10.0.0.4", ipv6: "—", gateway: "10.0.0.1", dns: "1.1.1.1", mac: "aa", speed: "1000", reach: "internet",
+  };
+  assert(connectionHeadline(ethernet) === "Ethernet · internet");
+  assert(reachFromNm("none", true) === "local");
+  assert(reachFromNm("full", true) === "internet");
+  const wifi = readFileSync("src-tauri/linux/wifi", "utf8");
+  const ctl = readFileSync("src-tauri/src/pi_ctl.rs", "utf8");
+  assert(!wifi.includes("password \""), "helper must not pass password argv");
+  assert(!ctl.includes("mem.passwords"), "app must not store wifi passwords");
+  assert(!ctl.includes("remembered_password"), "saved passwords are not replayed");
+  assert(neverPersistSecrets(ctl));
+  assert(wifi.includes("psk=%s"), "psk stays in the nm keyfile written by the helper");
+});
 
 if (failed) {
   console.log(`\n${failed} failed`);

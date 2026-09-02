@@ -1,0 +1,112 @@
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, CalCell, SlopNode } from "cards.slint";
+import { WidgetFace } from "faces.slint";
+
+// Preview presentation layer. Replaceable later with a static thumbnail (`source: "image"`)
+// without rewriting widget definitions. The face is the same component the home grid uses.
+
+export component WidgetPreview inherits Rectangle {
+    in property <string> kind: "activity";
+    in property <string> size: "1x1";
+    in property <float> preview-scale: 1.0;
+    in property <bool> sample: true;
+    in property <string> source: "live";
+    in property <image> thumb;
+    in property <string> widget-id: "";
+    in property <string> weather-loc: "";
+    in property <string> weather-temp: "";
+    in property <string> weather-cond: "";
+    in property <string> weather-range: "";
+    in property <string> weather-feel: "";
+    in property <string> weather-note: "";
+    in property <[HourRow]> hours: [];
+    in property <bool> master-on: true;
+    in property <int> brightness: 70;
+    in property <string> scene: "Cozy";
+    in property <string> master-color: "#FFB366";
+    in property <[LightRow]> lights: [];
+    in property <bool> playing: false;
+    in property <string> track-title: "";
+    in property <string> track-artist: "";
+    in property <int> volume: 62;
+    in property <float> media-progress: 0.2;
+    in property <string> indoor: "";
+    in property <string> outdoor: "";
+    in property <string> humidity: "";
+    in property <string> comfort: "";
+    in property <[EventRow]> events: [];
+    in property <string> month-name: "";
+    in property <[CalCell]> cal-cells: [];
+    in property <bool> purifier-on: true;
+    in property <string> purifier-mode: "Auto";
+    in property <string> purifier-aq: "Good";
+    in property <int> purifier-filter: 38;
+    in property <float> cpu: 0;
+    in property <float> memory: 0;
+    in property <string> mem-detail: "";
+    in property <string> temp-text: "";
+    in property <[ServiceRow]> services: [];
+    in property <[ActivityRow]> activity: [];
+    in property <[TimerRow]> timers: [];
+    in property <[SlopNode]> slop-nodes: [];
+    in property <bool> dnd: false;
+
+    property <length> canon-w: root.size == "1x1" ? 240px : 480px;
+    property <length> canon-h: root.size == "2x2" ? 480px : 240px;
+    property <float> zs: root.preview-scale;
+
+    width: round((root.canon-w / 1px) * root.zs) * 1px;
+    height: round((root.canon-h / 1px) * root.zs) * 1px;
+    clip: true;
+    background: #000000;
+    border-width: 1px;
+    border-color: #2a2a2a;
+
+    WidgetFace {
+        width: round((root.canon-w / 1px) * root.zs) * 1px;
+        height: round((root.canon-h / 1px) * root.zs) * 1px;
+        face-scale: root.zs;
+        kind: root.kind;
+        size: root.size;
+        sample: root.sample;
+        source: root.source;
+        thumb: root.thumb;
+        widget-id: root.widget-id;
+        weather-loc: root.weather-loc;
+        weather-temp: root.weather-temp;
+        weather-cond: root.weather-cond;
+        weather-range: root.weather-range;
+        weather-feel: root.weather-feel;
+        weather-note: root.weather-note;
+        hours: root.hours;
+        master-on: root.master-on;
+        brightness: root.brightness;
+        scene: root.scene;
+        master-color: root.master-color;
+        lights: root.lights;
+        playing: root.playing;
+        track-title: root.track-title;
+        track-artist: root.track-artist;
+        volume: root.volume;
+        media-progress: root.media-progress;
+        indoor: root.indoor;
+        outdoor: root.outdoor;
+        humidity: root.humidity;
+        comfort: root.comfort;
+        events: root.events;
+        month-name: root.month-name;
+        cal-cells: root.cal-cells;
+        purifier-on: root.purifier-on;
+        purifier-mode: root.purifier-mode;
+        purifier-aq: root.purifier-aq;
+        purifier-filter: root.purifier-filter;
+        cpu: root.cpu;
+        memory: root.memory;
+        mem-detail: root.mem-detail;
+        temp-text: root.temp-text;
+        services: root.services;
+        activity: root.activity;
+        timers: root.timers;
+        slop-nodes: root.slop-nodes;
+        dnd: root.dnd;
+    }
+}
