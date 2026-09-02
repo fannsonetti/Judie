@@ -22,11 +22,8 @@ export function powerMockEnabled() {
   return false;
 }
 
-export function uninstallWarning(kind: "pi" | "desktop" = "desktop") {
-  if (kind === "pi") {
-    return "This removes the Judie application, kiosk helpers, and autostart from this Raspberry Pi.\n\nKept on this computer:\n• Room settings, widgets, and routines (~/.local/share/judie)\n• Saved Wi-Fi networks\n\nThe panel stays on screen until uninstall finishes, then it reboots to the normal login screen.";
-  }
-  return "This removes the Judie application from this computer.\n\nKept on this computer:\n• Room settings, widgets, and routines\n• Saved preferences\n\nJudie will quit after uninstall. Your room data is not deleted.";
+export function uninstallWarning(_kind: "pi" | "desktop" = "pi") {
+  return "This removes the Judie application, kiosk helpers, and autostart from this Raspberry Pi.\n\nKept on this computer:\n• Room settings, widgets, and routines (~/.local/share/judie)\n• Saved Wi-Fi networks\n\nThe panel stays on screen until uninstall finishes, then it reboots to the normal login screen.";
 }
 
 export function powerStatusLabel(action: PowerAction) {

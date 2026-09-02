@@ -1,5 +1,5 @@
 import { ScrollView, Slider, Button } from "std-widgets.slint";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, KeyBtn, Bar, TileShell, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 
@@ -146,9 +146,8 @@ export component MainWindow inherits Window {
     in-out property <string> preview-source: "live";
     in-out property <string> wifi-detail: "";
     in-out property <[SlopNode]> gallery-nodes: [];
-    in-out property <string> routine-draft: "";
-    in-out property <string> routine-phrase: "";
-    in-out property <string> routine-command: "";
+    in-out property <string> pending-routine-id: "";
+    in-out property <string> pending-routine-name: "";
     property <[PartKind]> part-kinds: [
         { id: "text", label: "Text" },
         { id: "label", label: "Label" },
@@ -193,7 +192,12 @@ export component MainWindow inherits Window {
     callback set-latitude(string);
     callback set-longitude(string);
     callback set-assistant-url(string);
-    callback remove-routine(string);
+    callback add-routine();
+    callback save-routine(string);
+    callback cancel-routine(string);
+    callback duplicate-routine(string);
+    callback toggle-routine(string);
+    callback ask-delete-routine(string);
     callback set-page(int);
     callback expand(string);
     callback collapse();
@@ -255,7 +259,6 @@ export component MainWindow inherits Window {
     callback pick-version(string);
     callback gallery-set-index(int);
     callback drag-drop(string, int, int);
-    callback save-routine();
 
     property <length> pad: 20px;
     property <length> gap: 12px;
@@ -837,7 +840,7 @@ export component MainWindow inherits Window {
             }
             Flickable {
                 vertical-stretch: 1;
-                viewport-height: 2800px;
+                viewport-height: 8200px;
                 interactive: !root.settings-tracking;
                 VerticalLayout {
                     spacing: 14px;
@@ -921,20 +924,18 @@ export component MainWindow inherits Window {
                                 Rectangle { horizontal-stretch: 1; }
                             }
                             Text { text: "Routines"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
-                            FieldTap { label: "Name"; value: root.routine-draft; active: root.kb-field == "routine-name"; tapped => { root.open-keyboard("routine-name"); } }
-                            FieldTap { label: "When you say"; value: root.routine-phrase; active: root.kb-field == "routine-phrase"; tapped => { root.open-keyboard("routine-phrase"); } }
-                            FieldTap { label: "Judie should"; value: root.routine-command; active: root.kb-field == "routine-command"; tapped => { root.open-keyboard("routine-command"); } }
-                            Pill { label: "Save routine"; on: true; clicked => { root.save-routine(); } }
-                            for r in root.routines: HorizontalLayout {
-                                spacing: 10px;
-                                height: 48px;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Text { text: r.name; color: #ffffff; font-size: 15px; font-family: Dy.mono; }
-                                    Text { text: r.hint; color: #6a6a6a; font-size: 11px; font-family: Dy.mono; overflow: elide; }
-                                }
-                                Rectangle { horizontal-stretch: 1; }
-                                if !r.builtin: Pill { label: "Remove"; clicked => { root.remove-routine(r.id); } }
+                            Pill { label: "Add"; on: true; clicked => { root.add-routine(); } }
+                            for r in root.routines: RoutineCard {
+                                item: r;
+                                kb-field: root.kb-field;
+                                edit-name => { root.open-keyboard("routine-name:" + r.id); }
+                                edit-phrase => { root.open-keyboard("routine-phrase:" + r.id); }
+                                edit-command => { root.open-keyboard("routine-command:" + r.id); }
+                                save => { root.save-routine(r.id); }
+                                cancel => { root.cancel-routine(r.id); }
+                                duplicate => { root.duplicate-routine(r.id); }
+                                toggle-enabled => { root.toggle-routine(r.id); }
+                                delete => { root.ask-delete-routine(r.id); }
                             }
                         }
                     }
@@ -1200,10 +1201,10 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade": ConfirmSheet {
+    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "delete-routine": ConfirmSheet {
         title: root.confirm-title;
         body: root.confirm-body;
-        primary: "Continue";
+        primary: root.confirm-kind == "delete-routine" ? "Delete" : "Continue";
         secondary: "Cancel";
         accept => { root.accept-confirm(); }
         dismiss => { root.cancel-confirm(); }

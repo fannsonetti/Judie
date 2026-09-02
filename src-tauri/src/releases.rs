@@ -3,7 +3,9 @@ use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
+#[cfg(target_os = "linux")]
+use std::process::Stdio;
 use std::time::Duration;
 
 const GH_REPO: &str = "fannsonetti/Judie";
@@ -125,35 +127,26 @@ pub fn confirm_body(current: &str, target: &str) -> String {
 
 pub fn asset_matches_for(name: &str, os: &str, arch: &str) -> bool {
     let n = name.to_ascii_lowercase();
-    match os {
-        "windows" => {
-            n.ends_with(".exe")
-                && (n.contains("x64-setup") || n.contains("x64") || n.contains("setup"))
+    if os != "linux" || !n.ends_with(".deb") {
+        return false;
+    }
+    match arch {
+        "arm" | "armv7" | "armhf" => {
+            n.contains("armhf") || n.contains("armv7") || n.contains("_arm.")
         }
-        "linux" => {
-            if !n.ends_with(".deb") {
-                return false;
-            }
-            match arch {
-                "arm" | "armv7" | "armhf" => {
-                    n.contains("armhf") || n.contains("armv7") || n.contains("_arm.")
-                }
-                "aarch64" | "arm64" => n.contains("aarch64") || n.contains("arm64"),
-                "x86_64" | "amd64" => {
-                    n.contains("amd64") || n.contains("x86_64") || n.contains("x64")
-                }
-                _ => false,
-            }
+        "aarch64" | "arm64" => n.contains("aarch64") || n.contains("arm64"),
+        "x86_64" | "amd64" => {
+            n.contains("amd64") || n.contains("x86_64") || n.contains("x64")
         }
         _ => false,
     }
 }
 
 fn host_os() -> &'static str {
-    if cfg!(windows) {
-        "windows"
-    } else {
+    if cfg!(target_os = "linux") {
         "linux"
+    } else {
+        "unsupported"
     }
 }
 
@@ -434,17 +427,11 @@ pub fn download(url: &str, dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
 fn spawn_detached(mut cmd: Command) -> Result<(), String> {
     cmd.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const DETACHED_PROCESS: u32 = 0x00000008;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-        cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP);
-    }
     cmd.spawn().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -487,19 +474,10 @@ pub fn apply_package(path: &Path, expected_version: &str) -> Result<String, Stri
         return apply_linux_deb(path, expected_version);
     }
 
-    #[cfg(windows)]
-    {
-        let _ = expected_version;
-        let mut cmd = Command::new(path);
-        cmd.arg("/S");
-        spawn_detached(cmd)?;
-        return Ok(expected_version.to_string());
-    }
-
-    #[cfg(not(any(target_os = "linux", windows)))]
+    #[cfg(not(target_os = "linux"))]
     {
         let _ = (path, expected_version);
-        Err("Install is only available on Windows and Linux".into())
+        Err("Install is only available on Raspberry Pi / Linux".into())
     }
 }
 
@@ -714,20 +692,8 @@ mod tests {
         assert!(asset_matches_for("Judie_0.1.6_arm64.deb", "linux", "arm64"));
         assert!(!asset_matches_for("Judie_0.2.9_x64-setup.exe", "linux", "arm"));
         assert!(!asset_matches_for("readme.md", "linux", "armhf"));
-    }
-
-    #[test]
-    fn windows_setup() {
-        assert!(asset_matches_for(
-            "Judie_0.1.0_x64-setup.exe",
-            "windows",
-            "x86_64"
-        ));
-        assert!(!asset_matches_for(
-            "Judie_0.1.0_armhf.deb",
-            "windows",
-            "x86_64"
-        ));
+        assert!(!asset_matches_for("Judie_0.1.0_x64-setup.exe", "windows", "x86_64"));
+        assert!(!asset_matches_for("Judie_0.1.0_armhf.deb", "windows", "x86_64"));
     }
 
     #[test]

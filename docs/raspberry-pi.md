@@ -16,7 +16,7 @@ Judie is meant to *look like* the tablet OS: fullscreen, no window title, starts
 
 Linux **armhf** releases ship a **native Slint home screen** — weather, lights, media, calendar, climate, air, quick controls, system, timers, activity, and server, plus settings, command palette, and expanded apps. No WebKitWebProcess.
 
-Windows still uses the full Tauri + web UI (including the custom widget creator).
+**Windows is unsupported beginning with v0.2.14.** Releases publish only the Raspberry Pi Debian package. There is no Windows installer, executable, or substitute client.
 
 ## Requirements
 
@@ -131,5 +131,5 @@ Linux desktop developers can run the Slint kiosk UI with `./scripts/run-pi-ui.sh
 
 ## CI
 
-GitHub Actions cross-compiles the native Slint binary for **armhf** on `ubuntu-24.04-arm` when you push a `v*` tag (see `.github/workflows/release.yml`). The job also uploads a stable `judie_armhf.deb` alias.
+GitHub Actions cross-compiles the native Slint binary for **armhf** on `ubuntu-24.04-arm` when you push a `v*` tag (see `.github/workflows/release.yml`). The job creates the GitHub release and uploads `judie_armhf.deb`. No Windows job or artifacts are produced.
 

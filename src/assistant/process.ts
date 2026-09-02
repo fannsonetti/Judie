@@ -71,7 +71,9 @@ function teachRoutine(text: string): { phrase: string; command: string } | null 
 
 function matchRoutine(snap: RoomSnapshot, text: string) {
   const t = text.toLowerCase();
-  return snap.routines.find((r) => r.phrases.some((p) => t === p || t.includes(p)));
+  return snap.routines.find(
+    (r) => r.enabled !== false && r.phrases.some((p) => t === p || t.includes(p)),
+  );
 }
 
 function weatherLine(snap: RoomSnapshot, offset = 0) {

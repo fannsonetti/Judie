@@ -1,4 +1,4 @@
-/** Tauri/WebKitGTK on Linux (Raspberry Pi), not Android or desktop browsers on Windows. */
+/** Linux WebKitGTK / kiosk user agent, not Android. */
 export function isLinuxWebview(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent.toLowerCase();

@@ -1,51 +1,47 @@
 # Judie
 
-Tablet-style room control for a 1920×1200 display (also runs on Raspberry Pi). Tauri + React + TypeScript.
+Linux-only room control for Debian-based Raspberry Pi systems (1920×1200 kiosk). Native Slint UI, no WebKit.
+
+**Windows is unsupported beginning with v0.2.14.** There is no Windows installer, executable, or substitute client.
 
 Judie is a local environment assistant, not a chatbot. Commands are parsed deterministically — no LLM is required.
 
-## Run
+## Install (Raspberry Pi)
+
+On a 32-bit Raspberry Pi OS Lite system:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/fannsonetti/Judie/main/scripts/install-pi.sh | bash
+```
+
+Details: [docs/raspberry-pi.md](docs/raspberry-pi.md).
+
+## Run (Linux)
 
 ```bash
 npm install
-npm run dev          # Vite only
-npm run tauri dev    # desktop app
 npm test
+./scripts/run-pi-ui.sh    # Slint kiosk UI on a Linux desktop (needs DISPLAY or Wayland)
 ```
 
-## Installers
+Pi packages are built on Linux ARM:
 
-| Platform | How |
-| --- | --- |
-| Windows x64 | Double-click `build.bat` (or `npm run installer`) |
-| Raspberry Pi 3+ (32-bit Lite) | On the Pi: `curl -fsSL https://raw.githubusercontent.com/fannsonetti/Judie/main/scripts/install-pi.sh \| bash` — see [docs/raspberry-pi.md](docs/raspberry-pi.md) |
-| Linux desktop (Slint kiosk UI) | `./scripts/run-pi-ui.sh` (needs `DISPLAY` or Wayland; not the Pi systemd unit) |
-
-`build-pi.bat` on Windows only prints instructions; the Pi `.deb` must be built on Linux ARM (32-bit armhf for the GitHub release).
+```bash
+./scripts/build-pi.sh
+```
 
 ## What it does
 
 - Home screen of live widgets (long-press to edit, extra pages only if you add them)
 - Lights, scenes, media, purifier, climate, calendar, weather, timers, activity
-- Natural-language commands via swipe-down from the top (or **Ctrl+K**)
+- Natural-language commands via swipe-down from the top
 - Configurable routines (Good Night, Movie, Away, plus “when I say …”)
 - Timers, alarms, delayed actions (`turn the lights off in 20 minutes`)
-- Undo (say “undo” or Ctrl+Z)
+- Undo (say “undo”)
 - Real weather from [Open-Meteo](https://open-meteo.com) (no API key)
 - Activity log with source (manual / Judie / routine / timer)
 
-## Commands (examples)
-
-Speak or type variations — wording does not need to be exact:
-
-- “lights off” / “kill the lights” / “make it dark in here”
-- “turn the desk lamp on”
-- “make them darker” (after talking about lights)
-- “what’s the temperature outside?” → “what about tomorrow?”
-- “turn off the lights, set my alarm for 7 and tell me tomorrow’s weather”
-- “when I say focus mode, turn the ceiling light off and set volume to 20”
-
-Swipe down from the top of the screen (iPad-style) for search, listen, and settings. Space starts/stops listening when you are not typing. Escape cancels overlays and speech.
+Swipe down from the top of the screen (iPad-style) for search, listen, and settings.
 
 ## Settings
 
@@ -54,12 +50,9 @@ Swipe down → **Settings**:
 - Room name and weather location (lat/lon)
 - Voice in / voice out
 - Units
-- Proactive notices (timers, calendar, rain, air, device issues)
-- Custom routines
+- Custom routines (name, trigger, action, with save / cancel / duplicate / enable / delete)
 
 Indoor climate and the music queue are **local to this tablet** until a sensor or player is connected. That is intentional — the UI does not pretend to be wired to hardware that is not there.
-
-Optional: if the Python [Nova Assistant](../Nova%20Assistant) is running on `127.0.0.1:8742`, the Server widget can show it as online (TCP check from the Tauri backend). This tablet still owns room state.
 
 ## Custom widgets
 
@@ -73,12 +66,4 @@ Typed/spoken text → normalize → intent match → actions → room store → 
 Timers / routines / weather fetch run beside the UI
 ```
 
-Adding a capability: handle it in `src/assistant/intents.ts` + `process.ts`, then apply a `RoomAction` in `src/store/roomStore.ts`.
-
-Debug overlay in development: **Ctrl+Shift+D** (intent, actions, timing — no hidden model reasoning; there isn’t one).
-
-Conversation text is appended to a log file (not just the browser):
-
-`%AppData%\com.judie.app\logs\conversation.log`
-
-Open it from Settings. There is also `conversation.jsonl` beside it.
+Adding a capability: handle it in `src/assistant/intents.ts` + `process.ts`, then apply a `RoomAction` in `src/store/roomStore.ts`. The Raspberry Pi kiosk uses the native Slint UI and `src-tauri/src/pi_room.rs`.

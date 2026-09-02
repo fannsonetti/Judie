@@ -8,6 +8,16 @@ import { GRID_COLS, GRID_ROWS, WidgetInstance, WIDGET_LABELS } from "../types/wi
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
+import {
+  draftFromRoutine,
+  duplicateRoutineDraft,
+  emptyRoutineDraft,
+  isRoutineDirty,
+  migrateRoutine,
+  routineFieldsValid,
+  routineStatusLabel,
+  validateRoutineFields,
+} from "../lib/routineEditor";
 import { DEFAULT_LIGHTS, DEFAULT_QUEUE, DEFAULT_EVENTS, HOURLY_FORECAST } from "../lib/mockData";
 import { clampPct, snapPct, snapBoxToGrid, EDITOR_GRID_PX, CANONICAL, moveNode, defaultNode, nodesFor, filledSizes, hitBox, withLayout, chartSeries } from "../slopbox/schema";
 import { makeFromTemplate } from "../slopbox/templates";
@@ -217,9 +227,26 @@ test("custom routine runs its command", () => {
     },
   ];
   const r = processUtterance("desk time", s);
+  assert(r.success, r.response);
   const a = r.actions.find((x) => x.type === "lights.power");
   assert(a && a.type === "lights.power" && a.on === true, JSON.stringify(r.actions));
   assert(a && a.type === "lights.power" && a.ids?.includes("desk"), JSON.stringify(a));
+});
+
+test("disabled custom routine does not run", () => {
+  const s = snap();
+  s.routines = [
+    ...s.routines,
+    {
+      id: "r-quiet",
+      name: "Quiet",
+      phrases: ["quiet hours"],
+      command: "lights off",
+      enabled: false,
+    },
+  ];
+  const r = processUtterance("quiet hours", s);
+  assert(!r.actions.some((a) => a.type === "lights.power"), JSON.stringify(r.actions));
 });
 
 test("device alias desk lamp", () => {
@@ -516,7 +543,7 @@ test("who-questions are not one bucket", () => {
   assert(made.intent !== "social.who" || /local|tablet|room|whoever|install/i.test(made.response), made.response);
   assert(!/^judie\.?\s*(your )?room assistant\.?$/i.test(made.response.trim()), `creator collided with identity: ${made.response}`);
   const built = processUtterance("who built this thing", snap());
-  assert(/local|tablet|room|whoever|install/i.test(built.response), built.response);
+  assert(/local|tablet|room|whoever|install|run here/i.test(built.response), built.response);
   const siri = processUtterance("who is siri", snap());
   assert(!/^judie/i.test(siri.response), `siri became identity: ${siri.response}`);
   const jobs = processUtterance("who is Steve Jobs", snap());
@@ -667,7 +694,7 @@ test("settings units are three complete presets with migration", () => {
   assert(slint.includes("Celsius and kilometres"), slint.includes("Celsius") ? "pi labels" : "missing");
   assert(slint.includes("Fahrenheit and miles"), "pi fahrenheit preset");
   assert(!slint.includes("Nautical miles"), "pi nautical miles removed");
-  assert(slint.includes("viewport-height: 2800px"), "settings scroll viewport reaches the bottom");
+  assert(/viewport-height: 8200px/.test(slint), "settings scroll viewport reaches the bottom");
 });
 
 test("settings sheet follows the pointer without jumping", () => {
@@ -759,8 +786,8 @@ test("release filter drops drafts, prereleases, incompatible debs, and duplicate
       { tag: "v0.2.8", draft: true, installable: true, assetName: "Judie_0.2.8_armhf.deb" },
       { tag: "v0.2.7", installable: true, assetName: "Judie_0.2.7_amd64.deb" },
       { tag: "v0.2.6", installable: true, assetName: "Judie_0.2.6_armhf.deb" },
+      { tag: "v0.2.5", installable: true, assetName: "Judie_0.2.5_x64-setup.exe" },
     ],
-    "linux",
     "armhf",
   );
   assert(tags.join(",") === "v0.2.10,v0.2.6", tags.join(","));
@@ -798,8 +825,6 @@ test("uninstall warning names removal and preserved data", () => {
   assert(pi.includes("~/.local/share/judie"), pi);
   assert(pi.includes("widgets"), pi);
   assert(pi.includes("routines"), pi);
-  const desktop = uninstallWarning("desktop");
-  assert(desktop.includes("not deleted"), desktop);
 });
 
 test("power helper and package scripts never stop the kiosk", () => {
@@ -812,6 +837,54 @@ test("power helper and package scripts never stop the kiosk", () => {
   const pack = readFileSync("scripts/package-armhf-deb.sh", "utf8");
   assert(!/systemctl disable --now/.test(pack), "prerm still uses disable --now");
   assert(!/systemctl start getty@tty1\.service/.test(pack), "postrm still starts getty during remove");
+});
+
+test("release workflow is Debian-only and has no Windows job", () => {
+  const yml = readFileSync(".github/workflows/release.yml", "utf8");
+  assert(!/windows-latest/.test(yml), yml);
+  assert(!/\n {2}windows:/.test(yml), "windows job still present");
+  assert(!/nsis/i.test(yml), yml);
+  assert(!/x64-setup\.exe/.test(yml), yml);
+  assert(/linux-armv7/.test(yml), "missing linux-armv7 job");
+  assert(/judie_armhf\.deb/.test(yml), "missing armhf deb upload");
+});
+
+test("routine editor validates, statuses, migrates, and duplicates", () => {
+  const empty = validateRoutineFields("", "", "");
+  assert(empty.name === "Enter a name", empty.name);
+  assert(empty.phrase === "Enter a trigger", empty.phrase);
+  assert(empty.command === "Enter an action", empty.command);
+  assert(!routineFieldsValid(empty));
+  assert(routineFieldsValid(validateRoutineFields("Focus", "focus mode", "lights off")));
+
+  const legacy = migrateRoutine({
+    id: "r-old",
+    name: "Legacy",
+    phrases: ["legacy"],
+    command: "movie mode",
+  });
+  assert(legacy.enabled === true, String(legacy.enabled));
+
+  const draft = emptyRoutineDraft();
+  assert(routineStatusLabel(draft).includes("New"), routineStatusLabel(draft));
+  assert(routineStatusLabel(draft).includes("Invalid"), routineStatusLabel(draft));
+  draft.name = "Focus";
+  draft.phrase = "focus mode";
+  draft.command = "lights off";
+  assert(routineStatusLabel(draft) === "New", routineStatusLabel(draft));
+
+  const saved = draftFromRoutine(legacy);
+  assert(!isRoutineDirty(saved, legacy));
+  saved.name = "Renamed";
+  assert(isRoutineDirty(saved, legacy));
+  assert(routineStatusLabel(saved, legacy).includes("Modified"), routineStatusLabel(saved, legacy));
+  saved.enabled = false;
+  assert(routineStatusLabel(saved, legacy).includes("Disabled"), routineStatusLabel(saved, legacy));
+
+  const copy = duplicateRoutineDraft(saved);
+  assert(copy.isNew);
+  assert(copy.name.startsWith("Copy of "), copy.name);
+  assert(!copy.builtin);
 });
 
 if (failed) {

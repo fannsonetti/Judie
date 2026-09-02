@@ -126,6 +126,9 @@ interface RoomState {
   dueTimers: () => TimerSnap[];
   completeTimer: (id: string) => void;
   addRoutine: (phrase: string, command: string, name?: string) => void;
+  updateRoutine: (id: string, name: string, phrase: string, command: string) => boolean;
+  duplicateRoutine: (id: string) => string | null;
+  setRoutineEnabled: (id: string, enabled: boolean) => void;
   removeRoutine: (id: string) => void;
 }
 
@@ -338,6 +341,7 @@ function applyOne(s: RoomState, action: RoomAction): Partial<RoomState> {
         name,
         phrases: [phrase.toLowerCase()],
         command: action.command.trim(),
+        enabled: true,
       };
       return { routines: [...s.routines.filter((r) => r.id !== id), routine] };
     }
@@ -626,6 +630,48 @@ export const useRoomStore = create<RoomState>()(
       addRoutine: (phrase, command, name) =>
         get().applyActions([{ type: "routine.create", phrase, command, name }], "user"),
 
+      updateRoutine: (id, name, phrase, command) => {
+        const n = name.trim();
+        const p = phrase.trim();
+        const c = command.trim();
+        if (!n || !p || !c) return false;
+        let ok = false;
+        set((s) => {
+          const routines = s.routines.map((r) => {
+            if (r.id !== id || r.builtin) return r;
+            ok = true;
+            return { ...r, name: n, phrases: [p.toLowerCase()], command: c };
+          });
+          return { routines };
+        });
+        return ok;
+      },
+
+      duplicateRoutine: (id) => {
+        const source = get().routines.find((r) => r.id === id);
+        if (!source) return null;
+        const phrase = (source.phrases[0] ?? source.name).trim();
+        const command = (source.command ?? "").trim();
+        if (!phrase) return null;
+        const copyName = source.name.trim() ? `Copy of ${source.name.trim()}` : phrase;
+        const newId = `r-${Date.now().toString(36)}`;
+        const routine: import("../assistant/types").RoutineSnap = {
+          id: newId,
+          name: copyName,
+          phrases: [phrase.toLowerCase()],
+          command,
+          enabled: true,
+        };
+        set((s) => ({ routines: [...s.routines, routine] }));
+        return newId;
+      },
+
+      setRoutineEnabled: (id, enabled) => {
+        set((s) => ({
+          routines: s.routines.map((r) => (r.id === id ? { ...r, enabled } : r)),
+        }));
+      },
+
       removeRoutine: (id) => get().applyActions([{ type: "routine.delete", id }], "user"),
     }),
     {
@@ -642,9 +688,15 @@ export const useRoomStore = create<RoomState>()(
       }),
       merge: (persisted, current) => {
         const p = (persisted as Partial<RoomState>) ?? {};
+        const custom = (p.routines ?? [])
+          .filter((r) => !r.builtin)
+          .map((r) => ({ ...r, enabled: r.enabled !== false }));
+        const disabled = new Set(
+          (p.routines ?? []).filter((r) => r.builtin && r.enabled === false).map((r) => r.id),
+        );
         const routines = [
-          ...BUILTIN_ROUTINES,
-          ...(p.routines ?? []).filter((r) => !r.builtin),
+          ...BUILTIN_ROUTINES.map((r) => ({ ...r, enabled: !disabled.has(r.id) })),
+          ...custom,
         ];
         const lights = p.lights?.length ? p.lights : current.lights;
         const events = p.events ?? current.events;

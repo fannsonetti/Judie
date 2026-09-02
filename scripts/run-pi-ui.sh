@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
-  echo "run-pi-ui.sh is for Linux desktops. On Windows use the Tauri UI; on the Pi use judie.service." >&2
+  echo "run-pi-ui.sh is for Linux desktops. Windows is unsupported beginning with v0.2.14." >&2
   exit 1
 fi
 

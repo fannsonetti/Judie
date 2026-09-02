@@ -110,6 +110,7 @@ export interface RoutineSnap {
   phrases: string[];
   command?: string;
   builtin?: boolean;
+  enabled?: boolean;
   actions?: RoomAction[];
 }
 

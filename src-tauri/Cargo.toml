@@ -1,6 +1,6 @@
 [package]
 name = "judie"
-version = "0.2.13"
+version = "0.2.14"
 description = "Judie room control"
 authors = ["Judie"]
 edition = "2021"
@@ -51,10 +51,8 @@ ureq = { version = "2.12", features = ["json"] }
 slint = { version = "1.9", optional = true, default-features = false, features = ["compat-1-2", "std", "renderer-software", "backend-winit"] }
 chrono = { version = "0.4", optional = true, default-features = false, features = ["clock", "std"] }
 
-[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
-tauri-plugin-updater = { version = "2", optional = true }
-
 [target.'cfg(target_os = "linux")'.dependencies]
+tauri-plugin-updater = { version = "2", optional = true }
 webkit2gtk = { version = "2.0", optional = true }
 
 # Lean release binary for Raspberry Pi (1 GB RAM class)

@@ -30,7 +30,15 @@ import { applyUnitsPreset, UNITS_PRESETS, unitsPresetFromConfig } from "../../li
 import { powerMockEnabled, powerStatusLabel, uninstallWarning } from "../../lib/power";
 import { ConfirmSheet } from "../chrome/ConfirmSheet";
 import { FieldTap } from "../chrome/FieldTap";
-import { networkReconnect, networkSetDhcp } from "../../lib/network";
+import { RoutineEditorCard, draftsFromRoutines } from "./RoutineEditorCard";
+import {
+  draftFromRoutine,
+  duplicateRoutineDraft,
+  emptyRoutineDraft,
+  routineFieldsValid,
+  validateRoutineFields,
+  type RoutineDraft,
+} from "../../lib/routineEditor";
 
 type Tab = "general" | "network" | "power";
 type Confirm =
@@ -41,7 +49,8 @@ type Confirm =
   | { kind: "uninstall2"; prompt: string; answer: number }
   | { kind: "uninstall3"; code: string }
   | { kind: "upgrade"; tag: string }
-  | { kind: "downgrade"; tag: string };
+  | { kind: "downgrade"; tag: string }
+  | { kind: "delete-routine"; id: string; name: string };
 
 export function SettingsOverlay() {
   const open = useAssistantStore((s) => s.settingsOpen);
@@ -53,6 +62,8 @@ export function SettingsOverlay() {
   const update = useSettingsStore((s) => s.update);
   const routines = useRoomStore((s) => s.routines);
   const addRoutine = useRoomStore((s) => s.addRoutine);
+  const updateRoutine = useRoomStore((s) => s.updateRoutine);
+  const setRoutineEnabled = useRoomStore((s) => s.setRoutineEnabled);
   const removeRoutine = useRoomStore((s) => s.removeRoutine);
   const [tab, setTab] = useState<Tab>("general");
   const [busy, setBusy] = useState(false);
@@ -68,9 +79,7 @@ export function SettingsOverlay() {
   const busyRef = useRef(false);
   const closeDrag = useRef<SettingsDrag | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
-  const [routineName, setRoutineName] = useState("");
-  const [routinePhrase, setRoutinePhrase] = useState("");
-  const [routineCommand, setRoutineCommand] = useState("");
+  const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
 
   const displayed = useVisualSettingsPull(pull, tracking);
   const visible = open || tracking || displayed > 0.01 || pull > 0.01;
@@ -87,9 +96,7 @@ export function SettingsOverlay() {
       setTyped("");
       setVersionOpen(false);
       setActionError(null);
-      setRoutineName("");
-      setRoutinePhrase("");
-      setRoutineCommand("");
+      setRoutineDrafts([]);
     }
   }, [visible]);
 
@@ -148,14 +155,50 @@ export function SettingsOverlay() {
     setOpen(target === 1);
   };
 
-  const saveRoutine = () => {
-    const phrase = routinePhrase.trim();
-    const command = routineCommand.trim();
-    if (!phrase || !command) return;
-    addRoutine(phrase, command, routineName.trim() || phrase);
-    setRoutineName("");
-    setRoutinePhrase("");
-    setRoutineCommand("");
+  useEffect(() => {
+    if (!visible) return;
+    setRoutineDrafts((prev) => draftsFromRoutines(routines, prev));
+  }, [visible, routines]);
+
+  const patchRoutineDraft = (id: string, patch: Partial<RoutineDraft>) => {
+    setRoutineDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  };
+
+  const saveRoutineDraft = (draft: RoutineDraft) => {
+    if (draft.builtin) return;
+    const errors = validateRoutineFields(draft.name, draft.phrase, draft.command);
+    if (!routineFieldsValid(errors)) return;
+    if (draft.isNew) {
+      setRoutineDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+      addRoutine(draft.phrase.trim(), draft.command.trim(), draft.name.trim());
+      if (!draft.enabled) {
+        const created = useRoomStore.getState().routines.filter((r) => !r.builtin).at(-1);
+        if (created) setRoutineEnabled(created.id, false);
+      }
+      return;
+    }
+    updateRoutine(draft.id, draft.name, draft.phrase, draft.command);
+  };
+
+  const cancelRoutineDraft = (draft: RoutineDraft) => {
+    if (draft.isNew) {
+      setRoutineDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+      return;
+    }
+    const saved = routines.find((r) => r.id === draft.id);
+    if (!saved) return;
+    setRoutineDrafts((prev) => prev.map((d) => (d.id === draft.id ? draftFromRoutine(saved) : d)));
+  };
+
+  const addRoutineEditor = () => {
+    setRoutineDrafts((prev) => {
+      if (prev.some((d) => d.isNew)) return prev;
+      return [emptyRoutineDraft(), ...prev];
+    });
+  };
+
+  const duplicateRoutineEditor = (draft: RoutineDraft) => {
+    setRoutineDrafts((prev) => [duplicateRoutineDraft(draft), ...prev]);
   };
 
   const pickVersion = (tag: string) => {
@@ -241,6 +284,13 @@ export function SettingsOverlay() {
       const tag = confirm.tag;
       setConfirm(null);
       await runInstall(tag);
+      return;
+    }
+    if (confirm.kind === "delete-routine") {
+      const id = confirm.id;
+      setConfirm(null);
+      setRoutineDrafts((prev) => prev.filter((d) => d.id !== id));
+      removeRoutine(id);
     }
   };
 
@@ -339,35 +389,31 @@ export function SettingsOverlay() {
                 <button type="button" className={`os-toggle${settings.speakReplies ? " on" : ""}`} aria-pressed={settings.speakReplies} onClick={() => update({ speakReplies: !settings.speakReplies })} />
               </div>
               <p className="os-kicker">Routines</p>
-              <FieldTap label="Name" field="routine-name" value={routineName} onCommit={setRoutineName} live />
-              <FieldTap label="When you say" field="routine-phrase" value={routinePhrase} onCommit={setRoutinePhrase} live />
-              <FieldTap label="Judie should" field="routine-command" value={routineCommand} onCommit={setRoutineCommand} live />
-              <button
-                type="button"
-                className="os-pill"
-                disabled={!routinePhrase.trim() || !routineCommand.trim()}
-                onClick={saveRoutine}
-              >
-                Save routine
+              <button type="button" className="os-pill on" onClick={addRoutineEditor}>
+                Add
               </button>
-              {routines.map((r) => (
-                <div key={r.id} className="os-row">
-                  <div>
-                    <div>{r.name}</div>
-                    <div className="os-sub">
-                      {r.builtin
-                        ? `${r.phrases[0] ?? r.name} · built-in`
-                        : r.command
-                          ? `When you say “${r.phrases[0] ?? r.name}” → ${r.command}`
-                          : r.phrases.join(", ")}
-                    </div>
-                  </div>
-                  {!r.builtin && (
-                    <button type="button" className="os-pill" onClick={() => removeRoutine(r.id)}>
-                      Remove
-                    </button>
-                  )}
-                </div>
+              {routineDrafts.map((draft) => (
+                <RoutineEditorCard
+                  key={draft.id}
+                  draft={draft}
+                  saved={routines.find((r) => r.id === draft.id)}
+                  onChange={(patch) => patchRoutineDraft(draft.id, patch)}
+                  onSave={() => saveRoutineDraft(draft)}
+                  onCancel={() => cancelRoutineDraft(draft)}
+                  onDuplicate={() => duplicateRoutineEditor(draft)}
+                  onToggle={() => {
+                    const enabled = !draft.enabled;
+                    patchRoutineDraft(draft.id, { enabled });
+                    if (!draft.isNew) setRoutineEnabled(draft.id, enabled);
+                  }}
+                  onDelete={() =>
+                    setConfirm({
+                      kind: "delete-routine",
+                      id: draft.id,
+                      name: draft.name.trim() || "this routine",
+                    })
+                  }
+                />
               ))}
               <div className="settings-inline">
                 <div>
@@ -509,7 +555,7 @@ export function SettingsOverlay() {
         <ConfirmSheet title="Shut down Judie?" body="Judie will quit until you open it again." primary="Shutdown" onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
       )}
       {confirm?.kind === "uninstall1" && (
-        <ConfirmSheet title="Uninstall Judie?" body={uninstallWarning("desktop")} onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
+        <ConfirmSheet title="Uninstall Judie?" body={uninstallWarning()} onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
       )}
       {confirm?.kind === "uninstall2" && (
         <ConfirmSheet title={confirm.prompt} body="Follow normal order of operations." onAccept={() => void accept()} onDismiss={() => setConfirm(null)}>
@@ -533,6 +579,15 @@ export function SettingsOverlay() {
         <ConfirmSheet
           title={`Downgrade to ${confirm.tag.replace(/^v/, "")}?`}
           body={confirmInstallBody(JUDIE_VERSION, confirm.tag.replace(/^v/, ""))}
+          onAccept={() => void accept()}
+          onDismiss={() => setConfirm(null)}
+        />
+      )}
+      {confirm?.kind === "delete-routine" && (
+        <ConfirmSheet
+          title="Delete this routine?"
+          body={`“${confirm.name}” will be removed. This cannot be undone.`}
+          primary="Delete"
           onAccept={() => void accept()}
           onDismiss={() => setConfirm(null)}
         />

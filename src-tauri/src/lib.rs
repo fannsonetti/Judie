@@ -239,7 +239,7 @@ mod desktop {
                     linux_webview::tune(&win);
                 }
 
-                #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
+                #[cfg(target_os = "linux")]
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
 

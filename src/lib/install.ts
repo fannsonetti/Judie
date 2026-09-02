@@ -65,7 +65,6 @@ export type CompatibleRelease = {
 /** Mirrors the kiosk filter: skip drafts, prereleases, incompatible assets, duplicates. */
 export function compatibleReleaseTags(
   rows: CompatibleRelease[],
-  os: "linux" | "windows",
   arch: string,
 ): string[] {
   const seen = new Set<string>();
@@ -74,11 +73,9 @@ export function compatibleReleaseTags(
     if (row.draft || row.prerelease || !row.installable) continue;
     const name = row.assetName.toLowerCase();
     const ok =
-      os === "linux"
-        ? name.endsWith(".deb") &&
-          ((arch === "armhf" || arch === "arm") &&
-            (name.includes("armhf") || name.includes("armv7")))
-        : name.endsWith(".exe");
+      name.endsWith(".deb") &&
+      ((arch === "armhf" || arch === "arm") &&
+        (name.includes("armhf") || name.includes("armv7")));
     if (!ok) continue;
     const key = row.tag.replace(/^v/, "");
     if (seen.has(key)) continue;

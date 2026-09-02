@@ -30,15 +30,10 @@ fn finish_install(app: AppHandle) -> Result<(), String> {
         app.exit(0);
         return Ok(());
     }
-    #[cfg(windows)]
-    {
-        app.exit(0);
-        return Ok(());
-    }
-    #[cfg(not(any(target_os = "linux", windows)))]
+    #[cfg(not(target_os = "linux"))]
     {
         let _ = app;
-        Err("Install is only available on Windows and Linux".into())
+        Err("Install is only available on Raspberry Pi / Linux".into())
     }
 }
 
@@ -56,27 +51,10 @@ pub fn uninstall_judie(app: AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    #[cfg(windows)]
-    {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let dir = exe
-            .parent()
-            .ok_or_else(|| "Missing install folder".to_string())?;
-        let uninst = dir.join("uninstall.exe");
-        if !uninst.exists() {
-            return Err("Windows uninstaller was not found".into());
-        }
-        let mut cmd = Command::new(&uninst);
-        cmd.arg("/S");
-        cmd.spawn().map_err(|e| e.to_string())?;
-        app.exit(0);
-        return Ok(());
-    }
-
-    #[cfg(not(any(target_os = "linux", windows)))]
+    #[cfg(not(target_os = "linux"))]
     {
         let _ = app;
-        Err("Uninstall is only available on Windows and Linux".into())
+        Err("Uninstall is only available on Raspberry Pi / Linux".into())
     }
 }
 

@@ -68,8 +68,17 @@ export struct PaletteHit {
 export struct RoutineRow {
     id: string,
     name: string,
-    hint: string,
+    phrase: string,
+    command: string,
     builtin: bool,
+    enabled: bool,
+    is-new: bool,
+    dirty: bool,
+    valid: bool,
+    status: string,
+    name-error: string,
+    phrase-error: string,
+    command-error: string,
 }
 
 export struct PartKind {
@@ -298,7 +307,9 @@ export component HitBtn inherits Rectangle {
 export component FieldTap inherits Rectangle {
     in property <string> label;
     in property <string> value;
+    in property <string> error: "";
     in property <bool> active: false;
+    in property <bool> locked: false;
     in property <length> label-size: 11px;
     in property <length> value-size: 16px;
     in property <length> tap-height: 64px;
@@ -306,22 +317,137 @@ export component FieldTap inherits Rectangle {
     height: root.tap-height;
     border-width: 0px;
     background: Dy.canvas;
-    TouchArea { clicked => { root.tapped(); } }
-    VerticalLayout {
-        padding-left: 0px;
-        padding-right: 0px;
-        alignment: center;
-        Text { text: root.label; color: Dy.muted; font-size: root.label-size; font-family: Dy.mono; }
-        Rectangle {
-            height: 1.5px;
-            background: root.active ? Dy.text : Dy.border;
+    TouchArea {
+        enabled: !root.locked;
+        clicked => { root.tapped(); }
+    }
+    HorizontalLayout {
+        spacing: 12px;
+        VerticalLayout {
+            padding-left: 0px;
+            padding-right: 0px;
+            alignment: center;
+            horizontal-stretch: 1;
+            Text { text: root.label; color: Dy.muted; font-size: root.label-size; font-family: Dy.mono; }
+            Rectangle {
+                height: 1.5px;
+                background: root.active ? Dy.text : Dy.border;
+            }
+            Text {
+                text: root.value == "" ? "Tap to type" : root.value;
+                color: Dy.text;
+                font-size: root.value-size;
+                font-family: Dy.mono;
+                overflow: elide;
+            }
         }
-        Text {
-            text: root.value == "" ? "Tap to type" : root.value;
+        if root.error != "": Text {
+            text: root.error;
             color: Dy.text;
-            font-size: root.value-size;
+            font-size: 14px;
             font-family: Dy.mono;
-            overflow: elide;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            width: 148px;
+        }
+    }
+}
+
+export component RoutineCard inherits Rectangle {
+    in property <RoutineRow> item;
+    in property <string> kb-field: "";
+    callback edit-name;
+    callback edit-phrase;
+    callback edit-command;
+    callback save;
+    callback cancel;
+    callback duplicate;
+    callback toggle-enabled;
+    callback delete;
+    border-width: 1.5px;
+    border-color: Dy.border;
+    background: Dy.canvas;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 12px;
+            Text {
+                text: root.item.name == "" ? "New routine" : root.item.name;
+                color: Dy.text;
+                font-size: 18px;
+                font-weight: 700;
+                font-family: Dy.mono;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            Text {
+                text: root.item.status;
+                color: Dy.muted;
+                font-size: 14px;
+                font-family: Dy.mono;
+                vertical-alignment: center;
+                horizontal-alignment: right;
+            }
+        }
+        FieldTap {
+            label: "Routine name";
+            value: root.item.name;
+            error: root.item.name-error;
+            active: root.kb-field == "routine-name:" + root.item.id;
+            locked: root.item.builtin;
+            label-size: 15px;
+            value-size: 22px;
+            tap-height: 78px;
+            tapped => { root.edit-name(); }
+        }
+        FieldTap {
+            label: "When you say";
+            value: root.item.phrase;
+            error: root.item.phrase-error;
+            active: root.kb-field == "routine-phrase:" + root.item.id;
+            locked: root.item.builtin;
+            label-size: 15px;
+            value-size: 22px;
+            tap-height: 78px;
+            tapped => { root.edit-phrase(); }
+        }
+        FieldTap {
+            label: "Judie should";
+            value: root.item.command;
+            error: root.item.command-error;
+            active: root.kb-field == "routine-command:" + root.item.id;
+            locked: root.item.builtin;
+            label-size: 15px;
+            value-size: 22px;
+            tap-height: 78px;
+            tapped => { root.edit-command(); }
+        }
+        HorizontalLayout {
+            spacing: 10px;
+            Pill {
+                label: "Save";
+                on: true;
+                opacity: (!root.item.builtin && root.item.dirty && root.item.valid) ? 1 : 0.35;
+                clicked => { root.save(); }
+            }
+            Pill {
+                label: "Cancel";
+                opacity: (root.item.dirty || root.item.is-new) ? 1 : 0.35;
+                clicked => { root.cancel(); }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        HorizontalLayout {
+            spacing: 10px;
+            Pill { label: "Duplicate"; clicked => { root.duplicate(); } }
+            Pill {
+                label: root.item.enabled ? "Disable" : "Enable";
+                clicked => { root.toggle-enabled(); }
+            }
+            if !root.item.builtin: Pill { label: "Delete"; clicked => { root.delete(); } }
+            Rectangle { horizontal-stretch: 1; }
         }
     }
 }

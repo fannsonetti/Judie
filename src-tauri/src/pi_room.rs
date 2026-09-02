@@ -1,4 +1,4 @@
-//! Room state for the native Pi UI — same defaults as the live Windows home screen.
+//! Room state for the native Pi UI — same defaults as the live home screen.
 
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
@@ -100,6 +100,10 @@ pub struct CustomWidget {
     pub layouts: std::collections::BTreeMap<String, Vec<SlopNode>>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Routine {
     pub id: String,
@@ -108,6 +112,19 @@ pub struct Routine {
     pub builtin: bool,
     #[serde(default)]
     pub command: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+#[derive(Clone)]
+pub struct RoutineEdit {
+    pub id: String,
+    pub name: String,
+    pub phrase: String,
+    pub command: String,
+    pub enabled: bool,
+    pub builtin: bool,
+    pub is_new: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -161,7 +178,7 @@ fn slot(id: &str, kind: &str, size: &str, col: i32, row: i32) -> Slot {
     }
 }
 
-/// Same 6×4 placement as the live Windows home (PID 24608).
+/// Same 6×4 placement as the live home screen.
 fn default_slots() -> Vec<Slot> {
     vec![
         slot("quick-1", "quickControls", "1x1", 0, 0),
@@ -319,6 +336,11 @@ fn days_in_month(year: i32, month: u32) -> u32 {
 }
 
 fn data_dir() -> PathBuf {
+    if let Ok(dir) = std::env::var("JUDIE_DATA_DIR") {
+        if !dir.trim().is_empty() {
+            return PathBuf::from(dir);
+        }
+    }
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/fannsonetti".into());
     PathBuf::from(home).join(".local/share/judie")
 }
@@ -379,7 +401,12 @@ fn save_persist(room: &Room) {
         distance_unit: room.distance_unit.clone(),
         voice: Some(room.voice),
         speak: Some(room.speak),
-        routines: room.routines.iter().filter(|r| !r.builtin).cloned().collect(),
+        routines: room
+            .routines
+            .iter()
+            .filter(|r| !r.builtin || !r.enabled)
+            .cloned()
+            .collect(),
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
@@ -473,6 +500,112 @@ fn template_nodes(template: &str, size: &str) -> Vec<SlopNode> {
     }
 }
 
+fn builtin_action_label(id: &str) -> &'static str {
+    match id {
+        "goodNight" => "Night scene, quiet volume, pause, do not disturb",
+        "movie" => "Movie scene and volume 35",
+        "away" => "Lights off, pause, purifier auto",
+        "morning" => "Bright scene, clear do not disturb, purifier auto",
+        "home" => "Lights on, clear do not disturb, purifier auto",
+        _ => "Built-in room actions",
+    }
+}
+
+fn routine_phrase(r: &Routine) -> String {
+    r.phrases.first().cloned().unwrap_or_default()
+}
+
+pub fn validate_routine_fields(name: &str, phrase: &str, command: &str) -> (String, String, String) {
+    (
+        if name.trim().is_empty() {
+            "Enter a name".into()
+        } else {
+            String::new()
+        },
+        if phrase.trim().is_empty() {
+            "Enter a trigger".into()
+        } else {
+            String::new()
+        },
+        if command.trim().is_empty() {
+            "Enter an action".into()
+        } else {
+            String::new()
+        },
+    )
+}
+
+pub fn routine_fields_valid(name: &str, phrase: &str, command: &str) -> bool {
+    let (n, p, c) = validate_routine_fields(name, phrase, command);
+    n.is_empty() && p.is_empty() && c.is_empty()
+}
+
+fn edit_from_routine(r: &Routine) -> RoutineEdit {
+    RoutineEdit {
+        id: r.id.clone(),
+        name: r.name.clone(),
+        phrase: routine_phrase(r),
+        command: if r.builtin {
+            builtin_action_label(&r.id).into()
+        } else {
+            r.command.clone()
+        },
+        enabled: r.enabled,
+        builtin: r.builtin,
+        is_new: false,
+    }
+}
+
+fn edit_is_dirty(edit: &RoutineEdit, saved: Option<&Routine>) -> bool {
+    if edit.is_new {
+        return true;
+    }
+    let Some(saved) = saved else {
+        return true;
+    };
+    let command = if saved.builtin {
+        builtin_action_label(&saved.id)
+    } else {
+        saved.command.as_str()
+    };
+    edit.name.trim() != saved.name.trim()
+        || edit.phrase.trim() != routine_phrase(saved).trim()
+        || edit.command.trim() != command.trim()
+}
+
+pub fn routine_status_label(edit: &RoutineEdit, saved: Option<&Routine>) -> String {
+    let valid = edit.builtin || routine_fields_valid(&edit.name, &edit.phrase, &edit.command);
+    let dirty = edit_is_dirty(edit, saved);
+    let mut parts = Vec::new();
+    if edit.is_new {
+        parts.push("New");
+    } else if dirty {
+        parts.push("Modified");
+    } else {
+        parts.push("Saved");
+    }
+    if !edit.enabled {
+        parts.push("Disabled");
+    }
+    if !valid {
+        parts.push("Invalid");
+    }
+    parts.join(" · ")
+}
+
+pub fn merge_persisted_routines(mut list: Vec<Routine>, persisted: Vec<Routine>) -> Vec<Routine> {
+    for r in persisted {
+        if let Some(existing) = list.iter_mut().find(|x| x.id == r.id) {
+            if existing.builtin {
+                existing.enabled = r.enabled;
+            }
+        } else if !r.builtin && !list.iter().any(|x| x.id == r.id) {
+            list.push(r);
+        }
+    }
+    list
+}
+
 fn default_routines() -> Vec<Routine> {
     vec![
         Routine {
@@ -481,6 +614,7 @@ fn default_routines() -> Vec<Routine> {
             phrases: vec!["good night".into(), "bedtime".into()],
             builtin: true,
             command: String::new(),
+            enabled: true,
         },
         Routine {
             id: "movie".into(),
@@ -488,6 +622,7 @@ fn default_routines() -> Vec<Routine> {
             phrases: vec!["movie mode".into(), "movie time".into()],
             builtin: true,
             command: String::new(),
+            enabled: true,
         },
         Routine {
             id: "away".into(),
@@ -495,6 +630,7 @@ fn default_routines() -> Vec<Routine> {
             phrases: vec!["away mode".into(), "i am leaving".into()],
             builtin: true,
             command: String::new(),
+            enabled: true,
         },
         Routine {
             id: "morning".into(),
@@ -502,6 +638,7 @@ fn default_routines() -> Vec<Routine> {
             phrases: vec!["good morning".into(), "start the day".into()],
             builtin: true,
             command: String::new(),
+            enabled: true,
         },
         Routine {
             id: "home".into(),
@@ -509,6 +646,7 @@ fn default_routines() -> Vec<Routine> {
             phrases: vec!["i am home".into(), "i am back".into()],
             builtin: true,
             command: String::new(),
+            enabled: true,
         },
     ]
 }
@@ -574,6 +712,7 @@ pub struct Room {
     pub activity: Vec<Activity>,
     pub timers: Vec<TimerItem>,
     pub routines: Vec<Routine>,
+    pub routine_edits: Vec<RoutineEdit>,
     pub expanded: Expanded,
 }
 
@@ -700,19 +839,16 @@ impl Default for Room {
                 TimerItem { label: "Laundry".into(), remain: "18:00".into() },
             ],
             routines: {
-                let mut list = default_routines();
-                for r in persist.routines {
-                    if !r.builtin && !list.iter().any(|x| x.id == r.id) {
-                        list.push(r);
-                    }
-                }
+                let list = merge_persisted_routines(default_routines(), persist.routines);
                 list
             },
+            routine_edits: Vec::new(),
             expanded: Expanded::None,
         };
         let preset = migrate_units_preset(&persist.temp_unit, &persist.distance_unit);
         room.apply_units_preset(preset);
         room.import_json_files();
+        room.sync_routine_edits();
         if persist.temp_unit != room.temp_unit || persist.distance_unit != room.distance_unit {
             room.save();
         }
@@ -1071,7 +1207,7 @@ impl Room {
         let custom: Vec<Routine> = self
             .routines
             .iter()
-            .filter(|r| !r.builtin)
+            .filter(|r| !r.builtin && r.enabled)
             .cloned()
             .collect();
         for r in custom {
@@ -1113,6 +1249,9 @@ impl Room {
             items.push((format!("scene-{scene}"), format!("{scene} scene"), "Scene".into()));
         }
         for r in &self.routines {
+            if !r.enabled {
+                continue;
+            }
             items.push((format!("routine-{}", r.id), r.name.clone(), "Routine".into()));
         }
         items.push(("undo".into(), "Undo last action".into(), "Undo".into()));
@@ -1539,6 +1678,9 @@ impl Room {
         let Some(r) = self.routines.iter().find(|r| r.id == id).cloned() else {
             return;
         };
+        if !r.enabled {
+            return;
+        }
         if r.builtin {
             self.quick(&r.id);
             return;
@@ -1550,14 +1692,160 @@ impl Room {
         }
     }
 
+    pub fn sync_routine_edits(&mut self) {
+        let news: Vec<RoutineEdit> = self
+            .routine_edits
+            .iter()
+            .filter(|e| e.is_new)
+            .cloned()
+            .collect();
+        let dirty: Vec<RoutineEdit> = self
+            .routine_edits
+            .iter()
+            .filter(|e| {
+                !e.is_new
+                    && edit_is_dirty(e, self.routines.iter().find(|r| r.id == e.id))
+            })
+            .cloned()
+            .collect();
+        let mut edits: Vec<RoutineEdit> = news;
+        for r in &self.routines {
+            if let Some(d) = dirty.iter().find(|e| e.id == r.id) {
+                edits.push(d.clone());
+            } else {
+                edits.push(edit_from_routine(r));
+            }
+        }
+        self.routine_edits = edits;
+    }
+
+    pub fn add_routine_draft(&mut self) {
+        if self.routine_edits.iter().any(|e| e.is_new) {
+            return;
+        }
+        let id = format!("draft-{}", chrono::Local::now().timestamp_millis());
+        self.routine_edits.insert(
+            0,
+            RoutineEdit {
+                id,
+                name: String::new(),
+                phrase: String::new(),
+                command: String::new(),
+                enabled: true,
+                builtin: false,
+                is_new: true,
+            },
+        );
+    }
+
+    pub fn set_routine_edit_field(&mut self, id: &str, field: &str, text: &str) {
+        if let Some(edit) = self.routine_edits.iter_mut().find(|e| e.id == id) {
+            if edit.builtin {
+                return;
+            }
+            match field {
+                "name" => edit.name = text.to_string(),
+                "phrase" => edit.phrase = text.to_string(),
+                "command" => edit.command = text.to_string(),
+                _ => {}
+            }
+        }
+    }
+
+    pub fn save_routine_edit(&mut self, id: &str) -> bool {
+        let Some(idx) = self.routine_edits.iter().position(|e| e.id == id) else {
+            return false;
+        };
+        let edit = self.routine_edits[idx].clone();
+        if edit.builtin {
+            return false;
+        }
+        if !routine_fields_valid(&edit.name, &edit.phrase, &edit.command) {
+            return false;
+        }
+        if edit.is_new {
+            let new_id = format!("r-{}", chrono::Local::now().timestamp_millis());
+            self.routines.push(Routine {
+                id: new_id.clone(),
+                name: edit.name.trim().into(),
+                phrases: vec![edit.phrase.trim().to_lowercase()],
+                builtin: false,
+                command: edit.command.trim().into(),
+                enabled: edit.enabled,
+            });
+            self.routine_edits.remove(idx);
+            self.sync_routine_edits();
+            self.persist();
+            return true;
+        }
+        if let Some(saved) = self.routines.iter_mut().find(|r| r.id == id) {
+            saved.name = edit.name.trim().into();
+            saved.phrases = vec![edit.phrase.trim().to_lowercase()];
+            saved.command = edit.command.trim().into();
+        }
+        self.sync_routine_edits();
+        self.persist();
+        true
+    }
+
+    pub fn cancel_routine_edit(&mut self, id: &str) {
+        let Some(idx) = self.routine_edits.iter().position(|e| e.id == id) else {
+            return;
+        };
+        if self.routine_edits[idx].is_new {
+            self.routine_edits.remove(idx);
+            return;
+        }
+        if let Some(saved) = self.routines.iter().find(|r| r.id == id).cloned() {
+            self.routine_edits[idx] = edit_from_routine(&saved);
+        }
+    }
+
+    pub fn duplicate_routine_edit(&mut self, id: &str) {
+        let Some(source) = self.routine_edits.iter().find(|e| e.id == id).cloned() else {
+            return;
+        };
+        let new_id = format!("draft-{}", chrono::Local::now().timestamp_millis());
+        let name = source.name.trim();
+        self.routine_edits.insert(
+            0,
+            RoutineEdit {
+                id: new_id,
+                name: if name.is_empty() {
+                    String::new()
+                } else {
+                    format!("Copy of {name}")
+                },
+                phrase: source.phrase,
+                command: if source.builtin {
+                    String::new()
+                } else {
+                    source.command
+                },
+                enabled: true,
+                builtin: false,
+                is_new: true,
+            },
+        );
+    }
+
+    pub fn set_routine_enabled(&mut self, id: &str, enabled: bool) {
+        if let Some(edit) = self.routine_edits.iter_mut().find(|e| e.id == id) {
+            edit.enabled = enabled;
+        }
+        if let Some(saved) = self.routines.iter_mut().find(|r| r.id == id) {
+            saved.enabled = enabled;
+            self.persist();
+        }
+    }
+
     pub fn add_routine(&mut self, name: &str, phrase: &str, command: &str) {
         let phrase = phrase.trim();
         let command = command.trim();
-        if phrase.is_empty() || command.is_empty() {
+        let name = name.trim();
+        if !routine_fields_valid(name, phrase, command) {
             return;
         }
-        let name = name.trim();
-        let name = if name.is_empty() { phrase } else { name };
         let id = format!("r-{}", chrono::Local::now().timestamp_millis());
         self.routines.push(Routine {
             id,
@@ -1565,12 +1853,15 @@ impl Room {
             phrases: vec![phrase.to_lowercase()],
             builtin: false,
             command: command.into(),
+            enabled: true,
         });
+        self.sync_routine_edits();
         self.persist();
     }
 
     pub fn remove_routine(&mut self, id: &str) {
         self.routines.retain(|r| r.builtin || r.id != id);
+        self.routine_edits.retain(|e| e.builtin || e.id != id);
         self.persist();
     }
 
@@ -1602,4 +1893,139 @@ pub fn with<R>(f: impl FnOnce(&mut Room) -> R) -> R {
         *g = Some(Room::default());
     }
     f(g.as_mut().unwrap())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static HOME_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_temp_room(f: impl FnOnce(&mut Room)) {
+        let _g = HOME_LOCK.lock().expect("home lock");
+        let dir = std::env::temp_dir().join(format!(
+            "judie-rt-{}-{}",
+            std::process::id(),
+            chrono::Local::now().timestamp_millis()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let prev = std::env::var("JUDIE_DATA_DIR").ok();
+        unsafe { std::env::set_var("JUDIE_DATA_DIR", &dir); }
+        *ROOM.lock().expect("room") = None;
+        with(f);
+        *ROOM.lock().expect("room") = None;
+        match prev {
+            Some(v) => unsafe { std::env::set_var("JUDIE_DATA_DIR", v); }
+            None => unsafe { std::env::remove_var("JUDIE_DATA_DIR"); }
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn old_routine_json_defaults_enabled() {
+        let json = r#"{"id":"r-1","name":"Focus","phrases":["focus mode"],"builtin":false,"command":"lights off"}"#;
+        let r: Routine = serde_json::from_str(json).unwrap();
+        assert!(r.enabled);
+        assert_eq!(r.name, "Focus");
+        assert_eq!(r.command, "lights off");
+    }
+
+    #[test]
+    fn merge_keeps_custom_and_disabled_builtin() {
+        let persisted = vec![
+            Routine {
+                id: "goodNight".into(),
+                name: "Good Night".into(),
+                phrases: vec![],
+                builtin: true,
+                command: String::new(),
+                enabled: false,
+            },
+            Routine {
+                id: "r-1".into(),
+                name: "Focus".into(),
+                phrases: vec!["focus".into()],
+                builtin: false,
+                command: "lights off".into(),
+                enabled: true,
+            },
+        ];
+        let list = merge_persisted_routines(default_routines(), persisted);
+        assert!(!list.iter().find(|r| r.id == "goodNight").unwrap().enabled);
+        assert!(list.iter().any(|r| r.id == "r-1" && r.name == "Focus"));
+    }
+
+    #[test]
+    fn validation_rejects_empty_fields() {
+        assert!(!routine_fields_valid("", "say this", "do that"));
+        assert!(!routine_fields_valid("Name", "", "do that"));
+        assert!(!routine_fields_valid("Name", "say this", ""));
+        assert!(routine_fields_valid("Name", "say this", "do that"));
+        let (n, p, c) = validate_routine_fields("", "", "");
+        assert_eq!(n, "Enter a name");
+        assert_eq!(p, "Enter a trigger");
+        assert_eq!(c, "Enter an action");
+    }
+
+    #[test]
+    fn editor_create_edit_disable_duplicate_delete_cancel_and_reload() {
+        with_temp_room(|room| {
+            room.add_routine_draft();
+            let id = room.routine_edits.iter().find(|e| e.is_new).unwrap().id.clone();
+            assert!(!room.save_routine_edit(&id), "empty draft must not save");
+            room.set_routine_edit_field(&id, "name", "Focus");
+            room.set_routine_edit_field(&id, "phrase", "focus mode");
+            assert!(!room.save_routine_edit(&id), "missing action must not save");
+            room.set_routine_edit_field(&id, "command", "lights off");
+            assert!(room.save_routine_edit(&id));
+            let saved = room.routines.iter().find(|r| r.name == "Focus").unwrap().clone();
+            assert_eq!(saved.phrases[0], "focus mode");
+            assert!(saved.enabled);
+
+            room.set_routine_edit_field(&saved.id, "name", "");
+            assert!(!room.save_routine_edit(&saved.id));
+            room.cancel_routine_edit(&saved.id);
+            assert_eq!(
+                room.routine_edits.iter().find(|e| e.id == saved.id).unwrap().name,
+                "Focus"
+            );
+
+            room.set_routine_edit_field(&saved.id, "command", "volume 10");
+            assert!(room.save_routine_edit(&saved.id));
+            assert_eq!(
+                room.routines.iter().find(|r| r.id == saved.id).unwrap().command,
+                "volume 10"
+            );
+
+            room.set_routine_enabled(&saved.id, false);
+            assert!(!room.routines.iter().find(|r| r.id == saved.id).unwrap().enabled);
+            room.run_routine(&saved.id);
+            assert!(room.palette_reply.is_empty() || !room.palette_reply.contains("volume"));
+
+            room.duplicate_routine_edit(&saved.id);
+            let copy = room.routine_edits.iter().find(|e| e.is_new).unwrap().clone();
+            assert!(copy.name.starts_with("Copy of "));
+            room.set_routine_edit_field(&copy.id, "command", "lights on");
+            assert!(room.save_routine_edit(&copy.id));
+
+            room.remove_routine(&saved.id);
+            assert!(!room.routines.iter().any(|r| r.id == saved.id));
+
+            room.add_routine("Persisted", "persist me", "do persist");
+            room.save();
+            let reloaded = Room::default();
+            assert!(reloaded
+                .routines
+                .iter()
+                .any(|r| r.name == "Persisted" && r.command == "do persist"));
+
+            let old = r#"{"slots":[],"custom":[],"routines":[{"id":"r-old","name":"Legacy","phrases":["legacy"],"builtin":false,"command":"movie mode"}]}"#;
+            std::fs::write(persist_path(), old).unwrap();
+            let migrated = Room::default();
+            let legacy = migrated.routines.iter().find(|r| r.id == "r-old").unwrap();
+            assert!(legacy.enabled);
+            assert_eq!(legacy.name, "Legacy");
+        });
+    }
 }

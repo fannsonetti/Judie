@@ -1,7 +1,7 @@
 {
   "name": "judie",
   "private": true,
-  "version": "0.2.13",
+  "version": "0.2.14",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,6 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "tsx src/__tests__/run.ts",
-    "installer": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
     "installer:pi": "bash scripts/build-pi.sh"
   },
   "dependencies": {

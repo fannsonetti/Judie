@@ -399,28 +399,15 @@ fn push_ui(ui: &MainWindow) {
             .collect();
         ui.set_palette_hits(ModelRc::new(VecModel::from(hits)));
 
-        let routines: Vec<RoutineRow> = room
-            .routines
-            .iter()
-            .map(|r| RoutineRow {
-                id: r.id.clone().into(),
-                name: r.name.clone().into(),
-                hint: if r.builtin {
-                    format!("{} · built-in", r.phrases.first().cloned().unwrap_or_else(|| r.name.clone()))
-                } else if r.command.is_empty() {
-                    r.phrases.join(", ")
-                } else {
-                    format!(
-                        "When you say “{}” → {}",
-                        r.phrases.first().cloned().unwrap_or_else(|| r.name.clone()),
-                        r.command
-                    )
-                }
-                .into(),
-                builtin: r.builtin,
-            })
-            .collect();
-        ui.set_routines(ModelRc::new(VecModel::from(routines)));
+        let editing_routine = ui.get_kb_field().to_string().starts_with("routine-");
+        if !editing_routine {
+            let routines: Vec<RoutineRow> = room
+                .routine_edits
+                .iter()
+                .map(|e| routine_row_for(room, e))
+                .collect();
+            ui.set_routines(ModelRc::new(VecModel::from(routines)));
+        }
 
         let slop: Vec<SlopNode> = room
             .home_slop_nodes()
@@ -492,15 +479,90 @@ fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
             pi_room::with(|room| room.set_creator_node_text(text));
             ui.set_creator_node_text(text.into());
         }
-        "routine-name" => ui.set_routine_draft(text.into()),
-        "routine-phrase" => ui.set_routine_phrase(text.into()),
-        "routine-command" => ui.set_routine_command(text.into()),
         "gallery-query" => {
             pi_room::with(|room| room.gallery_query = text.to_string());
             ui.set_gallery_query(text.into());
             push_ui(ui);
         }
-        _ => {}
+        _ => {
+            if apply_routine_kb(ui, field, text) {
+                return;
+            }
+        }
+    }
+}
+
+fn routine_field_parts(field: &str) -> Option<(&'static str, &str)> {
+    let (kind, id) = field.split_once(':')?;
+    let key = match kind {
+        "routine-name" => "name",
+        "routine-phrase" => "phrase",
+        "routine-command" => "command",
+        _ => return None,
+    };
+    Some((key, id))
+}
+
+fn apply_routine_kb(ui: &MainWindow, field: &str, text: &str) -> bool {
+    let Some((key, id)) = routine_field_parts(field) else {
+        return false;
+    };
+    pi_room::with(|room| room.set_routine_edit_field(id, key, text));
+    patch_routine_row(ui, id);
+    true
+}
+
+fn routine_row_for(room: &pi_room::Room, e: &pi_room::RoutineEdit) -> RoutineRow {
+    let saved = room.routines.iter().find(|r| r.id == e.id);
+    let (name_error, phrase_error, command_error) = if e.builtin {
+        (String::new(), String::new(), String::new())
+    } else {
+        pi_room::validate_routine_fields(&e.name, &e.phrase, &e.command)
+    };
+    let valid = e.builtin || pi_room::routine_fields_valid(&e.name, &e.phrase, &e.command);
+    let dirty = e.is_new
+        || saved
+            .map(|s| {
+                e.name.trim() != s.name.trim()
+                    || e.phrase.trim() != s.phrases.first().cloned().unwrap_or_default().trim()
+                    || (!s.builtin && e.command.trim() != s.command.trim())
+            })
+            .unwrap_or(true);
+    RoutineRow {
+        id: e.id.clone().into(),
+        name: e.name.clone().into(),
+        phrase: e.phrase.clone().into(),
+        command: e.command.clone().into(),
+        builtin: e.builtin,
+        enabled: e.enabled,
+        is_new: e.is_new,
+        dirty,
+        valid,
+        status: pi_room::routine_status_label(e, saved).into(),
+        name_error: name_error.into(),
+        phrase_error: phrase_error.into(),
+        command_error: command_error.into(),
+    }
+}
+
+fn patch_routine_row(ui: &MainWindow, id: &str) {
+    let row = pi_room::with(|room| {
+        room.routine_edits
+            .iter()
+            .find(|e| e.id == id)
+            .map(|e| routine_row_for(room, e))
+    });
+    let Some(row) = row else {
+        return;
+    };
+    let model = ui.get_routines();
+    if let Some(vm) = model.as_any().downcast_ref::<VecModel<RoutineRow>>() {
+        for i in 0..vm.row_count() {
+            if vm.row_data(i).is_some_and(|r| r.id.as_str() == id) {
+                vm.set_row_data(i, row);
+                return;
+            }
+        }
     }
 }
 
@@ -517,11 +579,24 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
         "verify" => ui.get_verify_typed().to_string(),
         "creator-name" => ui.get_creator_name().to_string(),
         "creator-node" => ui.get_creator_node_text().to_string(),
-        "routine-name" => ui.get_routine_draft().to_string(),
-        "routine-phrase" => ui.get_routine_phrase().to_string(),
-        "routine-command" => ui.get_routine_command().to_string(),
         "gallery-query" => ui.get_gallery_query().to_string(),
-        _ => String::new(),
+        _ => {
+            if let Some((key, id)) = routine_field_parts(field) {
+                return pi_room::with(|room| {
+                    room.routine_edits
+                        .iter()
+                        .find(|e| e.id == id)
+                        .map(|e| match key {
+                            "name" => e.name.clone(),
+                            "phrase" => e.phrase.clone(),
+                            "command" => e.command.clone(),
+                            _ => String::new(),
+                        })
+                        .unwrap_or_default()
+                });
+            }
+            String::new()
+        }
     }
 }
 
@@ -1089,22 +1164,67 @@ fn bind(ui: &MainWindow) {
         pi_room::with(|room| room.assistant_url = t.to_string());
     });
     let r = refresh.clone();
-    ui.on_remove_routine(move |id| {
-        pi_room::with(|room| room.remove_routine(id.as_str()));
+    ui.on_add_routine(move || {
+        pi_room::with(|room| room.add_routine_draft());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_save_routine(move |id| {
+        pi_room::with(|room| {
+            room.save_routine_edit(id.as_str());
+        });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_cancel_routine(move |id| {
+        pi_room::with(|room| room.cancel_routine_edit(id.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_duplicate_routine(move |id| {
+        pi_room::with(|room| room.duplicate_routine_edit(id.as_str()));
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_toggle_routine(move |id| {
+        pi_room::with(|room| {
+            let enabled = room
+                .routine_edits
+                .iter()
+                .find(|e| e.id == id.as_str())
+                .map(|e| !e.enabled)
+                .unwrap_or(true);
+            room.set_routine_enabled(id.as_str(), enabled);
+        });
         r();
     });
     let weak = ui.as_weak();
-    let r = refresh.clone();
-    ui.on_save_routine(move || {
+    ui.on_ask_delete_routine(move |id| {
         let Some(ui) = weak.upgrade() else { return };
-        let name = ui.get_routine_draft().to_string();
-        let phrase = ui.get_routine_phrase().to_string();
-        let command = ui.get_routine_command().to_string();
-        pi_room::with(|room| room.add_routine(&name, &phrase, &command));
-        ui.set_routine_draft("".into());
-        ui.set_routine_phrase("".into());
-        ui.set_routine_command("".into());
-        r();
+        let name = pi_room::with(|room| {
+            room.routine_edits
+                .iter()
+                .find(|e| e.id == id.as_str())
+                .map(|e| {
+                    if e.name.trim().is_empty() {
+                        "this routine".into()
+                    } else {
+                        e.name.clone()
+                    }
+                })
+                .unwrap_or_else(|| "this routine".into())
+        });
+        ui.set_pending_routine_id(id);
+        ui.set_pending_routine_name(name.into());
+        ui.set_confirm_title("Delete this routine?".into());
+        ui.set_confirm_body(
+            format!(
+                "“{}” will be removed. This cannot be undone.",
+                ui.get_pending_routine_name()
+            )
+            .into(),
+        );
+        ui.set_confirm_kind("delete-routine".into());
     });
 
     let weak = ui.as_weak();
@@ -1405,13 +1525,25 @@ fn bind(ui: &MainWindow) {
     ui.on_cancel_confirm(move || {
         if let Some(ui) = weak.upgrade() {
             ui.set_confirm_kind("".into());
+            ui.set_pending_routine_id("".into());
             ui.set_math_typed("".into());
             ui.set_verify_typed("".into());
         }
     });
     let weak = ui.as_weak();
+    let r = refresh.clone();
     ui.on_accept_confirm(move || {
         let Some(ui) = weak.upgrade() else { return };
+        if ui.get_confirm_kind() == "delete-routine" {
+            let id = ui.get_pending_routine_id().to_string();
+            ui.set_confirm_kind("".into());
+            ui.set_pending_routine_id("".into());
+            if !id.is_empty() {
+                pi_room::with(|room| room.remove_routine(&id));
+            }
+            r();
+            return;
+        }
         if ui.get_updating() || ui.get_power_busy() {
             return;
         }

@@ -9,38 +9,6 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install frontend
-        run: npm ci
-
-      # Installers only (no updater signing). Re-enable createUpdaterArtifacts + TAURI_SIGNING_* later.
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: Judie ${{ github.ref_name }}
-          releaseBody: |
-            ## Windows
-            Install `Judie_*_x64-setup.exe`.
-
-            ## Raspberry Pi (32-bit)
-            Native Slint kiosk `.deb` (no WebKit). See [docs/raspberry-pi.md](docs/raspberry-pi.md).
-            Pi 3 (1 GB) should run **32-bit Raspberry Pi OS**.
-          releaseDraft: false
-          prerelease: false
-
   linux-armv7:
     runs-on: ubuntu-24.04-arm
     steps:
@@ -77,7 +45,7 @@ jobs:
           bash scripts/package-armhf-deb.sh
           bash scripts/ci-check-armhf-deb.sh
 
-      - name: Upload armhf .deb to release
+      - name: Create release and upload armhf .deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -89,12 +57,9 @@ jobs:
             exit 1
           fi
           cp "${files[0]}" /tmp/judie_armhf.deb
-          for _ in $(seq 1 90); do
-            if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-              gh release upload "${{ github.ref_name }}" "${files[@]}" /tmp/judie_armhf.deb --clobber
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Timed out waiting for release ${{ github.ref_name }}" >&2
-          exit 1
+          if ! gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release create "${{ github.ref_name }}" \
+              --title "Judie ${{ github.ref_name }}" \
+              --notes "Raspberry Pi 32-bit native Slint kiosk .deb (no WebKit). Windows is unsupported beginning with v0.2.14. See docs/raspberry-pi.md. Pi 3 (1 GB) should run 32-bit Raspberry Pi OS."
+          fi
+          gh release upload "${{ github.ref_name }}" "${files[@]}" /tmp/judie_armhf.deb --clobber

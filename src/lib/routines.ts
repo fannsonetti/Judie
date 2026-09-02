@@ -6,6 +6,7 @@ export const BUILTIN_ROUTINES: RoutineSnap[] = [
     name: "Good Night",
     phrases: ["good night", "goodnight", "bedtime", "i am going to bed", "i am off to bed"],
     builtin: true,
+    enabled: true,
     actions: [
       { type: "lights.scene", scene: "Night" },
       { type: "media.volume", value: 12 },
@@ -18,6 +19,7 @@ export const BUILTIN_ROUTINES: RoutineSnap[] = [
     name: "Movie",
     phrases: ["movie mode", "movie time", "watch a movie", "start movie"],
     builtin: true,
+    enabled: true,
     actions: [
       { type: "lights.scene", scene: "Movie" },
       { type: "media.volume", value: 35 },
@@ -28,6 +30,7 @@ export const BUILTIN_ROUTINES: RoutineSnap[] = [
     name: "Away",
     phrases: ["away mode", "i am leaving", "i am heading out", "lock up"],
     builtin: true,
+    enabled: true,
     actions: [
       { type: "lights.power", on: false },
       { type: "media.play", playing: false },
@@ -39,6 +42,7 @@ export const BUILTIN_ROUTINES: RoutineSnap[] = [
     name: "Morning",
     phrases: ["morning mode", "start the day", "good morning"],
     builtin: true,
+    enabled: true,
     actions: [
       { type: "lights.scene", scene: "Bright" },
       { type: "dnd", on: false },
@@ -50,6 +54,7 @@ export const BUILTIN_ROUTINES: RoutineSnap[] = [
     name: "Home",
     phrases: ["i am home", "i am back", "i am back home"],
     builtin: true,
+    enabled: true,
     actions: [
       { type: "lights.power", on: true },
       { type: "dnd", on: false },
