@@ -1,7 +1,7 @@
 import { processUtterance, emptyContext } from "../assistant/process";
 import { applyContextFromResult } from "../assistant/process";
 import { RoomSnapshot } from "../assistant/types";
-import { packWidgets, placeWidgets, canPlaceWidget, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
+import { packWidgets, placeWidgets, canPlaceWidget, nearestPlace, reorderWidgets, cycleSize, normalizeOrders, usedPageCount, visiblePageCount } from "../lib/layout";
 import { homeScaleFor, measureWidgetGrid, novaShellSize, NOVA_FRAME } from "../lib/widgetGrid";
 import {
   HOME_CLOCK_PX,
@@ -17,6 +17,7 @@ import {
 import { formatClock, formatDateLong } from "../lib/time";
 import { DEMO_ACTIVITY, DEMO_HOST_STATS, DEMO_MEDIA, DEMO_TIMERS, DEMO_WEATHER } from "../lib/demoStats";
 import { GRID_COLS, GRID_ROWS, WidgetInstance, WIDGET_LABELS } from "../types/widgets";
+import { dragOffset, dropCell, leftoverDelta } from "../lib/widgetDrag";
 import { normalizeForSpeech } from "../lib/tts";
 import { patternToRegex } from "../assistant/matcher";
 import { BUILTIN_ROUTINES } from "../lib/routines";
@@ -950,6 +951,78 @@ test("slint and css home type scale match the readability constants", () => {
   assert(faces.includes("Dy.type-clock") === false, "clock lives in the header, not widget faces");
   assert(faces.includes("Dy.type-value") && faces.includes("Dy.type-title"), "widget faces use the type scale");
   assert(!/font-size:\s*(8|9|10|11)px/.test(faces), "faces dropped sub-12px copy");
+});
+
+test("widget drag uses a dedicated layer, does not jump, and stays on the grid", () => {
+  assert(dragOffset(10, 20, 10, 20).dx === 0 && dragOffset(10, 20, 10, 20).dy === 0, "lift starts at zero");
+  const moved = dragOffset(10, 20, 40, 50);
+  assert(moved.dx === 30 && moved.dy === 30, "pointer delta is 1:1");
+
+  const edge = dropCell(0, 0, -400, -400, 100, 2, 2);
+  assert(edge.col === 0 && edge.row === 0, "cannot leave the top-left");
+  const far = dropCell(0, 0, 8000, 8000, 100, 2, 2);
+  assert(far.col === GRID_COLS - 2 && far.row === GRID_ROWS - 2, "cannot leave the bottom-right");
+  const mid = dropCell(1, 1, 100, 0, 100, 1, 1);
+  assert(mid.col === 2 && mid.row === 1, "free move snaps to nearest cell");
+
+  const left = leftoverDelta(120, 40, 1, 1, 2, 1, 100);
+  assert(left.dx === 20 && left.dy === 40, "glide leftover after snap");
+  const cancel = leftoverDelta(120, 40, 1, 1, 1, 1, 100);
+  assert(cancel.dx === 120 && cancel.dy === 40, "cancel glides back to origin");
+
+  const crowd: WidgetInstance[] = [
+    { id: "a", type: "weather", page: 0, size: "2x2", order: 0, col: 0, row: 0 },
+    { id: "b", type: "lights", page: 0, size: "2x2", order: 1, col: 2, row: 0 },
+    { id: "c", type: "media", page: 0, size: "1x2", order: 2, col: 4, row: 0 },
+    { id: "d", type: "calendar", page: 0, size: "1x1", order: 3, col: 4, row: 1 },
+    { id: "e", type: "climate", page: 0, size: "1x1", order: 4, col: 5, row: 0 },
+    { id: "f", type: "purifier", page: 0, size: "1x1", order: 5, col: 5, row: 1 },
+    { id: "g", type: "quickControls", page: 0, size: "1x2", order: 6, col: 0, row: 2 },
+  ];
+  assert(!canPlaceWidget(crowd, "a", 2, 0), "overlap with lights is blocked");
+  const near = nearestPlace(crowd, "a", 2, 0);
+  assert(near && (near.col !== 2 || near.row !== 0), "nearest place avoids collision");
+  assert(near && canPlaceWidget(crowd, "a", near.col, near.row), "nearest is legal");
+  const outside = nearestPlace(crowd, "g", -3, 9);
+  assert(outside && outside.col >= 0 && outside.row <= GRID_ROWS - 1, "outside drop stays on the grid");
+  assert(canPlaceWidget(crowd, "g", outside!.col, outside!.row), "clamped drop is legal");
+
+  for (const type of Object.keys(WIDGET_LABELS)) {
+    const one: WidgetInstance[] = [
+      { id: "solo", type: type as WidgetInstance["type"], page: 0, size: "1x1", order: 0, col: 0, row: 0 },
+    ];
+    const at = nearestPlace(one, "solo", 3, 2);
+    assert(at && at.col === 3 && at.row === 2, `${type} can drag across the grid`);
+    const again = nearestPlace([{ ...one[0], col: at!.col, row: at!.row }], "solo", 1, 1);
+    assert(again && again.col === 1 && again.row === 1, `${type} repeated drag`);
+  }
+
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8") + readFileSync("src-tauri/ui/pi/cards.slint", "utf8");
+  const grid = readFileSync("src/components/home/WidgetGrid.tsx", "utf8");
+  const css = readFileSync("src/styles/global.css", "utf8");
+  const container = readFileSync("src/components/home/WidgetContainer.tsx", "utf8");
+  const editAt = slint.indexOf("if root.edit-mode:");
+  const layerAt = slint.indexOf("if root.drag-id != \"\": TileShell");
+  assert(slint.includes("ghost: root.drag-id == w.id"), "home tiles ghost while lifted");
+  assert(slint.includes("layer: true"), "slint drag portal");
+  assert(slint.includes("drag-cancel"), "canceled drags restore");
+  assert(slint.includes("drag-ox"), "layer keeps the press origin");
+  assert(layerAt > editAt && layerAt > 0, "drag layer paints above edit controls");
+  assert(!/z-index:\s*\d+/.test(slint), "slint must not stack tiles with z-index");
+  assert(grid.includes("widget-drag-layer"), "react drag portal");
+  assert(grid.indexOf("widget-drag-layer") > grid.indexOf("placed.map"), "portal is after slots");
+  assert(container.includes("liftIntoLayer") && container.includes("cloneNode"), "visual is portaled");
+  assert(container.includes("finishDrag(true)"), "pointer cancel restores");
+  assert(container.includes("abortSettle") && container.includes("snapFromDelta"), "rapid drags reuse the portal");
+  assert(!/zIndex:\s*\d+/.test(container), "no local z-index on slots");
+  assert(!/scale\(1\.045\)/.test(css), "drag must not scale/jump");
+  assert(css.includes(".widget-drag-layer"), "css layer");
+  assert(slint.includes("if root.layer: TouchArea"), "drag portal ignores inner controls");
+  assert(slint.includes("root.drag-closing = false"), "a new drag cancels the previous settle");
+  const rust = readFileSync("src-tauri/src/bin/judie-pi.rs", "utf8");
+  assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  assert(pkg.version === "0.2.16", "package version is 0.2.16");
 });
 
 function textHeightSafe(px: number) {

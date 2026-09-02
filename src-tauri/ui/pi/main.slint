@@ -279,12 +279,21 @@ export component MainWindow inherits Window {
     property <int> settings-kind: 0;
     property <float> settings-eased: 0;
     property <string> drag-id: "";
+    property <string> drag-kind: "activity";
+    property <string> drag-size: "1x1";
     property <length> drag-dx: 0px;
     property <length> drag-dy: 0px;
+    property <length> drag-ox: 0px;
+    property <length> drag-oy: 0px;
+    property <length> drag-w: 0px;
+    property <length> drag-h: 0px;
     property <length> drag-press-x: 0px;
     property <length> drag-press-y: 0px;
+    property <int> drag-from-col: 0;
+    property <int> drag-from-row: 0;
     property <bool> drag-live: false;
     property <bool> drag-settle: false;
+    property <bool> drag-closing: false;
     property <duration> drag-ease: 0ms;
     property <length> gallery-swipe: 0px;
     property <bool> gallery-swiping: false;
@@ -563,8 +572,17 @@ export component MainWindow inherits Window {
                         root.drag-dx = 0px;
                         root.drag-dy = 0px;
                         root.drag-settle = false;
+                        root.drag-closing = true;
+                    }
+                }
+                Timer {
+                    interval: 230ms;
+                    running: root.drag-closing;
+                    triggered => {
+                        root.drag-closing = false;
                         root.drag-id = "";
                         root.drag-live = false;
+                        root.drag-ease = 0ms;
                     }
                 }
 
@@ -576,13 +594,24 @@ export component MainWindow inherits Window {
                     visible: w.page == root.page;
                     editing: root.edit-mode;
                     pending: root.pending-remove == w.id;
-                    vis-x: root.drag-id == w.id ? root.drag-dx : 0px;
-                    vis-y: root.drag-id == w.id ? root.drag-dy : 0px;
+                    ghost: root.drag-id == w.id;
+                    vis-x: 0px;
+                    vis-y: 0px;
                     tapped => { root.expand(w.kind); }
                     held => { root.hold-home(); }
                     remove => { root.request-remove(w.id); }
                     drag-begin(lx, ly) => {
+                        root.drag-closing = false;
+                        root.drag-settle = false;
                         root.drag-id = w.id;
+                        root.drag-kind = w.kind;
+                        root.drag-size = w.size;
+                        root.drag-from-col = w.col;
+                        root.drag-from-row = w.row;
+                        root.drag-ox = ox + w.col * cell;
+                        root.drag-oy = oy + w.row * cell;
+                        root.drag-w = w.cols * cell - g;
+                        root.drag-h = w.rows * cell - g;
                         root.drag-press-x = lx;
                         root.drag-press-y = ly;
                         root.drag-ease = 0ms;
@@ -599,12 +628,20 @@ export component MainWindow inherits Window {
                     drag-end => {
                         if root.drag-id == w.id && root.drag-live {
                             root.drag-live = false;
-                            root.drop-col = round((w.col * cell + root.drag-dx) / cell);
-                            root.drop-row = round((w.row * cell + root.drag-dy) / cell);
+                            root.drop-col = max(0, min(6 - w.cols, round((root.drag-from-col * cell + root.drag-dx) / cell)));
+                            root.drop-row = max(0, min(4 - w.rows, round((root.drag-from-row * cell + root.drag-dy) / cell)));
                             root.drag-ease = 0ms;
-                            root.drag-dx = root.drag-dx - (root.drop-col - w.col) * cell;
-                            root.drag-dy = root.drag-dy - (root.drop-row - w.row) * cell;
                             root.drag-drop(w.id, root.drop-col, root.drop-row);
+                            root.drag-ox = ox + root.drop-col * cell;
+                            root.drag-oy = oy + root.drop-row * cell;
+                            root.drag-dx = root.drag-dx - (root.drop-col - root.drag-from-col) * cell;
+                            root.drag-dy = root.drag-dy - (root.drop-row - root.drag-from-row) * cell;
+                            root.drag-settle = true;
+                        }
+                    }
+                    drag-cancel => {
+                        if root.drag-id == w.id && root.drag-live {
+                            root.drag-live = false;
                             root.drag-settle = true;
                         }
                     }
@@ -706,6 +743,71 @@ export component MainWindow inherits Window {
                         padding: 10px; spacing: 10px; alignment: center;
                         Pill { label: "ADD WIDGET"; on: true; clicked => { root.open-gallery(); } }
                         Pill { label: "DONE"; clicked => { root.exit-edit(); } }
+                    }
+                }
+
+                if root.drag-id != "": TileShell {
+                    x: root.drag-ox + root.drag-dx;
+                    y: root.drag-oy + root.drag-dy;
+                    width: root.drag-w;
+                    height: root.drag-h;
+                    editing: root.edit-mode;
+                    pending: root.pending-remove == root.drag-id;
+                    layer: true;
+                    ghost: false;
+                    WidgetFace {
+                        kind: root.drag-kind;
+                        size: root.drag-size;
+                        sample: false;
+                        source: "live";
+                        widget-id: root.drag-id;
+                        weather-loc: root.weather-loc;
+                        weather-temp: root.weather-temp;
+                        weather-cond: root.weather-cond;
+                        weather-range: root.weather-range;
+                        weather-feel: root.weather-feel;
+                        weather-note: root.weather-note;
+                        hours: root.hours;
+                        master-on: root.master-on;
+                        brightness: root.brightness;
+                        scene: root.scene;
+                        master-color: root.master-color;
+                        lights: root.lights;
+                        playing: root.playing;
+                        track-title: root.track-title;
+                        track-artist: root.track-artist;
+                        volume: root.volume;
+                        media-progress: root.media-progress;
+                        indoor: root.indoor;
+                        outdoor: root.outdoor;
+                        humidity: root.humidity;
+                        comfort: root.comfort;
+                        events: root.events;
+                        month-name: root.month-name;
+                        cal-cells: root.cal-cells;
+                        purifier-on: root.purifier-on;
+                        purifier-mode: root.purifier-mode;
+                        purifier-aq: root.purifier-aq;
+                        purifier-filter: root.purifier-filter;
+                        cpu: root.cpu;
+                        memory: root.memory;
+                        mem-detail: root.mem-detail;
+                        temp-text: root.temp-text;
+                        services: root.services;
+                        activity: root.activity;
+                        timers: root.timers;
+                        slop-nodes: root.slop-nodes;
+                        dnd: root.dnd;
+                        toggle-master => { root.toggle-master(); }
+                        brightness-changed(v) => { root.brightness-changed(v); }
+                        set-color(c) => { root.set-color(c); }
+                        toggle-light(id) => { root.toggle-light(id); }
+                        toggle-play => { root.toggle-play(); }
+                        next-track => { root.next-track(); }
+                        prev-track => { root.prev-track(); }
+                        volume-changed(v) => { root.volume-changed(v); }
+                        quick(id) => { root.quick(id); }
+                        set-purifier-mode(m) => { root.set-purifier-mode(m); }
                     }
                 }
             }

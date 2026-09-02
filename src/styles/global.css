@@ -236,6 +236,13 @@ input:focus-visible {
   overflow: visible;
 }
 
+.widget-drag-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
 .widget-slot {
   position: absolute;
   padding: calc(var(--grid-gap) / 2);
@@ -291,11 +298,7 @@ input:focus-visible {
 }
 
 .widget-shell.dragging {
-  opacity: 0.96;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.48);
-  z-index: 30;
   animation: none !important;
-  transform: scale(1.045);
 }
 
 .widget-shell.pending-remove {

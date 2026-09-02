@@ -136,6 +136,37 @@ export function canPlaceWidget(
   return fits(occupied, row, col, w, h, maxRows);
 }
 
+/** Clamp a drop to the usable grid, then the nearest collision-free cell. */
+export function nearestPlace(
+  widgets: WidgetInstance[],
+  id: string,
+  col: number,
+  row: number,
+  maxRows: number = GRID_ROWS
+): { col: number; row: number } | null {
+  const widget = widgets.find((w) => w.id === id);
+  if (!widget) return null;
+  const { cols: w, rows: h } = sizeDims(widget.size);
+  const c0 = Math.max(0, Math.min(GRID_COLS - w, Math.round(col)));
+  const r0 = Math.max(0, Math.min(maxRows - h, Math.round(row)));
+  if (canPlaceWidget(widgets, id, c0, r0, widget.size, maxRows)) {
+    return { col: c0, row: r0 };
+  }
+  let best: { col: number; row: number } | null = null;
+  let bestD = Infinity;
+  for (let r = 0; r <= maxRows - h; r++) {
+    for (let c = 0; c <= GRID_COLS - w; c++) {
+      if (!canPlaceWidget(widgets, id, c, r, widget.size, maxRows)) continue;
+      const d = Math.abs(c - c0) + Math.abs(r - r0);
+      if (d < bestD) {
+        bestD = d;
+        best = { col: c, row: r };
+      }
+    }
+  }
+  return best;
+}
+
 export function firstFreeCell(
   widgets: WidgetInstance[],
   size: WidgetSize,

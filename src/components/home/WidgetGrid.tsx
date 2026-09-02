@@ -10,6 +10,7 @@ interface Props {
 
 export function WidgetGrid({ widgets }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const dragLayerRef = useRef<HTMLDivElement>(null);
   const [metrics, setMetrics] = useState({
     cellW: 160,
     cellH: 160,
@@ -46,8 +47,10 @@ export function WidgetGrid({ widgets }: Props) {
           gap={metrics.gap}
           offsetX={metrics.offsetX}
           offsetY={metrics.offsetY}
+          dragLayerRef={dragLayerRef}
         />
       ))}
+      <div className="widget-drag-layer" ref={dragLayerRef} />
     </div>
   );
 }

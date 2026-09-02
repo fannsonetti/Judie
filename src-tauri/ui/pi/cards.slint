@@ -639,6 +639,8 @@ export component ConfirmSheet inherits Rectangle {
 export component TileShell inherits Rectangle {
     in property <bool> editing: false;
     in property <bool> pending: false;
+    in property <bool> ghost: false;
+    in property <bool> layer: false;
     in property <length> vis-x: 0px;
     in property <length> vis-y: 0px;
     callback tapped;
@@ -647,21 +649,24 @@ export component TileShell inherits Rectangle {
     callback drag-begin(length, length);
     callback drag-move(length, length);
     callback drag-end();
+    callback drag-cancel();
     background: transparent;
     border-radius: 0px;
     border-width: 0px;
     clip: false;
 
     ta := TouchArea {
+        enabled: !root.layer;
         clicked => { if !root.editing { root.tapped(); } }
         pointer-event(ev) => {
             if ev.kind == PointerEventKind.down && root.editing {
                 root.drag-begin(self.mouse-x, self.mouse-y);
             }
-            if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
-                if root.editing {
-                    root.drag-end();
-                }
+            if ev.kind == PointerEventKind.up && root.editing {
+                root.drag-end();
+            }
+            if ev.kind == PointerEventKind.cancel && root.editing {
+                root.drag-cancel();
             }
         }
         moved => {
@@ -681,6 +686,7 @@ export component TileShell inherits Rectangle {
         y: root.vis-y;
         width: parent.width;
         height: parent.height;
+        opacity: root.ghost ? 0 : 1;
         background: Dy.canvas;
         border-radius: 0px;
         border-width: 1.5px;
@@ -693,11 +699,12 @@ export component TileShell inherits Rectangle {
         }
     }
 
-    if root.editing: TouchArea {
+    if root.editing && !root.ghost: TouchArea {
         x: parent.width + root.vis-x - 15px;
         y: root.vis-y - 15px;
         width: 30px;
         height: 30px;
+        enabled: !root.layer;
         clicked => { root.remove(); }
         Rectangle {
             border-radius: 15px;
@@ -714,5 +721,11 @@ export component TileShell inherits Rectangle {
                 vertical-alignment: center;
             }
         }
+    }
+
+    // The drag portal is visual-only. Keep live controls from stealing the grab.
+    if root.layer: TouchArea {
+        width: 100%;
+        height: 100%;
     }
 }

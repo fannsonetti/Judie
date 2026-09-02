@@ -1419,9 +1419,22 @@ fn bind(ui: &MainWindow) {
         }
     });
 
+    let weak = ui.as_weak();
     let r = refresh.clone();
     ui.on_drag_drop(move |id, col, row| {
-        pi_room::with(|room| room.place_slot(id.as_str(), col, row));
+        let id = id.to_string();
+        let placed = pi_room::with(|room| {
+            room.place_slot(&id, col, row);
+            room.slots
+                .iter()
+                .find(|s| s.id == id)
+                .map(|s| (s.col, s.row))
+                .unwrap_or((col, row))
+        });
+        if let Some(ui) = weak.upgrade() {
+            ui.set_drop_col(placed.0);
+            ui.set_drop_row(placed.1);
+        }
         r();
     });
     let r = refresh.clone();

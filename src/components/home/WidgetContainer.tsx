@@ -1,12 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import {
-  ExpandableWidgetType,
-  GRID_COLS,
-  GRID_ROWS,
-  PlacedWidget,
-  SIZE_DIMS,
-} from "../../types/widgets";
-import { canPlaceWidget } from "../../lib/layout";
+import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
+import { ExpandableWidgetType, PlacedWidget, SIZE_DIMS } from "../../types/widgets";
+import { nearestPlace } from "../../lib/layout";
+import { dropCell, leftoverDelta } from "../../lib/widgetDrag";
 import { useLayoutStore } from "../../store/layoutStore";
 import { WidgetFace } from "../widgets/WidgetFace";
 
@@ -28,6 +23,7 @@ interface Props {
   gap: number;
   offsetX?: number;
   offsetY?: number;
+  dragLayerRef: RefObject<HTMLDivElement | null>;
 }
 
 export function WidgetContainer({
@@ -37,9 +33,9 @@ export function WidgetContainer({
   gap,
   offsetX = 0,
   offsetY = 0,
+  dragLayerRef,
 }: Props) {
   const editMode = useLayoutStore((s) => s.editMode);
-  const draggingId = useLayoutStore((s) => s.draggingId);
   const expandedId = useLayoutStore((s) => s.expandedId);
   const pendingRemoveId = useLayoutStore((s) => s.pendingRemoveId);
   const expandWidget = useLayoutStore((s) => s.expandWidget);
@@ -48,15 +44,14 @@ export function WidgetContainer({
   const placeWidget = useLayoutStore((s) => s.placeWidget);
 
   const pressStart = useRef<{ x: number; y: number } | null>(null);
-  const originCenter = useRef({ x: 0, y: 0 });
+  const lastPtr = useRef<{ x: number; y: number } | null>(null);
   const movedEnough = useRef(false);
   const draggingRef = useRef(false);
   const settlingRef = useRef(false);
-  const centeredRef = useRef(false);
-  const snapRef = useRef<{ col: number; row: number } | null>(null);
   const visualRef = useRef({ x: 0, y: 0 });
   const settleRaf = useRef(0);
-  const [dragDelta, setDragDelta] = useState({ x: 0, y: 0 });
+  const shellRef = useRef<HTMLDivElement>(null);
+  const cloneRef = useRef<HTMLElement | null>(null);
 
   const dims = SIZE_DIMS[widget.size];
   const width = dims.cols * cellW;
@@ -65,37 +60,72 @@ export function WidgetContainer({
   const top = offsetY + widget.row * cellH;
 
   const isHidden = expandedId === widget.id;
-  const isDragging = draggingId === widget.id;
   const isPendingRemove = pendingRemoveId === widget.id;
-  if (isDragging) draggingRef.current = true;
 
   useEffect(() => {
     return () => {
       if (settleRaf.current) cancelAnimationFrame(settleRaf.current);
+      cloneRef.current?.remove();
+      cloneRef.current = null;
     };
   }, []);
 
-  const snapFromPoint = (clientX: number, clientY: number) => {
-    const grid = document.querySelector(".widget-grid") as HTMLElement | null;
-    if (!grid) return null;
-    const rect = grid.getBoundingClientRect();
-    const originX = clientX - width / 2 - rect.left - offsetX;
-    const originY = clientY - height / 2 - rect.top - offsetY;
-    const col = Math.max(0, Math.min(GRID_COLS - dims.cols, Math.round(originX / cellW)));
-    const row = Math.max(0, Math.min(GRID_ROWS - dims.rows, Math.round(originY / cellH)));
-    return { col, row };
+  const placeClone = (dx: number, dy: number) => {
+    const clone = cloneRef.current;
+    if (!clone) return;
+    clone.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
   };
 
-  const snapDeltaFor = (snap: { col: number; row: number } | null) => {
-    if (!snap) return { x: 0, y: 0 };
-    return {
-      x: (snap.col - widget.col) * cellW,
-      y: (snap.row - widget.row) * cellH,
-    };
+  const liftIntoLayer = () => {
+    const shell = shellRef.current;
+    const layer = dragLayerRef.current;
+    const grid = layer?.parentElement;
+    if (!shell || !layer || !grid || cloneRef.current) return;
+    const gridRect = grid.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    const clone = shell.cloneNode(true) as HTMLElement;
+    clone.classList.add("dragging");
+    clone.setAttribute("aria-hidden", "true");
+    clone.style.position = "absolute";
+    clone.style.left = `${shellRect.left - gridRect.left}px`;
+    clone.style.top = `${shellRect.top - gridRect.top}px`;
+    clone.style.width = `${shellRect.width}px`;
+    clone.style.height = `${shellRect.height}px`;
+    clone.style.margin = "0";
+    clone.style.right = "auto";
+    clone.style.bottom = "auto";
+    clone.style.transform = "none";
+    clone.style.transition = "none";
+    clone.style.animation = "none";
+    clone.style.pointerEvents = "none";
+    layer.replaceChildren(clone);
+    cloneRef.current = clone;
+    shell.style.visibility = "hidden";
+  };
+
+  const dropClone = () => {
+    cloneRef.current?.remove();
+    cloneRef.current = null;
+    if (shellRef.current) shellRef.current.style.visibility = "";
+  };
+
+  const abortSettle = () => {
+    if (settleRaf.current) cancelAnimationFrame(settleRaf.current);
+    settleRaf.current = 0;
+    if (!settlingRef.current) return;
+    dropClone();
+    visualRef.current = { x: 0, y: 0 };
+    settlingRef.current = false;
+  };
+
+  const snapFromDelta = (dx: number, dy: number) => {
+    const raw = dropCell(widget.col, widget.row, dx, dy, cellW, dims.cols, dims.rows);
+    return nearestPlace(useLayoutStore.getState().widgets, widget.id, raw.col, raw.row);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (expandedId || settlingRef.current) return;
+    if (expandedId) return;
+    abortSettle();
     const target = e.target as HTMLElement;
     if (target.closest(".widget-remove")) return;
     if (
@@ -108,24 +138,15 @@ export function WidgetContainer({
     }
 
     pressStart.current = { x: e.clientX, y: e.clientY };
+    lastPtr.current = { x: e.clientX, y: e.clientY };
     movedEnough.current = false;
     draggingRef.current = false;
-    centeredRef.current = false;
-    snapRef.current = null;
-    setDragDelta({ x: 0, y: 0 });
+    visualRef.current = { x: 0, y: 0 };
 
-    const slot = e.currentTarget.parentElement as HTMLElement | null;
-    if (slot) {
-      const rect = slot.getBoundingClientRect();
-      originCenter.current = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
-      };
-    }
-
-    if (editMode || draggingId === widget.id) {
+    if (editMode) {
       draggingRef.current = true;
       setDragging(widget.id);
+      liftIntoLayer();
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     }
   };
@@ -134,70 +155,76 @@ export function WidgetContainer({
     if (!pressStart.current || settlingRef.current) return;
     const dx = e.clientX - pressStart.current.x;
     const dy = e.clientY - pressStart.current.y;
+    lastPtr.current = { x: e.clientX, y: e.clientY };
 
-    const draggingNow =
-      draggingRef.current || useLayoutStore.getState().draggingId === widget.id;
-    if (!draggingNow) {
+    if (!draggingRef.current) {
       if (Math.hypot(dx, dy) > 10) movedEnough.current = true;
       return;
     }
 
-    if (Math.hypot(dx, dy) > 8) centeredRef.current = true;
-
-    const visual = { x: dx, y: dy };
-    const snap = snapFromPoint(e.clientX, e.clientY);
-    const ok =
-      snap && canPlaceWidget(useLayoutStore.getState().widgets, widget.id, snap.col, snap.row);
-    if (ok) snapRef.current = snap;
-    visualRef.current = visual;
-    setDragDelta(visual);
+    visualRef.current = { x: dx, y: dy };
+    placeClone(dx, dy);
   };
 
-  const finishDrag = (toSnap: { col: number; row: number } | null) => {
-    const from = visualRef.current;
-    const magnet = snapDeltaFor(toSnap);
-    if (toSnap && (toSnap.col !== widget.col || toSnap.row !== widget.row)) {
-      placeWidget(widget.id, toSnap.col, toSnap.row);
-    }
-    const leftover = { x: from.x - magnet.x, y: from.y - magnet.y };
-    settlingRef.current = true;
-    draggingRef.current = false;
-    setDragging(null);
-    visualRef.current = leftover;
-    setDragDelta(leftover);
-    snapRef.current = null;
-    pressStart.current = null;
-    if (Math.hypot(leftover.x, leftover.y) < 0.5) {
-      setDragDelta({ x: 0, y: 0 });
-      visualRef.current = { x: 0, y: 0 };
-      settlingRef.current = false;
+  const glideClone = (from: { x: number; y: number }, then: () => void) => {
+    if (Math.hypot(from.x, from.y) < 0.5) {
+      then();
       return;
     }
     const started = performance.now();
     const tick = (now: number) => {
       const t = Math.min(1, (now - started) / SETTLE_MS);
       const k = easeOutCubic(t);
-      const next = { x: lerp(leftover.x, 0, k), y: lerp(leftover.y, 0, k) };
+      const next = { x: lerp(from.x, 0, k), y: lerp(from.y, 0, k) };
       visualRef.current = next;
-      setDragDelta(next);
+      placeClone(next.x, next.y);
       if (t < 1) {
         settleRaf.current = requestAnimationFrame(tick);
         return;
       }
-      setDragDelta({ x: 0, y: 0 });
-      visualRef.current = { x: 0, y: 0 };
-      settlingRef.current = false;
+      then();
     };
     settleRaf.current = requestAnimationFrame(tick);
   };
 
-  const onPointerUp = () => {
+  const finishDrag = (cancelled: boolean) => {
     if (settlingRef.current) return;
-    if (!draggingRef.current && useLayoutStore.getState().draggingId !== widget.id) {
+    if (!draggingRef.current) {
       pressStart.current = null;
       return;
     }
-    finishDrag(snapRef.current);
+    const from = visualRef.current;
+    settlingRef.current = true;
+    draggingRef.current = false;
+    setDragging(null);
+    pressStart.current = null;
+
+    let leftover = from;
+    if (!cancelled) {
+      const snap = snapFromDelta(from.x, from.y);
+      if (snap) {
+        leftover = leftoverDelta(from.x, from.y, widget.col, widget.row, snap.col, snap.row, cellW);
+        const clone = cloneRef.current;
+        if (clone) {
+          const nextLeft = parseFloat(clone.style.left) + (snap.col - widget.col) * cellW;
+          const nextTop = parseFloat(clone.style.top) + (snap.row - widget.row) * cellH;
+          clone.style.left = `${nextLeft}px`;
+          clone.style.top = `${nextTop}px`;
+        }
+        if (snap.col !== widget.col || snap.row !== widget.row) {
+          placeWidget(widget.id, snap.col, snap.row);
+        }
+      }
+    }
+
+    lastPtr.current = null;
+    visualRef.current = leftover;
+    placeClone(leftover.x, leftover.y);
+    glideClone(leftover, () => {
+      dropClone();
+      visualRef.current = { x: 0, y: 0 };
+      settlingRef.current = false;
+    });
   };
 
   const onClick = (e: React.MouseEvent) => {
@@ -222,17 +249,11 @@ export function WidgetContainer({
     padding: gap / 2,
     opacity: isHidden ? 0 : 1,
     pointerEvents: isHidden ? "none" : "auto",
-    zIndex: isDragging || settlingRef.current ? 40 : isPendingRemove ? 35 : 1,
-    transform:
-      isDragging || dragDelta.x !== 0 || dragDelta.y !== 0
-        ? `translate3d(${dragDelta.x}px, ${dragDelta.y}px, 0)`
-        : undefined,
   };
 
   const shellClass = [
     "widget-shell",
     editMode ? "edit-jiggle" : "",
-    isDragging ? "dragging" : "",
     isPendingRemove ? "pending-remove" : "",
   ]
     .filter(Boolean)
@@ -241,12 +262,13 @@ export function WidgetContainer({
   return (
     <div className="widget-slot" data-widget-id={widget.id} style={slotStyle}>
       <div
+        ref={shellRef}
         className={shellClass}
         style={editMode ? { animationDelay: `${(widget.order % 5) * 40}ms` } : undefined}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerUp={() => finishDrag(false)}
+        onPointerCancel={() => finishDrag(true)}
         onClick={onClick}
       >
         {editMode && (

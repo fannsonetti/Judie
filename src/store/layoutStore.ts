@@ -14,6 +14,7 @@ import {
   createId,
   cycleSize,
   firstFreeCell,
+  nearestPlace,
   nextAvailableOrder,
   normalizeOrders,
   packWidgets,
@@ -124,9 +125,10 @@ export const useLayoutStore = create<LayoutState>()(
 
       placeWidget: (id, col, row) => {
         const { widgets } = get();
-        if (!canPlaceWidget(widgets, id, col, row)) return false;
+        const at = nearestPlace(widgets, id, col, row);
+        if (!at) return false;
         set({
-          widgets: widgets.map((w) => (w.id === id ? { ...w, col, row } : w)),
+          widgets: widgets.map((w) => (w.id === id ? { ...w, col: at.col, row: at.row } : w)),
         });
         return true;
       },
