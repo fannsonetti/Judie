@@ -1,0 +1,130 @@
+import { Dy, SlopNode, TileShell, Pill } from "cards.slint";
+import { WidgetFace } from "faces.slint";
+
+// 1:1 home-grid stage: same TileShell pad (12px) and WidgetFace slop percents as Debian.
+export component DesignerStage inherits Rectangle {
+    in property <string> size: "1x1";
+    in property <string> kind: "custom";
+    in property <[SlopNode]> nodes: [];
+    in property <string> selected: "";
+    in property <bool> sample: true;
+    callback select-node(string);
+    callback patch-node(string, float, float, float, float);
+
+    property <length> tile-w: root.size == "1x1" ? 240px : 480px;
+    property <length> tile-h: root.size == "2x2" ? 480px : 240px;
+    property <length> pad: 12px;
+    property <string> drag-id: "";
+    property <int> drag-mode: 0;
+    property <float> grab-x: 0;
+    property <float> grab-y: 0;
+    property <float> grab-w: 0;
+    property <float> grab-h: 0;
+    property <length> grab-mx: 0px;
+    property <length> grab-my: 0px;
+
+    width: root.tile-w;
+    height: root.tile-h;
+    background: #000000;
+    clip: false;
+
+    TileShell {
+        width: 100%;
+        height: 100%;
+        WidgetFace {
+            kind: root.kind == "" ? "custom" : root.kind;
+            size: root.size;
+            sample: root.sample;
+            use-layout: root.kind != "custom";
+            slop-nodes: root.nodes;
+            widget-id: "";
+        }
+    }
+
+    inner := Rectangle {
+        x: root.pad;
+        y: root.pad;
+        width: parent.width - root.pad * 2;
+        height: parent.height - root.pad * 2;
+        background: #00000000;
+        clip: true;
+
+        for n in root.nodes: TouchArea {
+            x: parent.width * n.x / 100;
+            y: parent.height * n.y / 100;
+            width: max(12px, parent.width * n.w / 100);
+            height: max(12px, parent.height * n.h / 100);
+            pointer-event(ev) => {
+                if ev.kind == PointerEventKind.down {
+                    root.select-node(n.id);
+                    root.drag-id = n.id;
+                    root.drag-mode = 0;
+                    root.grab-x = n.x;
+                    root.grab-y = n.y;
+                    root.grab-w = n.w;
+                    root.grab-h = n.h;
+                    root.grab-mx = self.absolute-position.x + self.mouse-x;
+                    root.grab-my = self.absolute-position.y + self.mouse-y;
+                }
+                if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
+                    root.drag-id = "";
+                }
+            }
+            moved => {
+                if self.pressed && root.drag-id == n.id && root.drag-mode == 0 && inner.width > 0 && inner.height > 0 {
+                    root.patch-node(
+                        n.id,
+                        max(0, min(100 - root.grab-w, root.grab-x + ((self.absolute-position.x + self.mouse-x - root.grab-mx) / inner.width * 100))),
+                        max(0, min(100 - root.grab-h, root.grab-y + ((self.absolute-position.y + self.mouse-y - root.grab-my) / inner.height * 100))),
+                        root.grab-w,
+                        root.grab-h
+                    );
+                }
+            }
+            Rectangle {
+                border-width: root.selected == n.id ? 1.5px : 1px;
+                border-color: root.selected == n.id ? #ffffff : #3a3a3a;
+                background: #00000000;
+            }
+        }
+
+        for n in root.nodes: TouchArea {
+            x: parent.width * (n.x + n.w) / 100 - 14px;
+            y: parent.height * (n.y + n.h) / 100 - 14px;
+            width: 16px;
+            height: 16px;
+            visible: root.selected == n.id;
+            pointer-event(ev) => {
+                if ev.kind == PointerEventKind.down {
+                    root.drag-id = n.id;
+                    root.drag-mode = 1;
+                    root.grab-x = n.x;
+                    root.grab-y = n.y;
+                    root.grab-w = n.w;
+                    root.grab-h = n.h;
+                    root.grab-mx = self.absolute-position.x + self.mouse-x;
+                    root.grab-my = self.absolute-position.y + self.mouse-y;
+                }
+                if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
+                    root.drag-id = "";
+                }
+            }
+            moved => {
+                if self.pressed && root.drag-id == n.id && root.drag-mode == 1 && inner.width > 0 && inner.height > 0 {
+                    root.patch-node(
+                        n.id,
+                        root.grab-x,
+                        root.grab-y,
+                        max(4, min(100 - root.grab-x, root.grab-w + ((self.absolute-position.x + self.mouse-x - root.grab-mx) / inner.width * 100))),
+                        max(4, min(100 - root.grab-y, root.grab-h + ((self.absolute-position.y + self.mouse-y - root.grab-my) / inner.height * 100)))
+                    );
+                }
+            }
+            Rectangle {
+                width: 100%;
+                height: 100%;
+                background: #ffffff;
+            }
+        }
+    }
+}

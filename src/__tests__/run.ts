@@ -47,6 +47,8 @@ import {
   canBeginOpen,
   inCloseEdge,
   inOpenZone,
+  inActionsZone,
+  inSettingsZone,
   isPageScroll,
   interpolatePull,
   moveSettingsDrag,
@@ -720,8 +722,13 @@ test("settings units are three complete presets with migration", () => {
 
 test("settings sheet follows the pointer without jumping", () => {
   const h = 1200;
-  assert(inOpenZone(1920 * 0.8, 1920), "top-right opens");
-  assert(!inOpenZone(200, 1920), "left side does not open");
+  assert(inSettingsZone(1920 * 0.8, 1920), "top-right opens settings");
+  assert(inOpenZone(1920 * 0.8, 1920), "inOpenZone is the settings third");
+  assert(!inSettingsZone(200, 1920), "left side does not open settings");
+  assert(!inActionsZone(200, 1920), "left third is idle");
+  assert(inActionsZone(1920 * 0.5, 1920), "center third opens actions");
+  assert(!inActionsZone(1920 * 0.8, 1920), "right third is not actions");
+  assert(!inSettingsZone(1920 * 0.5, 1920), "center third is not settings");
   assert(canBeginOpen(false, 0), "home can open");
   assert(!canBeginOpen(true, 1), "settings cannot re-open");
   assert(!canBeginOpen(false, 0.5), "mid-pull does not start a second open");
@@ -1032,7 +1039,7 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
   assert(slint.includes("in-out property <int> drop-col"), "drop-col is writable from rust");
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-  assert(pkg.version === "0.2.19", "package version is 0.2.19");
+  assert(pkg.version === "0.3.0", "package version is 0.3.0");
 });
 
 test("edit-mode widget delete control is a square white X", () => {
@@ -1123,9 +1130,9 @@ test("edit-mode widget delete control is a square white X", () => {
   assert(left.x + left.size > leftShellLeft + leftShellWidth, "badge occupies the gutter toward the next widget");
   assert(overlayAt > tilesAt, "adjacent widgets cannot paint over the X");
 
-  assert(pkg.version === "0.2.19", "npm version");
-  assert(cargo.includes('version = "0.2.19"'), "crate version");
-  assert(tauri.version === "0.2.19", "tauri version");
+  assert(pkg.version === "0.3.0", "npm version");
+  assert(cargo.includes('version = "0.3.0"'), "crate version");
+  assert(tauri.version === "0.3.0", "tauri version");
 });
 
 test("widget editor size carousel is compact and has three sizes", () => {
@@ -1193,9 +1200,9 @@ test("widget editor size carousel is compact and has three sizes", () => {
   assert(gallery.includes("aria-label={gallerySizeCaption(s)}"), "dot accessible names");
   assert(gallery.includes('role="dialog"'), "keyboard dialog");
 
-  assert(pkg.version === "0.2.19", "npm version");
-  assert(cargo.includes('version = "0.2.19"'), "crate version");
-  assert(tauri.version === "0.2.19", "tauri version");
+  assert(pkg.version === "0.3.0", "npm version");
+  assert(cargo.includes('version = "0.3.0"'), "crate version");
+  assert(tauri.version === "0.3.0", "tauri version");
 });
 
 function textHeightSafe(px: number) {
@@ -1248,6 +1255,45 @@ test("settings compact power, routines, general, and close gesture live on the s
   assert(slint.includes("Run checks"), "diagnostics exist");
   assert(slint.includes("Nearby Wi-Fi"), "scan list exists");
   assert(slint.includes('kb-field == "wifi-pass"'), "password keyboard preview is masked");
+  assert(slint.includes("actions-edge"), "center third is the actions pull");
+  assert(slint.includes("arm-sheet-open(1,"), "center swipe opens actions");
+  assert(slint.includes("arm-sheet-open(0,"), "right swipe opens settings");
+  assert(!slint.includes("clicked => { root.open-palette(); }"), "clock is not a palette click");
+  assert(sheet.includes("sheet-id == 1"), "actions live in the pull-down sheet");
+  assert(!slint.includes("if root.palette-open: Rectangle"), "palette modal is gone");
+});
+
+test("keyboard is 600px and modifiers are hold-only", () => {
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  const kb = readFileSync("src-tauri/ui/pi/keyboard.slint", "utf8");
+  const cards = readFileSync("src-tauri/ui/pi/cards.slint", "utf8");
+  assert(slint.includes("height: 600px") && slint.includes("parent.height - 600px"), "keyboard overlay is 600px");
+  assert(cards.includes("min-height: 72px"), "keys stretch taller than 52px");
+  assert(cards.includes("out property <bool> down"), "keys expose pressed state");
+  assert(kb.includes("property <bool> shift: shift-l.down"), "shift is hold");
+  assert(kb.includes("property <bool> ctrl: ctrl-l.down"), "ctrl is hold");
+  assert(kb.includes("property <bool> alt: alt-l.down"), "alt is hold");
+  assert(kb.includes("fn-key := KeyBtn"), "fn is hold");
+  assert(!kb.includes("root.shift = !root.shift"), "shift is not sticky");
+  assert(!kb.includes("root.ctrl = !root.ctrl"), "ctrl is not sticky");
+  assert(!kb.includes("root.fn-layer = !root.fn-layer"), "fn is not sticky");
+  assert(kb.includes("root.caps = !root.caps"), "caps stays a lock");
+});
+
+test("widget designer shares TileShell and WidgetFace with the kiosk", () => {
+  const designer = readFileSync("src-tauri/ui/pi/designer.slint", "utf8");
+  const design = readFileSync("src-tauri/ui/pi/design.slint", "utf8");
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  const cargo = readFileSync("src-tauri/Cargo.toml", "utf8");
+  const faces = readFileSync("src-tauri/ui/pi/faces.slint", "utf8");
+  assert(designer.includes("TileShell"), "stage uses TileShell");
+  assert(designer.includes("WidgetFace"), "stage uses WidgetFace");
+  assert(designer.includes("property <length> pad: 12px"), "same 12px pad as home");
+  assert(designer.includes("parent.width * n.x / 100"), "same percent coords");
+  assert(slint.includes("DesignerStage"), "pi creator embeds the shared stage");
+  assert(design.includes("export component DesignWindow"), "windows designer window");
+  assert(cargo.includes('name = "judie-design"'), "judie-design binary");
+  assert(faces.includes("in property <bool> use-layout"), "built-in faces can load saved layouts");
 });
 
 test("pi network helpers never leak credentials and classify failures", () => {

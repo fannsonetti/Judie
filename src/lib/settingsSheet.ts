@@ -37,8 +37,16 @@ export function isPageScroll(y: number, height: number, edgePx = SETTINGS_CLOSE_
   return !inCloseEdge(y, height, edgePx);
 }
 
-export function inOpenZone(x: number, width: number): boolean {
+export function inActionsZone(x: number, width: number): boolean {
+  return width > 0 && x >= width / 3 && x < (width * 2) / 3;
+}
+
+export function inSettingsZone(x: number, width: number): boolean {
   return width > 0 && x >= (width * 2) / 3;
+}
+
+export function inOpenZone(x: number, width: number): boolean {
+  return inSettingsZone(x, width);
 }
 
 export function inCloseEdge(y: number, height: number, edgePx = SETTINGS_CLOSE_EDGE_PX): boolean {

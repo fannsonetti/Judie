@@ -1,11 +1,7 @@
 import { Dy, KeyBtn } from "cards.slint";
 
 export component AnsiKeyboard inherits Rectangle {
-    in-out property <bool> shift: false;
     in-out property <bool> caps: false;
-    in-out property <bool> fn-layer: false;
-    in-out property <bool> ctrl: false;
-    in-out property <bool> alt: false;
     in property <string> field: "";
     in property <string> preview: "";
     callback typed(string);
@@ -16,6 +12,10 @@ export component AnsiKeyboard inherits Rectangle {
     border-width: 1.5px;
     border-color: Dy.border;
 
+    property <bool> shift: shift-l.down || shift-r.down;
+    property <bool> fn-layer: fn-key.down;
+    property <bool> ctrl: ctrl-l.down || ctrl-r.down;
+    property <bool> alt: alt-l.down || alt-r.down;
     property <bool> upper: root.shift || root.caps;
 
     VerticalLayout {
@@ -55,57 +55,57 @@ export component AnsiKeyboard inherits Rectangle {
             }
         }
 
-        // Row 1 — Esc 1-0 - = Backspace
         HorizontalLayout {
             spacing: 5px;
+            vertical-stretch: 1;
             KeyBtn { u: 1.25; glyph: "Esc"; clicked => { root.command("esc"); } }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F1" : (root.shift ? "!" : "1"); sub: root.fn-layer ? "" : "F1";
-                clicked => { if root.fn-layer { root.command("f1"); } else { root.typed(root.shift ? "!" : "1"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f1"); } else { root.typed(root.shift ? "!" : "1"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F2" : (root.shift ? "@" : "2"); sub: root.fn-layer ? "" : "F2";
-                clicked => { if root.fn-layer { root.command("f2"); } else { root.typed(root.shift ? "@" : "2"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f2"); } else { root.typed(root.shift ? "@" : "2"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F3" : (root.shift ? "#" : "3"); sub: root.fn-layer ? "" : "F3";
-                clicked => { if root.fn-layer { root.command("f3"); } else { root.typed(root.shift ? "#" : "3"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f3"); } else { root.typed(root.shift ? "#" : "3"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F4" : (root.shift ? "$" : "4"); sub: root.fn-layer ? "" : "F4";
-                clicked => { if root.fn-layer { root.command("f4"); } else { root.typed(root.shift ? "$" : "4"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f4"); } else { root.typed(root.shift ? "$" : "4"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F5" : (root.shift ? "%" : "5"); sub: root.fn-layer ? "" : "F5";
-                clicked => { if root.fn-layer { root.command("f5"); } else { root.typed(root.shift ? "%" : "5"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f5"); } else { root.typed(root.shift ? "%" : "5"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F6" : (root.shift ? "^" : "6"); sub: root.fn-layer ? "" : "F6";
-                clicked => { if root.fn-layer { root.command("f6"); } else { root.typed(root.shift ? "^" : "6"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f6"); } else { root.typed(root.shift ? "^" : "6"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F7" : (root.shift ? "&" : "7"); sub: root.fn-layer ? "" : "F7";
-                clicked => { if root.fn-layer { root.command("f7"); } else { root.typed(root.shift ? "&" : "7"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f7"); } else { root.typed(root.shift ? "&" : "7"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F8" : (root.shift ? "*" : "8"); sub: root.fn-layer ? "" : "F8";
-                clicked => { if root.fn-layer { root.command("f8"); } else { root.typed(root.shift ? "*" : "8"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f8"); } else { root.typed(root.shift ? "*" : "8"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F9" : (root.shift ? "(" : "9"); sub: root.fn-layer ? "" : "F9";
-                clicked => { if root.fn-layer { root.command("f9"); } else { root.typed(root.shift ? "(" : "9"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f9"); } else { root.typed(root.shift ? "(" : "9"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F10" : (root.shift ? ")" : "0"); sub: root.fn-layer ? "" : "F10";
-                clicked => { if root.fn-layer { root.command("f10"); } else { root.typed(root.shift ? ")" : "0"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f10"); } else { root.typed(root.shift ? ")" : "0"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F11" : (root.shift ? "_" : "-"); sub: root.fn-layer ? "" : "F11";
-                clicked => { if root.fn-layer { root.command("f11"); } else { root.typed(root.shift ? "_" : "-"); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f11"); } else { root.typed(root.shift ? "_" : "-"); } }
             }
             KeyBtn {
                 u: 1; glyph: root.fn-layer ? "F12" : (root.shift ? "+" : "="); sub: root.fn-layer ? "" : "F12";
-                clicked => { if root.fn-layer { root.command("f12"); } else { root.typed(root.shift ? "+" : "="); if root.shift { root.shift = false; } } }
+                clicked => { if root.fn-layer { root.command("f12"); } else { root.typed(root.shift ? "+" : "="); } }
             }
             KeyBtn {
                 u: 2; glyph: root.fn-layer ? "Del" : "⌫";
@@ -113,64 +113,64 @@ export component AnsiKeyboard inherits Rectangle {
             }
         }
 
-        // Row 2 — Tab Q-P [ ] \
         HorizontalLayout {
             spacing: 5px;
+            vertical-stretch: 1;
             KeyBtn { u: 1.5; glyph: "Tab"; clicked => { root.command("tab"); } }
-            KeyBtn { u: 1; glyph: root.upper ? "Q" : "q"; clicked => { root.typed(root.upper ? "Q" : "q"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "W" : "w"; clicked => { root.typed(root.upper ? "W" : "w"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "E" : "e"; clicked => { root.typed(root.upper ? "E" : "e"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "R" : "r"; clicked => { root.typed(root.upper ? "R" : "r"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "T" : "t"; clicked => { root.typed(root.upper ? "T" : "t"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "Y" : "y"; clicked => { root.typed(root.upper ? "Y" : "y"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "U" : "u"; sub: root.fn-layer ? "PgUp" : ""; clicked => { if root.fn-layer { root.command("pgup"); } else { root.typed(root.upper ? "U" : "u"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.upper ? "I" : "i"; sub: root.fn-layer ? "↑" : ""; clicked => { if root.fn-layer { root.command("up"); } else { root.typed(root.upper ? "I" : "i"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.upper ? "O" : "o"; sub: root.fn-layer ? "PgDn" : ""; clicked => { if root.fn-layer { root.command("pgdn"); } else { root.typed(root.upper ? "O" : "o"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.upper ? "P" : "p"; clicked => { root.typed(root.upper ? "P" : "p"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.shift ? "{" : "["; clicked => { root.typed(root.shift ? "{" : "["); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.shift ? "}" : "]"; clicked => { root.typed(root.shift ? "}" : "]"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1.5; glyph: root.shift ? "|" : "\\"; clicked => { root.typed(root.shift ? "|" : "\\"); if root.shift { root.shift = false; } } }
+            KeyBtn { u: 1; glyph: root.upper ? "Q" : "q"; clicked => { root.typed(root.upper ? "Q" : "q"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "W" : "w"; clicked => { root.typed(root.upper ? "W" : "w"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "E" : "e"; clicked => { root.typed(root.upper ? "E" : "e"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "R" : "r"; clicked => { root.typed(root.upper ? "R" : "r"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "T" : "t"; clicked => { root.typed(root.upper ? "T" : "t"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "Y" : "y"; clicked => { root.typed(root.upper ? "Y" : "y"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "U" : "u"; sub: root.fn-layer ? "PgUp" : ""; clicked => { if root.fn-layer { root.command("pgup"); } else { root.typed(root.upper ? "U" : "u"); } } }
+            KeyBtn { u: 1; glyph: root.upper ? "I" : "i"; sub: root.fn-layer ? "↑" : ""; clicked => { if root.fn-layer { root.command("up"); } else { root.typed(root.upper ? "I" : "i"); } } }
+            KeyBtn { u: 1; glyph: root.upper ? "O" : "o"; sub: root.fn-layer ? "PgDn" : ""; clicked => { if root.fn-layer { root.command("pgdn"); } else { root.typed(root.upper ? "O" : "o"); } } }
+            KeyBtn { u: 1; glyph: root.upper ? "P" : "p"; clicked => { root.typed(root.upper ? "P" : "p"); } }
+            KeyBtn { u: 1; glyph: root.shift ? "{" : "["; clicked => { root.typed(root.shift ? "{" : "["); } }
+            KeyBtn { u: 1; glyph: root.shift ? "}" : "]"; clicked => { root.typed(root.shift ? "}" : "]"); } }
+            KeyBtn { u: 1.5; glyph: root.shift ? "|" : "\\"; clicked => { root.typed(root.shift ? "|" : "\\"); } }
         }
 
-        // Row 3 — Caps A-L ; ' Enter
         HorizontalLayout {
             spacing: 5px;
+            vertical-stretch: 1;
             KeyBtn { u: 1.75; glyph: "Caps"; on: root.caps; clicked => { root.caps = !root.caps; } }
-            KeyBtn { u: 1; glyph: root.upper ? "A" : "a"; clicked => { root.typed(root.upper ? "A" : "a"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "S" : "s"; clicked => { root.typed(root.upper ? "S" : "s"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "D" : "d"; clicked => { root.typed(root.upper ? "D" : "d"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "F" : "f"; clicked => { root.typed(root.upper ? "F" : "f"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "G" : "g"; clicked => { root.typed(root.upper ? "G" : "g"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "H" : "h"; clicked => { root.typed(root.upper ? "H" : "h"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "J" : "j"; sub: root.fn-layer ? "←" : ""; clicked => { if root.fn-layer { root.command("left"); } else { root.typed(root.upper ? "J" : "j"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.upper ? "K" : "k"; sub: root.fn-layer ? "↓" : ""; clicked => { if root.fn-layer { root.command("down"); } else { root.typed(root.upper ? "K" : "k"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.upper ? "L" : "l"; sub: root.fn-layer ? "→" : ""; clicked => { if root.fn-layer { root.command("right"); } else { root.typed(root.upper ? "L" : "l"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.shift ? ":" : ";"; clicked => { root.typed(root.shift ? ":" : ";"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.shift ? "\"" : "'"; clicked => { root.typed(root.shift ? "\"" : "'"); if root.shift { root.shift = false; } } }
+            KeyBtn { u: 1; glyph: root.upper ? "A" : "a"; clicked => { root.typed(root.upper ? "A" : "a"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "S" : "s"; clicked => { root.typed(root.upper ? "S" : "s"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "D" : "d"; clicked => { root.typed(root.upper ? "D" : "d"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "F" : "f"; clicked => { root.typed(root.upper ? "F" : "f"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "G" : "g"; clicked => { root.typed(root.upper ? "G" : "g"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "H" : "h"; clicked => { root.typed(root.upper ? "H" : "h"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "J" : "j"; sub: root.fn-layer ? "←" : ""; clicked => { if root.fn-layer { root.command("left"); } else { root.typed(root.upper ? "J" : "j"); } } }
+            KeyBtn { u: 1; glyph: root.upper ? "K" : "k"; sub: root.fn-layer ? "↓" : ""; clicked => { if root.fn-layer { root.command("down"); } else { root.typed(root.upper ? "K" : "k"); } } }
+            KeyBtn { u: 1; glyph: root.upper ? "L" : "l"; sub: root.fn-layer ? "→" : ""; clicked => { if root.fn-layer { root.command("right"); } else { root.typed(root.upper ? "L" : "l"); } } }
+            KeyBtn { u: 1; glyph: root.shift ? ":" : ";"; clicked => { root.typed(root.shift ? ":" : ";"); } }
+            KeyBtn { u: 1; glyph: root.shift ? "\"" : "'"; clicked => { root.typed(root.shift ? "\"" : "'"); } }
             KeyBtn { u: 2.25; glyph: "Enter"; clicked => { root.command("enter"); } }
         }
 
-        // Row 4 — Shift Z-M , . / Shift
         HorizontalLayout {
             spacing: 5px;
-            KeyBtn { u: 2.25; glyph: "Shift"; on: root.shift; clicked => { root.shift = !root.shift; } }
-            KeyBtn { u: 1; glyph: root.upper ? "Z" : "z"; clicked => { root.typed(root.upper ? "Z" : "z"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "X" : "x"; clicked => { root.typed(root.upper ? "X" : "x"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "C" : "c"; clicked => { root.typed(root.upper ? "C" : "c"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "V" : "v"; clicked => { root.typed(root.upper ? "V" : "v"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "B" : "b"; clicked => { root.typed(root.upper ? "B" : "b"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.upper ? "N" : "n"; sub: root.fn-layer ? "Home" : ""; clicked => { if root.fn-layer { root.command("home"); } else { root.typed(root.upper ? "N" : "n"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.upper ? "M" : "m"; sub: root.fn-layer ? "End" : ""; clicked => { if root.fn-layer { root.command("end"); } else { root.typed(root.upper ? "M" : "m"); if root.shift { root.shift = false; } } } }
-            KeyBtn { u: 1; glyph: root.shift ? "<" : ","; clicked => { root.typed(root.shift ? "<" : ","); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.shift ? ">" : "."; clicked => { root.typed(root.shift ? ">" : "."); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 1; glyph: root.shift ? "?" : "/"; clicked => { root.typed(root.shift ? "?" : "/"); if root.shift { root.shift = false; } } }
-            KeyBtn { u: 2.75; glyph: "Shift"; on: root.shift; clicked => { root.shift = !root.shift; } }
+            vertical-stretch: 1;
+            shift-l := KeyBtn { u: 2.25; glyph: "Shift"; on: root.shift; }
+            KeyBtn { u: 1; glyph: root.upper ? "Z" : "z"; clicked => { root.typed(root.upper ? "Z" : "z"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "X" : "x"; clicked => { root.typed(root.upper ? "X" : "x"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "C" : "c"; clicked => { root.typed(root.upper ? "C" : "c"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "V" : "v"; clicked => { root.typed(root.upper ? "V" : "v"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "B" : "b"; clicked => { root.typed(root.upper ? "B" : "b"); } }
+            KeyBtn { u: 1; glyph: root.upper ? "N" : "n"; sub: root.fn-layer ? "Home" : ""; clicked => { if root.fn-layer { root.command("home"); } else { root.typed(root.upper ? "N" : "n"); } } }
+            KeyBtn { u: 1; glyph: root.upper ? "M" : "m"; sub: root.fn-layer ? "End" : ""; clicked => { if root.fn-layer { root.command("end"); } else { root.typed(root.upper ? "M" : "m"); } } }
+            KeyBtn { u: 1; glyph: root.shift ? "<" : ","; clicked => { root.typed(root.shift ? "<" : ","); } }
+            KeyBtn { u: 1; glyph: root.shift ? ">" : "."; clicked => { root.typed(root.shift ? ">" : "."); } }
+            KeyBtn { u: 1; glyph: root.shift ? "?" : "/"; clicked => { root.typed(root.shift ? "?" : "/"); } }
+            shift-r := KeyBtn { u: 2.75; glyph: "Shift"; on: root.shift; }
         }
 
-        // Bottom — Ctrl Pi Alt Space Alt Fn Ctrl
         HorizontalLayout {
             spacing: 5px;
-            KeyBtn { u: 1.25; glyph: "Ctrl"; on: root.ctrl; clicked => { root.ctrl = !root.ctrl; } }
+            vertical-stretch: 1;
+            ctrl-l := KeyBtn { u: 1.25; glyph: "Ctrl"; on: root.ctrl; }
             KeyBtn {
                 u: 1.25;
                 glyph: "";
@@ -178,11 +178,11 @@ export component AnsiKeyboard inherits Rectangle {
                 icon: @image-url("raspberry.png");
                 clicked => { root.command("pi"); }
             }
-            KeyBtn { u: 1.25; glyph: "Alt"; on: root.alt; clicked => { root.alt = !root.alt; } }
+            alt-l := KeyBtn { u: 1.25; glyph: "Alt"; on: root.alt; }
             KeyBtn { u: 6.25; glyph: ""; clicked => { root.typed(" "); } }
-            KeyBtn { u: 1.25; glyph: "Alt"; on: root.alt; clicked => { root.alt = !root.alt; } }
-            KeyBtn { u: 1.25; glyph: "Fn"; on: root.fn-layer; clicked => { root.fn-layer = !root.fn-layer; } }
-            KeyBtn { u: 1.25; glyph: "Ctrl"; on: root.ctrl; clicked => { root.ctrl = !root.ctrl; } }
+            alt-r := KeyBtn { u: 1.25; glyph: "Alt"; on: root.alt; }
+            fn-key := KeyBtn { u: 1.25; glyph: "Fn"; on: root.fn-layer; }
+            ctrl-r := KeyBtn { u: 1.25; glyph: "Ctrl"; on: root.ctrl; }
         }
     }
 }

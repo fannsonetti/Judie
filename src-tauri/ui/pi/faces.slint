@@ -57,6 +57,7 @@ export component WidgetFace inherits Rectangle {
     in property <[TimerRow]> timers: [];
     in property <[SlopNode]> slop-nodes: [];
     in property <bool> dnd: false;
+    in property <bool> use-layout: false;
 
     callback toggle-master();
     callback brightness-changed(int);
@@ -152,7 +153,7 @@ export component WidgetFace inherits Rectangle {
     if root.source != "image": Rectangle {
         background: transparent;
 
-        if root.kind == "quickControls": GridLayout {
+        if !root.use-layout && root.kind == "quickControls": GridLayout {
             spacing: 8px * root.face-scale;
             padding: 0px;
             QuickTask { row: 0; col: 0; zoom: root.face-scale; glyph: "☾"; label: "Good Night"; clicked => { if !root.sample { root.quick("goodNight"); } } }
@@ -161,7 +162,7 @@ export component WidgetFace inherits Rectangle {
             QuickTask { row: 1; col: 1; zoom: root.face-scale; glyph: "▶"; label: "Movie Mode"; clicked => { if !root.sample { root.quick("movie"); } } }
         }
 
-        if root.kind == "climate": HorizontalLayout {
+        if !root.use-layout && root.kind == "climate": HorizontalLayout {
             spacing: 10px * root.face-scale;
             Rectangle {
                 width: 72px * root.face-scale; height: 72px * root.face-scale;
@@ -182,7 +183,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "calendar": HorizontalLayout {
+        if !root.use-layout && root.kind == "calendar": HorizontalLayout {
             spacing: 10px * root.face-scale;
             if root.size != "1x1": VerticalLayout {
                 spacing: 4px * root.face-scale; horizontal-stretch: 1;
@@ -227,7 +228,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "purifier": VerticalLayout {
+        if !root.use-layout && root.kind == "purifier": VerticalLayout {
             spacing: 8px * root.face-scale;
             if root.size != "1x1": HorizontalLayout {
                 spacing: 10px * root.face-scale;
@@ -280,7 +281,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "activity": VerticalLayout {
+        if !root.use-layout && root.kind == "activity": VerticalLayout {
             for a in root.sample ? root.demo-activity : root.activity: HorizontalLayout {
                 spacing: 8px;
                 if root.size == "2x2": Text { text: a.time; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; min-width: 52px; }
@@ -289,7 +290,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "server": VerticalLayout {
+        if !root.use-layout && root.kind == "server": VerticalLayout {
             spacing: 4px;
             Text { text: root.sample ? "6 ms" : "122 ms"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
             Text { text: root.sample ? "4/5 up" : "4/5 up"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
@@ -305,7 +306,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "weather": VerticalLayout {
+        if !root.use-layout && root.kind == "weather": VerticalLayout {
             HorizontalLayout {
                 Text { text: root.t-loc; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; overflow: elide; horizontal-stretch: 1; }
                 if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
@@ -334,7 +335,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "lights": VerticalLayout {
+        if !root.use-layout && root.kind == "lights": VerticalLayout {
             spacing: 6px;
             HorizontalLayout {
                 Text { text: root.t-scene; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; vertical-alignment: center; }
@@ -376,7 +377,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "media": VerticalLayout {
+        if !root.use-layout && root.kind == "media": VerticalLayout {
             Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
             Text { text: root.t-track; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 600; overflow: elide; }
             if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; overflow: elide; }
@@ -392,7 +393,7 @@ export component WidgetFace inherits Rectangle {
             if root.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.t-vol; changed(v) => { if !root.sample { root.volume-changed(round(v)); } } }
         }
 
-        if root.kind == "system": VerticalLayout {
+        if !root.use-layout && root.kind == "system": VerticalLayout {
             Text { text: "CPU"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
             Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
             Bar { level: root.t-cpu / 100; fill: #ffffff; zoom: root.face-scale; }
@@ -403,7 +404,7 @@ export component WidgetFace inherits Rectangle {
             if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
         }
 
-        if root.kind == "timers": VerticalLayout {
+        if !root.use-layout && root.kind == "timers": VerticalLayout {
             for t in root.sample ? root.demo-timers : root.timers: HorizontalLayout {
                 Text { text: t.label; color: #ffffff; font-size: Dy.type-title * root.face-scale; }
                 Rectangle { horizontal-stretch: 1; }
@@ -411,7 +412,7 @@ export component WidgetFace inherits Rectangle {
             }
         }
 
-        if root.kind == "custom": Rectangle {
+        if root.kind == "custom" || root.use-layout: Rectangle {
             vertical-stretch: 1;
             horizontal-stretch: 1;
             for n in root.slop-nodes: Rectangle {

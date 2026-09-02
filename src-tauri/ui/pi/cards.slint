@@ -45,6 +45,7 @@ export struct Slot {
     page: int,
     label: string,
     custom-id: string,
+    use-layout: bool,
 }
 
 export struct GalleryItem {
@@ -473,12 +474,14 @@ export component KeyBtn inherits Rectangle {
     in property <image> icon;
     callback clicked;
     min-width: 28px;
-    height: 52px;
+    min-height: 72px;
     horizontal-stretch: root.u;
+    vertical-stretch: 1;
     border-width: 1.5px;
-    border-color: root.on ? Dy.text : Dy.border;
-    background: root.on ? #141414 : Dy.canvas;
-    TouchArea { clicked => { root.clicked(); } }
+    border-color: (root.on || ta.pressed) ? Dy.text : Dy.border;
+    background: (root.on || ta.pressed) ? #141414 : Dy.canvas;
+    ta := TouchArea { clicked => { root.clicked(); } }
+    out property <bool> down: ta.pressed;
     if root.has-icon: Image {
         source: root.icon;
         width: 22px;

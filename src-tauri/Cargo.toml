@@ -1,6 +1,6 @@
 [package]
 name = "judie"
-version = "0.2.19"
+version = "0.3.0"
 description = "Judie room control"
 authors = ["Judie"]
 edition = "2021"
@@ -18,6 +18,11 @@ required-features = ["tauri-ui"]
 [[bin]]
 name = "judie-pi"
 path = "src/bin/judie-pi.rs"
+required-features = ["pi-native"]
+
+[[bin]]
+name = "judie-design"
+path = "src/bin/judie-design.rs"
 required-features = ["pi-native"]
 
 [build-dependencies]

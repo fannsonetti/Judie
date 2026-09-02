@@ -49,6 +49,7 @@ export component WidgetPreview inherits Rectangle {
     in property <[TimerRow]> timers: [];
     in property <[SlopNode]> slop-nodes: [];
     in property <bool> dnd: false;
+    in property <bool> use-layout: false;
 
     property <length> canon-w: root.size == "1x1" ? 240px : 480px;
     property <length> canon-h: root.size == "2x2" ? 480px : 240px;
@@ -108,5 +109,6 @@ export component WidgetPreview inherits Rectangle {
         timers: root.timers;
         slop-nodes: root.slop-nodes;
         dnd: root.dnd;
+        use-layout: root.use-layout;
     }
 }

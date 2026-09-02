@@ -1,0 +1,138 @@
+import { LineEdit } from "std-widgets.slint";
+import { Dy, Pill, SlopNode, PartKind } from "cards.slint";
+import { DesignerStage } from "designer.slint";
+
+export component DesignWindow inherits Window {
+    title: "Judie widget designer";
+    preferred-width: 1400px;
+    preferred-height: 900px;
+    background: #000000;
+    no-frame: false;
+
+    in-out property <string> kind: "custom";
+    in-out property <string> size: "1x1";
+    in-out property <string> widget-name: "Untitled";
+    in-out property <string> selected: "";
+    in-out property <string> selected-kind: "";
+    in-out property <string> node-text: "";
+    in-out property <string> status: "";
+    in-out property <string> path-text: "";
+    in-out property <[SlopNode]> nodes: [];
+    in-out property <[PartKind]> kinds: [
+        { id: "text", label: "Text" },
+        { id: "label", label: "Label" },
+        { id: "value", label: "Value" },
+        { id: "button", label: "Button" },
+        { id: "graph", label: "Graph" },
+        { id: "status", label: "Status" },
+        { id: "image", label: "Image" },
+        { id: "control", label: "Control" },
+        { id: "box", label: "Container" },
+    ];
+    in-out property <[PartKind]> face-kinds: [
+        { id: "custom", label: "Custom" },
+        { id: "weather", label: "Weather" },
+        { id: "lights", label: "Lights" },
+        { id: "media", label: "Media" },
+        { id: "calendar", label: "Calendar" },
+        { id: "climate", label: "Climate" },
+        { id: "purifier", label: "Purifier" },
+        { id: "quickControls", label: "Quick Controls" },
+        { id: "server", label: "Server" },
+        { id: "activity", label: "Activity" },
+        { id: "timers", label: "Timers" },
+        { id: "system", label: "System" },
+    ];
+
+    callback set-kind(string);
+    callback set-size(string);
+    callback add-part(string);
+    callback select-node(string);
+    callback patch-node(string, float, float, float, float);
+    callback node-text-changed(string);
+    callback delete-node();
+    callback save();
+    callback load();
+    callback name-changed(string);
+
+    HorizontalLayout {
+        padding: 20px;
+        spacing: 16px;
+
+        VerticalLayout {
+            width: 180px;
+            spacing: 8px;
+            Text { text: "Widget"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            for k in root.face-kinds: TouchArea {
+                clicked => { root.set-kind(k.id); }
+                height: 28px;
+                Text {
+                    text: k.label;
+                    color: root.kind == k.id ? #ffffff : #8a8a8a;
+                    font-size: 13px;
+                    font-family: Dy.mono;
+                    vertical-alignment: center;
+                }
+            }
+            Text { text: "Size"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            Pill { label: "1×1"; on: root.size == "1x1"; clicked => { root.set-size("1x1"); } }
+            Pill { label: "1×2"; on: root.size == "1x2"; clicked => { root.set-size("1x2"); } }
+            Pill { label: "2×2"; on: root.size == "2x2"; clicked => { root.set-size("2x2"); } }
+            Text { text: "Parts"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            for p in root.kinds: TouchArea {
+                clicked => { root.add-part(p.id); }
+                height: 28px;
+                Text { text: p.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            background: #0a0a0a;
+            border-width: 1.5px;
+            border-color: #2a2a2a;
+            DesignerStage {
+                x: max(0px, (parent.width - self.width) / 2);
+                y: max(0px, (parent.height - self.height) / 2);
+                size: root.size;
+                kind: root.kind;
+                nodes: root.nodes;
+                selected: root.selected;
+                sample: true;
+                select-node(id) => { root.select-node(id); }
+                patch-node(id, x, y, w, h) => { root.patch-node(id, x, y, w, h); }
+            }
+        }
+
+        VerticalLayout {
+            width: 260px;
+            spacing: 10px;
+            Text { text: "Save"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            LineEdit { text <=> root.widget-name; edited => { root.name-changed(self.text); } }
+            HorizontalLayout {
+                spacing: 8px;
+                Pill { label: "Save"; on: true; clicked => { root.save(); } }
+                Pill { label: "Reload"; clicked => { root.load(); } }
+            }
+            Text { text: root.path-text; color: #6a6a6a; font-size: 11px; font-family: Dy.mono; wrap: word-wrap; }
+            Text { text: root.status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+            Text { text: "Selected"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            Text {
+                text: root.selected == "" ? "Click a part" : root.selected-kind;
+                color: #ffffff;
+                font-size: 14px;
+                font-family: Dy.mono;
+                wrap: word-wrap;
+            }
+            LineEdit { text <=> root.node-text; edited => { root.node-text-changed(self.text); } }
+            Pill { label: "Remove part"; clicked => { root.delete-node(); } }
+            Text {
+                text: "Stage is the Debian tile: 240/480, 12px pad, same WidgetFace percents. Drag to move, white square to resize.";
+                color: #6a6a6a;
+                font-size: 11px;
+                font-family: Dy.mono;
+                wrap: word-wrap;
+            }
+        }
+    }
+}

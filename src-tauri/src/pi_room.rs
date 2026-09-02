@@ -153,6 +153,8 @@ struct Persist {
     routines: Vec<Routine>,
     #[serde(default)]
     deleted_builtin_ids: Vec<String>,
+    #[serde(default)]
+    face_layouts: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
 }
 
 pub const GRID_COLS: i32 = 6;
@@ -340,8 +342,44 @@ fn data_dir() -> PathBuf {
             return PathBuf::from(dir);
         }
     }
+    #[cfg(windows)]
+    {
+        if let Ok(home) = std::env::var("USERPROFILE") {
+            if !home.trim().is_empty() {
+                return PathBuf::from(home).join(".judie");
+            }
+        }
+    }
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/fannsonetti".into());
     PathBuf::from(home).join(".local/share/judie")
+}
+
+pub fn face_layouts_path() -> PathBuf {
+    data_dir().join("face-layouts.json")
+}
+
+fn load_face_layout_file() -> std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>> {
+    std::fs::read_to_string(face_layouts_path())
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
+pub fn save_face_layout_file(
+    map: &std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
+) {
+    let dir = data_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    if let Ok(json) = serde_json::to_string_pretty(map) {
+        let _ = std::fs::write(face_layouts_path(), json);
+    }
+    let repo = PathBuf::from("src-tauri/ui/pi/layouts/face-layouts.json");
+    if PathBuf::from("src-tauri/ui/pi").is_dir() {
+        let _ = std::fs::create_dir_all("src-tauri/ui/pi/layouts");
+        if let Ok(json) = serde_json::to_string_pretty(map) {
+            let _ = std::fs::write(repo, json);
+        }
+    }
 }
 
 fn persist_path() -> PathBuf {
@@ -407,10 +445,12 @@ fn save_persist(room: &Room) {
             .cloned()
             .collect(),
         deleted_builtin_ids: room.deleted_builtin_ids.clone(),
+        face_layouts: room.face_layouts.clone(),
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
     }
+    save_face_layout_file(&room.face_layouts);
 }
 
 fn parse_hex(color: &str) -> (i32, i32, i32) {
@@ -723,6 +763,7 @@ pub struct Room {
     pub deleted_builtin_ids: Vec<String>,
     pub routine_edits: Vec<RoutineEdit>,
     pub expanded: Expanded,
+    pub face_layouts: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -742,6 +783,33 @@ pub enum Expanded {
     Media,
     Calendar,
     Purifier,
+}
+
+fn expand_layout_text(kind: &str, text: &str, room: &Room) -> String {
+    let mut out = text.to_string();
+    let pairs: &[(&str, String)] = &[
+        ("{{weather-temp}}", format!("{}°", room.weather_temp)),
+        ("{{weather-loc}}", room.weather_loc.clone()),
+        ("{{weather-cond}}", room.weather_cond.clone()),
+        ("{{weather-range}}", format!("H {}°  L {}°", room.weather_high, room.weather_low)),
+        ("{{weather-feel}}", room.weather_feel.clone()),
+        ("{{weather-note}}", room.weather_note.clone()),
+        ("{{indoor}}", format!("{:.0}°", room.indoor)),
+        ("{{outdoor}}", format!("{:.0}°", room.outdoor)),
+        ("{{humidity}}", format!("{}%", room.humidity)),
+        ("{{track-title}}", room.queue.get(room.track).map(|t| t.title.clone()).unwrap_or_default()),
+        ("{{track-artist}}", room.queue.get(room.track).map(|t| t.artist.clone()).unwrap_or_default()),
+        ("{{volume}}", room.volume.to_string()),
+        ("{{purifier-aq}}", room.purifier_aq.clone()),
+        ("{{purifier-mode}}", room.purifier_mode.clone()),
+        ("{{purifier-filter}}", format!("{}%", room.purifier_filter)),
+        ("{{cpu}}", format!("{:.0}%", 0.0)),
+        ("{{kind}}", kind.into()),
+    ];
+    for (k, v) in pairs {
+        out = out.replace(k, v);
+    }
+    out
 }
 
 impl Default for Room {
@@ -858,6 +926,13 @@ impl Default for Room {
             deleted_builtin_ids: persist.deleted_builtin_ids,
             routine_edits: Vec::new(),
             expanded: Expanded::None,
+            face_layouts: {
+                let mut m = persist.face_layouts;
+                for (k, v) in load_face_layout_file() {
+                    m.insert(k, v);
+                }
+                m
+            },
         };
         let preset = migrate_units_preset(&persist.temp_unit, &persist.distance_unit);
         room.apply_units_preset(preset);
@@ -1651,22 +1726,64 @@ impl Room {
     pub fn home_slop_nodes(&self) -> Vec<(String, SlopNode)> {
         let mut out = Vec::new();
         for s in &self.slots {
-            if s.kind != "custom" {
+            if s.kind == "custom" {
+                if let Some(def) = self.custom.iter().find(|c| c.id == s.custom_id) {
+                    let nodes = def
+                        .layouts
+                        .get(&s.size)
+                        .or_else(|| def.layouts.values().next())
+                        .cloned()
+                        .unwrap_or_default();
+                    for n in nodes {
+                        out.push((s.id.clone(), n));
+                    }
+                }
                 continue;
             }
-            if let Some(def) = self.custom.iter().find(|c| c.id == s.custom_id) {
-                let nodes = def
-                    .layouts
-                    .get(&s.size)
-                    .or_else(|| def.layouts.values().next())
-                    .cloned()
-                    .unwrap_or_default();
-                for n in nodes {
-                    out.push((s.id.clone(), n));
+            if self.has_face_layout(&s.kind, &s.size) {
+                for n in self.face_nodes(&s.kind, &s.size) {
+                    out.push((s.id.clone(), self.expand_layout_node(&s.kind, n)));
                 }
             }
         }
         out
+    }
+
+    pub fn has_face_layout(&self, kind: &str, size: &str) -> bool {
+        self.face_layouts
+            .get(kind)
+            .and_then(|m| m.get(size))
+            .is_some_and(|n| !n.is_empty())
+    }
+
+    pub fn face_nodes(&self, kind: &str, size: &str) -> Vec<SlopNode> {
+        self.face_layouts
+            .get(kind)
+            .and_then(|m| m.get(size).or_else(|| m.values().next()))
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    pub fn set_face_layout(&mut self, kind: &str, size: &str, nodes: Vec<SlopNode>) {
+        self.face_layouts
+            .entry(kind.into())
+            .or_default()
+            .insert(size.into(), nodes);
+        self.persist();
+    }
+
+    pub fn patch_creator_node(&mut self, id: &str, x: f32, y: f32, w: f32, h: f32) {
+        if let Some(n) = self.creator_nodes.iter_mut().find(|n| n.id == id) {
+            n.x = x.clamp(0.0, 96.0);
+            n.y = y.clamp(0.0, 96.0);
+            n.w = w.clamp(4.0, 100.0);
+            n.h = h.clamp(4.0, 100.0);
+        }
+    }
+
+    pub fn expand_layout_node(&self, kind: &str, mut n: SlopNode) -> SlopNode {
+        n.text = expand_layout_text(kind, &n.text, self);
+        n
     }
 
     pub fn node_rgb(node: &SlopNode) -> (i32, i32, i32) {
@@ -1888,21 +2005,27 @@ impl Room {
     }
 
     pub fn gallery_preview_nodes(&self) -> Vec<(String, SlopNode)> {
-        if self.gallery_kind != "custom" {
+        if self.gallery_kind == "custom" {
+            let Some(def) = self.custom.iter().find(|c| c.id == self.gallery_custom_id) else {
+                return Vec::new();
+            };
+            let nodes = def
+                .layouts
+                .get(&self.gallery_size)
+                .or_else(|| def.layouts.values().next())
+                .cloned()
+                .unwrap_or_default();
+            return nodes
+                .into_iter()
+                .map(|n| (self.gallery_custom_id.clone(), n))
+                .collect();
+        }
+        if !self.has_face_layout(&self.gallery_kind, &self.gallery_size) {
             return Vec::new();
         }
-        let Some(def) = self.custom.iter().find(|c| c.id == self.gallery_custom_id) else {
-            return Vec::new();
-        };
-        let nodes = def
-            .layouts
-            .get(&self.gallery_size)
-            .or_else(|| def.layouts.values().next())
-            .cloned()
-            .unwrap_or_default();
-        nodes
+        self.face_nodes(&self.gallery_kind, &self.gallery_size)
             .into_iter()
-            .map(|n| (self.gallery_custom_id.clone(), n))
+            .map(|n| (String::new(), n))
             .collect()
     }
 }

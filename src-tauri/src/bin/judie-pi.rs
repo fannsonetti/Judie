@@ -271,6 +271,9 @@ fn push_ui(ui: &MainWindow) {
         ui.set_creator_open(creator);
         ui.set_gallery_kind(room.gallery_kind.clone().into());
         ui.set_gallery_size(room.gallery_size.clone().into());
+        ui.set_gallery_use_layout(
+            room.gallery_kind != "custom" && room.has_face_layout(&room.gallery_kind, &room.gallery_size),
+        );
         ui.set_creator_name(room.creator_name.clone().into());
         ui.set_creator_template(room.creator_template.clone().into());
         ui.set_creator_size(room.creator_size.clone().into());
@@ -378,6 +381,7 @@ fn push_ui(ui: &MainWindow) {
                     page: s.page,
                     label: s.label.clone().into(),
                     custom_id: s.custom_id.clone().into(),
+                    use_layout: s.kind == "custom" || room.has_face_layout(&s.kind, &s.size),
                 }
             })
             .collect();
@@ -1126,6 +1130,11 @@ fn bind(ui: &MainWindow) {
     let r = refresh.clone();
     ui.on_delete_creator_node(move || {
         pi_room::with(|room| room.delete_creator_node());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_creator_patch_node(move |id, x, y, w, h| {
+        pi_room::with(|room| room.patch_creator_node(id.as_str(), x, y, w, h));
         r();
     });
     let r = refresh.clone();
