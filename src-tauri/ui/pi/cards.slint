@@ -299,8 +299,11 @@ export component FieldTap inherits Rectangle {
     in property <string> label;
     in property <string> value;
     in property <bool> active: false;
+    in property <length> label-size: 11px;
+    in property <length> value-size: 16px;
+    in property <length> tap-height: 64px;
     callback tapped;
-    height: 64px;
+    height: root.tap-height;
     border-width: 0px;
     background: Dy.canvas;
     TouchArea { clicked => { root.tapped(); } }
@@ -308,7 +311,7 @@ export component FieldTap inherits Rectangle {
         padding-left: 0px;
         padding-right: 0px;
         alignment: center;
-        Text { text: root.label; color: Dy.muted; font-size: 11px; font-family: Dy.mono; }
+        Text { text: root.label; color: Dy.muted; font-size: root.label-size; font-family: Dy.mono; }
         Rectangle {
             height: 1.5px;
             background: root.active ? Dy.text : Dy.border;
@@ -316,7 +319,7 @@ export component FieldTap inherits Rectangle {
         Text {
             text: root.value == "" ? "Tap to type" : root.value;
             color: Dy.text;
-            font-size: 16px;
+            font-size: root.value-size;
             font-family: Dy.mono;
             overflow: elide;
         }

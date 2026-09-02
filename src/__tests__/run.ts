@@ -15,6 +15,7 @@ import { exportHookCode, parseWidgetFile, serializeWidget } from "../slopbox/exp
 import { sanitizeSvg } from "../slopbox/svg";
 import { overlayTransition } from "../lib/performance";
 import { isLinuxWebview } from "../lib/platform";
+import { applyUnitsPreset, migrateUnitsPreset, UNITS_PRESETS, unitsPresetFromConfig } from "../lib/units";
 import {
   SETTINGS_CLOSE_EDGE_PX,
   beginSettingsDrag,
@@ -629,6 +630,44 @@ test("calendar month fills adjacent-month days", () => {
 test("linux motion helpers are inert in node", () => {
   assert(!isLinuxWebview(), "node is not a linux webview");
   assert(overlayTransition().duration === 0.18, "desktop overlay duration");
+});
+
+test("settings units are three complete presets with migration", () => {
+  assert(UNITS_PRESETS.length === 3, "exactly three presets");
+  assert(UNITS_PRESETS[0].label === "Celsius and kilometres", UNITS_PRESETS[0].label);
+  assert(UNITS_PRESETS[1].label === "Fahrenheit and miles", UNITS_PRESETS[1].label);
+  assert(UNITS_PRESETS[2].label === "Kelvin and furlongs", UNITS_PRESETS[2].label);
+  assert(!UNITS_PRESETS.some((p) => /celcius|farenheit/i.test(p.label)), "spelling");
+
+  const metric = applyUnitsPreset("c-km");
+  assert(metric.tempUnit === "c" && metric.distanceUnit === "km" && metric.units === "metric", "c-km pair");
+  const imperial = applyUnitsPreset("f-mi");
+  assert(imperial.tempUnit === "f" && imperial.distanceUnit === "mi" && imperial.units === "imperial", "f-mi pair");
+  const kelvin = applyUnitsPreset("k-fur");
+  assert(kelvin.tempUnit === "k" && kelvin.distanceUnit === "fur", "k-fur pair");
+
+  assert(migrateUnitsPreset("c", "km") === "c-km", "exact metric");
+  assert(migrateUnitsPreset("f", "mi") === "f-mi", "exact imperial");
+  assert(migrateUnitsPreset("k", "fur") === "k-fur", "exact kelvin");
+  assert(migrateUnitsPreset("c", "mi") === "c-km", "temp Celsius wins over miles");
+  assert(migrateUnitsPreset("f", "km") === "f-mi", "temp Fahrenheit wins over km");
+  assert(migrateUnitsPreset("k", "km") === "k-fur", "temp Kelvin wins over km");
+  assert(migrateUnitsPreset(undefined, "nm") === "f-mi", "nautical miles become miles");
+  assert(migrateUnitsPreset(undefined, "fur") === "k-fur", "furlongs map to kelvin preset");
+  assert(migrateUnitsPreset(undefined, undefined, "imperial") === "f-mi", "legacy imperial flag");
+  assert(migrateUnitsPreset() === "c-km", "empty defaults to metric");
+  assert(unitsPresetFromConfig(applyUnitsPreset("f-mi")) === "f-mi", "round-trip");
+
+  const general = readFileSync("src/components/home/SettingsOverlay.tsx", "utf8");
+  assert(general.includes("settings-general"), "general page has a dense column");
+  assert(general.includes("settings-inline"), "voice rows stay compact");
+  assert(!general.includes("Nautical miles"), "nautical miles removed from settings");
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  assert(slint.includes("general-col"), "pi general column is capped");
+  assert(slint.includes("Celsius and kilometres"), slint.includes("Celsius") ? "pi labels" : "missing");
+  assert(slint.includes("Fahrenheit and miles"), "pi fahrenheit preset");
+  assert(!slint.includes("Nautical miles"), "pi nautical miles removed");
+  assert(slint.includes("viewport-height: 2800px"), "settings scroll viewport reaches the bottom");
 });
 
 test("settings sheet follows the pointer without jumping", () => {

@@ -26,6 +26,7 @@ import {
   type ReleaseInfo,
 } from "../../lib/install";
 import { JUDIE_VERSION } from "../../lib/version";
+import { applyUnitsPreset, UNITS_PRESETS, unitsPresetFromConfig } from "../../lib/units";
 import { powerMockEnabled, powerStatusLabel, uninstallWarning } from "../../lib/power";
 import { ConfirmSheet } from "../chrome/ConfirmSheet";
 import { FieldTap } from "../chrome/FieldTap";
@@ -243,8 +244,7 @@ export function SettingsOverlay() {
     }
   };
 
-  const setTemp = (tempUnit: "c" | "f" | "k") =>
-    update({ tempUnit, units: tempUnit === "f" ? "imperial" : "metric" });
+  const unitsPreset = unitsPresetFromConfig(settings);
 
   if (!visible) return null;
 
@@ -301,7 +301,7 @@ export function SettingsOverlay() {
         </nav>
         <div className="settings-body os-body" ref={bodyRef}>
           {tab === "general" && (
-            <>
+            <div className="settings-general">
               <p className="os-kicker">Profile</p>
               <FieldTap label="Username" field="room-name" value={settings.roomName} onCommit={(v) => update({ roomName: v.trim() || "Room" })} />
               <p className="os-kicker">Location</p>
@@ -317,33 +317,26 @@ export function SettingsOverlay() {
                 }} />
               </div>
               <p className="os-kicker">Units</p>
-              <p className="os-sub">Temperature</p>
-              <div className="os-pills">
-                <button type="button" className={`os-pill${settings.tempUnit === "c" ? " on" : ""}`} onClick={() => setTemp("c")}>Celsius</button>
-                <button type="button" className={`os-pill${settings.tempUnit === "f" ? " on" : ""}`} onClick={() => setTemp("f")}>Fahrenheit</button>
-                <button type="button" className={`os-pill${settings.tempUnit === "k" ? " on" : ""}`} onClick={() => setTemp("k")}>Kelvin</button>
-              </div>
-              <p className="os-sub">Distance</p>
-              <div className="os-pills">
-                {([
-                  ["km", "Kilometres"],
-                  ["mi", "Miles"],
-                  ["nm", "Nautical miles"],
-                  ["fur", "Furlongs"],
-                ] as const).map(([id, label]) => (
-                  <button key={id} type="button" className={`os-pill${settings.distanceUnit === id ? " on" : ""}`} onClick={() => update({ distanceUnit: id })}>
-                    {label}
+              <div className="settings-units">
+                {UNITS_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`settings-unit${unitsPreset === p.id ? " on" : ""}`}
+                    onClick={() => update(applyUnitsPreset(p.id))}
+                  >
+                    {p.label}
                   </button>
                 ))}
               </div>
               <p className="os-kicker">Voice</p>
-              <div className="os-row">
-                <span>Voice Response</span>
-                <button type="button" className={`os-toggle${settings.speakReplies ? " on" : ""}`} aria-pressed={settings.speakReplies} onClick={() => update({ speakReplies: !settings.speakReplies })} />
-              </div>
-              <div className="os-row">
+              <div className="settings-inline">
                 <span>Microphone</span>
                 <button type="button" className={`os-toggle${settings.voiceEnabled ? " on" : ""}`} aria-pressed={settings.voiceEnabled} onClick={() => update({ voiceEnabled: !settings.voiceEnabled })} />
+              </div>
+              <div className="settings-inline">
+                <span>Voice Response</span>
+                <button type="button" className={`os-toggle${settings.speakReplies ? " on" : ""}`} aria-pressed={settings.speakReplies} onClick={() => update({ speakReplies: !settings.speakReplies })} />
               </div>
               <p className="os-kicker">Routines</p>
               <FieldTap label="Name" field="routine-name" value={routineName} onCommit={setRoutineName} live />
@@ -376,7 +369,7 @@ export function SettingsOverlay() {
                   )}
                 </div>
               ))}
-              <div className="os-row">
+              <div className="settings-inline">
                 <div>
                   <div>Lock 16:10</div>
                   <div className="os-sub">Letterbox on 16:9 displays</div>
@@ -386,7 +379,7 @@ export function SettingsOverlay() {
               <button type="button" className="os-pill" onClick={() => { close(); useLayoutStore.getState().enterEditMode(); }}>
                 Edit home screen
               </button>
-            </>
+            </div>
           )}
           {tab === "network" && (
             <>

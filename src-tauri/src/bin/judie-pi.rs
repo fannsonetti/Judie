@@ -818,8 +818,8 @@ fn bind(ui: &MainWindow) {
     let r = refresh.clone();
     ui.on_toggle_units(move || {
         pi_room::with(|room| {
-            room.units_metric = !room.units_metric;
-            room.temp_unit = if room.units_metric { "c".into() } else { "f".into() };
+            let next = if room.temp_unit == "f" { "c-km" } else { "f-mi" };
+            room.apply_units_preset(next);
             room.save();
         });
         r();
@@ -1315,18 +1315,9 @@ fn bind(ui: &MainWindow) {
         r();
     });
     let r = refresh.clone();
-    ui.on_set_temp_unit(move |u| {
+    ui.on_set_units_preset(move |u| {
         pi_room::with(|room| {
-            room.temp_unit = u.to_string();
-            room.units_metric = u != "f";
-            room.save();
-        });
-        r();
-    });
-    let r = refresh.clone();
-    ui.on_set_distance_unit(move |u| {
-        pi_room::with(|room| {
-            room.distance_unit = u.to_string();
+            room.apply_units_preset(u.as_str());
             room.save();
         });
         r();

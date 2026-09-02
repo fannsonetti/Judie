@@ -241,8 +241,7 @@ export component MainWindow inherits Window {
     callback kb-toggle-shift();
     callback kb-toggle-symbols();
     callback keyboard-command(string);
-    callback set-temp-unit(string);
-    callback set-distance-unit(string);
+    callback set-units-preset(string);
     callback set-preferred-net(string);
     callback toggle-dhcp();
     callback reconnect-net();
@@ -292,6 +291,7 @@ export component MainWindow inherits Window {
     property <int> drop-row: 0;
 
     property <duration> gallery-ease: 0ms;
+    property <length> general-col: min(760px, root.width - 80px);
 
     animate drag-dx { duration: drag-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
     animate drag-dy { duration: drag-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
@@ -837,63 +837,105 @@ export component MainWindow inherits Window {
             }
             Flickable {
                 vertical-stretch: 1;
-                viewport-height: 1400px;
+                viewport-height: 2800px;
                 interactive: !root.settings-tracking;
                 VerticalLayout {
                     spacing: 14px;
-                    if root.settings-tab == 0: VerticalLayout {
-                        spacing: 16px;
-                        Text { text: "Profile"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        FieldTap { label: "Username"; value: root.room-name; active: root.kb-field == "room-name"; tapped => { root.open-keyboard("room-name"); } }
-                        Text { text: "Location"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        FieldTap { label: "Location name"; value: root.weather-loc; active: root.kb-field == "location"; tapped => { root.open-keyboard("location"); } }
-                        HorizontalLayout {
-                            spacing: 16px;
-                            FieldTap { label: "Latitude"; value: root.latitude; active: root.kb-field == "latitude"; tapped => { root.open-keyboard("latitude"); } }
-                            FieldTap { label: "Longitude"; value: root.longitude; active: root.kb-field == "longitude"; tapped => { root.open-keyboard("longitude"); } }
-                        }
-                        Text { text: "Units"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        Text { text: "Temperature"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            Pill { label: "Celsius"; on: root.temp-unit == "c"; clicked => { root.set-temp-unit("c"); } }
-                            Pill { label: "Fahrenheit"; on: root.temp-unit == "f"; clicked => { root.set-temp-unit("f"); } }
-                            Pill { label: "Kelvin"; on: root.temp-unit == "k"; clicked => { root.set-temp-unit("k"); } }
-                        }
-                        Text { text: "Distance"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            Pill { label: "Kilometres"; on: root.distance-unit == "km"; clicked => { root.set-distance-unit("km"); } }
-                            Pill { label: "Miles"; on: root.distance-unit == "mi"; clicked => { root.set-distance-unit("mi"); } }
-                            Pill { label: "Nautical miles"; on: root.distance-unit == "nm"; clicked => { root.set-distance-unit("nm"); } }
-                            Pill { label: "Furlongs"; on: root.distance-unit == "fur"; clicked => { root.set-distance-unit("fur"); } }
-                        }
-                        Text { text: "Voice"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            Text { text: "Voice Response"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Microphone"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } }
-                        }
-                        Text { text: "Routines"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        FieldTap { label: "Name"; value: root.routine-draft; active: root.kb-field == "routine-name"; tapped => { root.open-keyboard("routine-name"); } }
-                        FieldTap { label: "When you say"; value: root.routine-phrase; active: root.kb-field == "routine-phrase"; tapped => { root.open-keyboard("routine-phrase"); } }
-                        FieldTap { label: "Judie should"; value: root.routine-command; active: root.kb-field == "routine-command"; tapped => { root.open-keyboard("routine-command"); } }
-                        Pill { label: "Save routine"; on: true; clicked => { root.save-routine(); } }
-                        for r in root.routines: HorizontalLayout {
-                            spacing: 10px;
-                            height: 48px;
-                            VerticalLayout {
-                                alignment: center;
-                                Text { text: r.name; color: #ffffff; font-size: 15px; font-family: Dy.mono; }
-                                Text { text: r.hint; color: #6a6a6a; font-size: 11px; font-family: Dy.mono; overflow: elide; }
+                    if root.settings-tab == 0: HorizontalLayout {
+                        alignment: center;
+                        VerticalLayout {
+                            width: root.general-col;
+                            spacing: 18px;
+                            padding-bottom: 80px;
+                            Text { text: "Profile"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            FieldTap { label: "Username"; value: root.room-name; active: root.kb-field == "room-name"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("room-name"); } }
+                            Text { text: "Location"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            FieldTap { label: "Location name"; value: root.weather-loc; active: root.kb-field == "location"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("location"); } }
+                            HorizontalLayout {
+                                spacing: 20px;
+                                FieldTap { label: "Latitude"; value: root.latitude; active: root.kb-field == "latitude"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("latitude"); } }
+                                FieldTap { label: "Longitude"; value: root.longitude; active: root.kb-field == "longitude"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("longitude"); } }
                             }
-                            Rectangle { horizontal-stretch: 1; }
-                            if !r.builtin: Pill { label: "Remove"; clicked => { root.remove-routine(r.id); } }
+                            Text { text: "Units"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            VerticalLayout {
+                                spacing: 10px;
+                                Rectangle {
+                                    height: 58px;
+                                    border-width: 1.5px;
+                                    border-color: root.temp-unit == "c" ? #ffffff : #2a2a2a;
+                                    TouchArea { clicked => { root.set-units-preset("c-km"); } }
+                                    Text {
+                                        x: 16px;
+                                        height: 100%;
+                                        text: "Celsius and kilometres";
+                                        color: root.temp-unit == "c" ? #ffffff : #8a8a8a;
+                                        font-size: 20px;
+                                        font-family: Dy.mono;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                Rectangle {
+                                    height: 58px;
+                                    border-width: 1.5px;
+                                    border-color: root.temp-unit == "f" ? #ffffff : #2a2a2a;
+                                    TouchArea { clicked => { root.set-units-preset("f-mi"); } }
+                                    Text {
+                                        x: 16px;
+                                        height: 100%;
+                                        text: "Fahrenheit and miles";
+                                        color: root.temp-unit == "f" ? #ffffff : #8a8a8a;
+                                        font-size: 20px;
+                                        font-family: Dy.mono;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                Rectangle {
+                                    height: 58px;
+                                    border-width: 1.5px;
+                                    border-color: root.temp-unit == "k" ? #ffffff : #2a2a2a;
+                                    TouchArea { clicked => { root.set-units-preset("k-fur"); } }
+                                    Text {
+                                        x: 16px;
+                                        height: 100%;
+                                        text: "Kelvin and furlongs";
+                                        color: root.temp-unit == "k" ? #ffffff : #8a8a8a;
+                                        font-size: 20px;
+                                        font-family: Dy.mono;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                            Text { text: "Voice"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            HorizontalLayout {
+                                spacing: 20px;
+                                height: 56px;
+                                Text { text: "Microphone"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+                                Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            HorizontalLayout {
+                                spacing: 20px;
+                                height: 56px;
+                                Text { text: "Voice Response"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+                                Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            Text { text: "Routines"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            FieldTap { label: "Name"; value: root.routine-draft; active: root.kb-field == "routine-name"; tapped => { root.open-keyboard("routine-name"); } }
+                            FieldTap { label: "When you say"; value: root.routine-phrase; active: root.kb-field == "routine-phrase"; tapped => { root.open-keyboard("routine-phrase"); } }
+                            FieldTap { label: "Judie should"; value: root.routine-command; active: root.kb-field == "routine-command"; tapped => { root.open-keyboard("routine-command"); } }
+                            Pill { label: "Save routine"; on: true; clicked => { root.save-routine(); } }
+                            for r in root.routines: HorizontalLayout {
+                                spacing: 10px;
+                                height: 48px;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text { text: r.name; color: #ffffff; font-size: 15px; font-family: Dy.mono; }
+                                    Text { text: r.hint; color: #6a6a6a; font-size: 11px; font-family: Dy.mono; overflow: elide; }
+                                }
+                                Rectangle { horizontal-stretch: 1; }
+                                if !r.builtin: Pill { label: "Remove"; clicked => { root.remove-routine(r.id); } }
+                            }
                         }
                     }
                     if root.settings-tab == 1: VerticalLayout {

@@ -133,7 +133,7 @@
   gap: 12px;
   padding: 16px 20px 8px;
   flex-shrink: 0;
-  max-width: 720px;
+  max-width: 760px;
   width: 100%;
   margin: 0 auto;
 }
@@ -164,7 +164,7 @@
   overflow-x: auto;
   flex-shrink: 0;
   -webkit-overflow-scrolling: touch;
-  max-width: 720px;
+  max-width: 760px;
   width: 100%;
   margin: 0 auto;
 }
@@ -191,7 +191,7 @@
   padding: 4px 20px 20px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  max-width: 720px;
+  max-width: 760px;
   width: 100%;
   margin: 0 auto;
 }
@@ -427,7 +427,7 @@ select.settings-input {
   border-top: 1px solid var(--border);
   background: rgba(12, 14, 18, 0.35);
   flex-shrink: 0;
-  max-width: 720px;
+  max-width: 760px;
   width: 100%;
   margin: 0 auto;
 }
@@ -606,7 +606,78 @@ select.settings-input {
 }
 .settings-header h2 {
   font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 24px;
+}
+.settings-close { display: none; }
+.settings-general {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 72px;
+}
+.settings-general .os-kicker {
+  margin: 20px 0 10px;
   font-size: 18px;
+}
+.settings-general .os-kicker:first-child {
+  margin-top: 4px;
+}
+.settings-general .field-tap {
+  min-height: 72px;
+  padding: 12px 0 14px;
+  margin-bottom: 4px;
+}
+.settings-general .field-tap-label {
+  font-size: 15px;
+}
+.settings-general .field-tap-value {
+  font-size: 22px;
+}
+.settings-general .settings-field-row {
+  gap: 20px;
+}
+.settings-inline {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-height: 56px;
+  color: #fff;
+  font-size: 22px;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.settings-inline .os-toggle {
+  flex-shrink: 0;
+}
+.settings-inline .os-sub {
+  font-size: 16px;
+  margin: 2px 0 0;
+}
+.settings-units {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 8px;
+}
+.settings-unit {
+  min-height: 56px;
+  padding: 12px 16px;
+  text-align: left;
+  border: 1.5px solid #2a2a2a;
+  border-radius: 0;
+  background: #000;
+  color: #8a8a8a;
+  font-size: 20px;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+.settings-unit.on {
+  border-color: #fff;
+  color: #fff;
+}
+.settings-general .os-pill {
+  min-height: 52px;
+  font-size: 16px;
+  padding: 0 16px;
+  width: fit-content;
 }
 .settings-close { display: none; }
 .os-kicker {

@@ -327,6 +327,36 @@ fn persist_path() -> PathBuf {
     data_dir().join("layout.json")
 }
 
+pub fn migrate_units_preset(temp: &str, distance: &str) -> &'static str {
+    let t = temp.to_ascii_lowercase();
+    let d = distance.to_ascii_lowercase();
+    if (t == "c" || t == "celsius") && (d == "km" || d == "kilometres" || d == "kilometers") {
+        return "c-km";
+    }
+    if (t == "f" || t == "fahrenheit") && (d == "mi" || d == "mile" || d == "miles") {
+        return "f-mi";
+    }
+    if (t == "k" || t == "kelvin") && (d == "fur" || d == "furlong" || d == "furlongs") {
+        return "k-fur";
+    }
+    if t == "f" || t == "fahrenheit" {
+        return "f-mi";
+    }
+    if t == "k" || t == "kelvin" {
+        return "k-fur";
+    }
+    if t == "c" || t == "celsius" {
+        return "c-km";
+    }
+    if d == "mi" || d == "nm" || d == "mile" || d == "miles" || d == "nautical" {
+        return "f-mi";
+    }
+    if d == "fur" || d == "furlong" || d == "furlongs" {
+        return "k-fur";
+    }
+    "c-km"
+}
+
 fn load_persist() -> Persist {
     let path = persist_path();
     std::fs::read_to_string(&path)
@@ -632,9 +662,9 @@ impl Default for Room {
             longitude: if persist.longitude.is_empty() { "-21.95".into() } else { persist.longitude.clone() },
             voice: persist.voice.unwrap_or(true),
             speak: persist.speak.unwrap_or(true),
-            units_metric: persist.temp_unit != "f" && persist.temp_unit != "k",
-            temp_unit: if persist.temp_unit.is_empty() { "c".into() } else { persist.temp_unit.clone() },
-            distance_unit: if persist.distance_unit.is_empty() { "km".into() } else { persist.distance_unit.clone() },
+            units_metric: true,
+            temp_unit: "c".into(),
+            distance_unit: "km".into(),
             notice_timers: true,
             notice_calendar: true,
             notice_weather: true,
@@ -680,7 +710,12 @@ impl Default for Room {
             },
             expanded: Expanded::None,
         };
+        let preset = migrate_units_preset(&persist.temp_unit, &persist.distance_unit);
+        room.apply_units_preset(preset);
         room.import_json_files();
+        if persist.temp_unit != room.temp_unit || persist.distance_unit != room.distance_unit {
+            room.save();
+        }
         room
     }
 }
@@ -692,6 +727,26 @@ impl Room {
 
     pub fn save(&self) {
         self.persist();
+    }
+
+    pub fn apply_units_preset(&mut self, preset: &str) {
+        match preset {
+            "f" | "f-mi" => {
+                self.temp_unit = "f".into();
+                self.distance_unit = "mi".into();
+                self.units_metric = false;
+            }
+            "k" | "k-fur" => {
+                self.temp_unit = "k".into();
+                self.distance_unit = "fur".into();
+                self.units_metric = true;
+            }
+            _ => {
+                self.temp_unit = "c".into();
+                self.distance_unit = "km".into();
+                self.units_metric = true;
+            }
+        }
     }
 
     pub fn used_page_count(&self) -> i32 {
