@@ -1,5 +1,5 @@
 import { Slider } from "std-widgets.slint";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, CalCell, SlopNode, Pill, Toggle, Swatch, IconBtn, Bar, QuickTask } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, CalCell, SlopNode, TerminalLine, Pill, Toggle, Swatch, IconBtn, Bar, QuickTask, FieldTap } from "cards.slint";
 
 // Live widget face used on the home grid and in the add-widget carousel.
 // `sample` swaps in default preview data so gallery never reads the live room.
@@ -58,6 +58,9 @@ export component WidgetFace inherits Rectangle {
     in property <[SlopNode]> slop-nodes: [];
     in property <bool> dnd: false;
     in property <bool> use-layout: false;
+    in property <string> terminal-input: "";
+    in property <[TerminalLine]> terminal-lines: [];
+    in property <bool> terminal-kb-active: false;
 
     callback toggle-master();
     callback brightness-changed(int);
@@ -69,6 +72,8 @@ export component WidgetFace inherits Rectangle {
     callback volume-changed(int);
     callback quick(string);
     callback set-purifier-mode(string);
+    callback open-terminal-input();
+    callback submit-terminal();
 
     background: transparent;
     clip: true;
@@ -113,6 +118,14 @@ export component WidgetFace inherits Rectangle {
         { label: "Pasta", remain: "4:20" },
         { label: "Laundry", remain: "32:00" },
     ];
+    property <[TerminalLine]> demo-terminal: [
+        { text: "~$ uname -s", prompt: true },
+        { text: "Linux", prompt: false },
+        { text: "~$ ls", prompt: true },
+        { text: "Desktop  Documents  Downloads", prompt: false },
+    ];
+    property <[TerminalLine]> t-term: root.sample ? root.demo-terminal : root.terminal-lines;
+    property <string> t-term-in: root.sample ? "lights off" : root.terminal-input;
 
     property <string> t-loc: root.sample ? "Hafnarfjörður" : root.weather-loc;
     property <string> t-temp: root.sample ? "18°" : root.weather-temp;
@@ -402,6 +415,66 @@ export component WidgetFace inherits Rectangle {
             if root.size != "1x1": Bar { level: root.t-mem / 100; fill: #ffffff; zoom: root.face-scale; }
             if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
             if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+        }
+
+        if !root.use-layout && root.kind == "terminal": VerticalLayout {
+            spacing: 4px * root.face-scale;
+            Text {
+                text: "TERMINAL";
+                color: #8a8a8a;
+                font-size: Dy.type-secondary * root.face-scale;
+                font-family: Dy.mono;
+            }
+            if root.size == "1x1": Text {
+                text: root.t-term.length == 0 ? "Linux shell" : root.t-term[root.t-term.length - 1].text;
+                color: #ffffff;
+                font-size: Dy.type-title * root.face-scale;
+                font-family: Dy.mono;
+                overflow: elide;
+                vertical-stretch: 1;
+            }
+            if root.size != "1x1": Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+                VerticalLayout {
+                    spacing: 2px * root.face-scale;
+                    alignment: end;
+                    for line in root.t-term: Text {
+                        text: line.text;
+                        color: line.prompt ? #8a8a8a : #ffffff;
+                        font-size: Dy.type-secondary * root.face-scale;
+                        font-family: Dy.mono;
+                        overflow: elide;
+                        wrap: no-wrap;
+                    }
+                }
+            }
+            FieldTap {
+                label: "COMMAND";
+                value: root.t-term-in;
+                active: !root.sample && root.terminal-kb-active;
+                locked: root.sample;
+                label-size: Dy.type-dense * root.face-scale;
+                value-size: Dy.type-title * root.face-scale;
+                tap-height: root.size == "1x1" ? 48px * root.face-scale : 56px * root.face-scale;
+                tapped => { if !root.sample { root.open-terminal-input(); } }
+            }
+            if root.size == "2x2": HorizontalLayout {
+                spacing: 8px * root.face-scale;
+                Pill {
+                    label: "RUN";
+                    zoom: root.face-scale;
+                    on: true;
+                    clicked => { if !root.sample { root.submit-terminal(); } }
+                }
+                Text {
+                    text: "Tap empty area to expand";
+                    color: #555555;
+                    font-size: Dy.type-dense * root.face-scale;
+                    font-family: Dy.mono;
+                    vertical-alignment: center;
+                }
+            }
         }
 
         if !root.use-layout && root.kind == "timers": VerticalLayout {

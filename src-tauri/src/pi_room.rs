@@ -2,8 +2,11 @@
 
 use chrono::Datelike;
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Light {
@@ -41,6 +44,17 @@ pub struct Activity {
     pub title: String,
     pub source: String,
     pub time: String,
+}
+
+#[derive(Clone)]
+pub struct TerminalLine {
+    pub text: String,
+    pub prompt: bool,
+}
+
+pub enum TerminalJob {
+    Done,
+    Shell { cmdline: String, cwd: PathBuf },
 }
 
 #[derive(Clone)]
@@ -212,6 +226,7 @@ pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] 
         ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
         ("server", "Server Status", "Health and latency of local services."),
         ("system", "System", "CPU, memory, and top processes."),
+        ("terminal", "Terminal", "A Linux shell on this panel for normal commands."),
         ("timers", "Timers", "Running timers and reminders."),
         ("weather", "Weather", "Local conditions and the next few hours."),
     ]
@@ -654,6 +669,140 @@ pub fn merge_persisted_routines(
     list
 }
 
+fn default_shell_cwd() -> PathBuf {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .filter(|p| p.is_dir())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+}
+
+fn shorten_cwd(path: &Path) -> String {
+    let full = path.display().to_string();
+    if let Some(home) = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+    {
+        if let Ok(rest) = path.strip_prefix(&home) {
+            if rest.as_os_str().is_empty() {
+                return "~".into();
+            }
+            return format!("~/{}", rest.display());
+        }
+    }
+    full
+}
+
+fn run_shell(cmdline: &str, cwd: &Path) -> (i32, String) {
+    let timeout = Duration::from_secs(20);
+    #[cfg(windows)]
+    let mut child = match Command::new("cmd")
+        .args(["/C", cmdline])
+        .current_dir(cwd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env("TERM", "dumb")
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => return (127, format!("failed to start shell: {e}")),
+    };
+    #[cfg(not(windows))]
+    let mut child = match Command::new("bash")
+        .args(["-lc", cmdline])
+        .current_dir(cwd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env("TERM", "dumb")
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => return (127, format!("failed to start shell: {e}")),
+    };
+
+    let mut stdout = child.stdout.take();
+    let mut stderr = child.stderr.take();
+    let out_handle = std::thread::spawn(move || {
+        let mut buf = String::new();
+        if let Some(mut s) = stdout.take() {
+            let _ = s.read_to_string(&mut buf);
+        }
+        buf
+    });
+    let err_handle = std::thread::spawn(move || {
+        let mut buf = String::new();
+        if let Some(mut s) = stderr.take() {
+            let _ = s.read_to_string(&mut buf);
+        }
+        buf
+    });
+
+    let started = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() > timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = out_handle.join();
+                let _ = err_handle.join();
+                return (124, "Command timed out (20s).".into());
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(40)),
+            Err(e) => {
+                let _ = out_handle.join();
+                let _ = err_handle.join();
+                return (126, format!("wait failed: {e}"));
+            }
+        }
+    };
+
+    let out = out_handle.join().unwrap_or_default();
+    let err = err_handle.join().unwrap_or_default();
+    let mut combined = String::new();
+    if !out.is_empty() {
+        combined.push_str(out.trim_end_matches(['\r', '\n']));
+    }
+    if !err.is_empty() {
+        if !combined.is_empty() {
+            combined.push('\n');
+        }
+        combined.push_str(err.trim_end_matches(['\r', '\n']));
+    }
+    let code = status.code().unwrap_or(1);
+    if combined.is_empty() {
+        if code == 0 {
+            (0, String::new())
+        } else {
+            (code, format!("exit {code}"))
+        }
+    } else {
+        (code, combined)
+    }
+}
+
+fn push_terminal_output(lines: &mut Vec<TerminalLine>, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    for line in text.lines() {
+        lines.push(TerminalLine {
+            text: line.to_string(),
+            prompt: false,
+        });
+    }
+}
+
+fn trim_terminal_history(lines: &mut Vec<TerminalLine>) {
+    const MAX: usize = 80;
+    if lines.len() > MAX {
+        let drop_n = lines.len() - MAX;
+        lines.drain(0..drop_n);
+    }
+}
+
 fn default_routines() -> Vec<Routine> {
     vec![
         Routine {
@@ -742,6 +891,9 @@ pub struct Room {
     pub settings_tab: i32,
     pub palette_query: String,
     pub palette_reply: String,
+    pub terminal_input: String,
+    pub terminal_cwd: PathBuf,
+    pub terminal_lines: Vec<TerminalLine>,
     pub edit_mode: bool,
     pub page: i32,
     pub slots: Vec<Slot>,
@@ -783,6 +935,7 @@ pub enum Expanded {
     Media,
     Calendar,
     Purifier,
+    Terminal,
 }
 
 fn expand_layout_text(kind: &str, text: &str, room: &Room) -> String {
@@ -890,6 +1043,9 @@ impl Default for Room {
             settings_tab: 0,
             palette_query: String::new(),
             palette_reply: String::new(),
+            terminal_input: String::new(),
+            terminal_cwd: default_shell_cwd(),
+            terminal_lines: Vec::new(),
             edit_mode: false,
             page: 0,
             slots,
@@ -1081,6 +1237,88 @@ impl Room {
         self.playing = true;
     }
 
+    /// User-facing pages are 1-based; `self.page` is 0-based.
+    pub fn go_to_page(&mut self, page_1based: i32) -> String {
+        let max = self.visible_page_count().max(1);
+        if page_1based < 1 || page_1based > max {
+            return format!("Only pages 1–{max}.");
+        }
+        self.page = page_1based - 1;
+        format!("Page {page_1based}.")
+    }
+
+    pub fn next_page(&mut self) -> String {
+        let max = (self.visible_page_count() - 1).max(0);
+        if self.page >= max {
+            return format!("Already on page {}.", self.page + 1);
+        }
+        self.page += 1;
+        format!("Page {}.", self.page + 1)
+    }
+
+    pub fn prev_page(&mut self) -> String {
+        if self.page <= 0 {
+            return "Already on page 1.".into();
+        }
+        self.page -= 1;
+        format!("Page {}.", self.page + 1)
+    }
+
+    fn parse_page_number(token: &str) -> Option<i32> {
+        match token.trim() {
+            "1" | "one" | "first" => Some(1),
+            "2" | "two" | "second" => Some(2),
+            "3" | "three" | "third" => Some(3),
+            "4" | "four" | "fourth" => Some(4),
+            "5" | "five" | "fifth" => Some(5),
+            "6" | "six" | "sixth" => Some(6),
+            digits if digits.chars().all(|c| c.is_ascii_digit()) && !digits.is_empty() => {
+                digits.parse().ok()
+            }
+            _ => None,
+        }
+    }
+
+    /// Match page-navigation phrases before media “next”, so “next page” never skips a track.
+    fn try_page_command(&mut self, q: &str) -> Option<String> {
+        let wants_next = (q.contains("next") && q.contains("page"))
+            || q.contains("page forward")
+            || q == "next page"
+            || q == "swap page"
+            || q == "switch page"
+            || q == "page next";
+        if wants_next {
+            return Some(self.next_page());
+        }
+        let wants_prev = (q.contains("prev") && q.contains("page"))
+            || (q.contains("previous") && q.contains("page"))
+            || q.contains("page back")
+            || q == "back page"
+            || q == "page previous"
+            || q == "page prev";
+        if wants_prev {
+            return Some(self.prev_page());
+        }
+        // "go to page 2", "page 2", "page two", "open page 3", "page last"
+        let tokens: Vec<&str> = q.split_whitespace().collect();
+        for (i, t) in tokens.iter().enumerate() {
+            if *t != "page" {
+                continue;
+            }
+            let Some(next) = tokens.get(i + 1).copied() else {
+                continue;
+            };
+            if next == "last" {
+                let max = self.visible_page_count().max(1);
+                return Some(self.go_to_page(max));
+            }
+            if let Some(num) = Self::parse_page_number(next) {
+                return Some(self.go_to_page(num));
+            }
+        }
+        None
+    }
+
     pub fn tick_media(&mut self) {
         if !self.playing {
             return;
@@ -1180,6 +1418,103 @@ impl Room {
         self.activity.truncate(8);
     }
 
+    pub fn submit_terminal(&mut self) -> String {
+        match self.take_terminal_job() {
+            None => String::new(),
+            Some(TerminalJob::Done) => String::new(),
+            Some(TerminalJob::Shell { cmdline, cwd }) => {
+                let (code, output) = run_shell(&cmdline, &cwd);
+                self.append_shell_result(&output, code);
+                if output.is_empty() && code != 0 {
+                    format!("exit {code}")
+                } else {
+                    output
+                }
+            }
+        }
+    }
+
+    /// Push the prompt line and handle builtins. Returns a shell job for the UI thread to run off-thread.
+    pub fn take_terminal_job(&mut self) -> Option<TerminalJob> {
+        let raw = self.terminal_input.trim().to_string();
+        if raw.is_empty() {
+            return None;
+        }
+        let cwd_label = shorten_cwd(&self.terminal_cwd);
+        self.terminal_lines.push(TerminalLine {
+            text: format!("{cwd_label}$ {raw}"),
+            prompt: true,
+        });
+        self.terminal_input.clear();
+
+        let lower = raw.to_lowercase();
+        if lower == "clear" || lower == "cls" {
+            self.terminal_lines.clear();
+            return Some(TerminalJob::Done);
+        }
+
+        if lower == "cd" || lower.starts_with("cd ") {
+            let target = raw[2..].trim();
+            let next = if target.is_empty() || target == "~" {
+                default_shell_cwd()
+            } else if target.starts_with('~') {
+                let home = default_shell_cwd();
+                if target == "~" || target == "~/" || target == "~\\" {
+                    home
+                } else {
+                    let rest = target.trim_start_matches('~').trim_start_matches(['/', '\\']);
+                    home.join(rest)
+                }
+            } else {
+                let p = PathBuf::from(target);
+                if p.is_absolute() {
+                    p
+                } else {
+                    self.terminal_cwd.join(p)
+                }
+            };
+            let reply = match std::fs::canonicalize(&next) {
+                Ok(resolved) if resolved.is_dir() => {
+                    self.terminal_cwd = resolved;
+                    String::new()
+                }
+                Ok(_) => format!("cd: not a directory: {target}"),
+                Err(_) if next.is_dir() => {
+                    self.terminal_cwd = next;
+                    String::new()
+                }
+                Err(_) => format!("cd: no such file or directory: {target}"),
+            };
+            push_terminal_output(&mut self.terminal_lines, &reply);
+            trim_terminal_history(&mut self.terminal_lines);
+            return Some(TerminalJob::Done);
+        }
+
+        Some(TerminalJob::Shell {
+            cmdline: raw,
+            cwd: self.terminal_cwd.clone(),
+        })
+    }
+
+    pub fn append_shell_result(&mut self, output: &str, code: i32) {
+        if output.is_empty() {
+            if code != 0 {
+                push_terminal_output(&mut self.terminal_lines, &format!("exit {code}"));
+            }
+        } else {
+            push_terminal_output(&mut self.terminal_lines, output);
+        }
+        trim_terminal_history(&mut self.terminal_lines);
+    }
+
+    pub fn run_shell_command(cmdline: &str, cwd: &Path) -> (i32, String) {
+        run_shell(cmdline, cwd)
+    }
+
+    pub fn terminal_cwd_label(&self) -> String {
+        shorten_cwd(&self.terminal_cwd)
+    }
+
     pub fn run_command(&mut self, raw: &str) -> String {
         let q = raw.trim().to_lowercase();
         if q.is_empty() {
@@ -1220,6 +1555,9 @@ impl Room {
         if q.contains("light") && q.contains("on") {
             self.set_master_power(true);
             return "Lights on.".into();
+        }
+        if let Some(reply) = self.try_page_command(&q) {
+            return reply;
         }
         if q.contains("pause") || q.contains("stop") {
             self.playing = false;
@@ -1274,6 +1612,7 @@ impl Room {
                 ("calendar", "calendar"),
                 ("climate", "climate"),
                 ("purifier", "purifier"),
+                ("terminal", "terminal"),
             ];
             if let Some((_, kind)) = map.iter().find(|(k, _)| kind.contains(k)) {
                 match self.add_widget(kind, "1x1") {
@@ -1282,16 +1621,8 @@ impl Room {
                 }
             }
         }
-        if q.contains("page 1") || q.contains("page one") || q.contains("go to page 1") {
-            self.page = 0;
-            return "Page 1.".into();
-        }
-        if q.contains("page 2") || q.contains("go to page 2") {
-            self.page = 1.min(self.visible_page_count() - 1);
-            return "Page 2.".into();
-        }
         if q.contains("help") || q.contains("what can") {
-            return "Try: lights off, movie mode, good night, play, weather, DND.".into();
+            return "Try: lights off, movie mode, good night, play, weather, DND, next page, go to page 2.".into();
         }
         let custom: Vec<Routine> = self
             .routines
@@ -1326,6 +1657,8 @@ impl Room {
             format!("Ask Judie: {}", self.palette_query.trim())
         };
         items.push(("ask".into(), ask, "Enter".into()));
+        items.push(("page-next".into(), "Next page".into(), "Nav".into()));
+        items.push(("page-prev".into(), "Previous page".into(), "Nav".into()));
         for l in &self.lights {
             let title = if l.on {
                 format!("Turn off {}", l.name.replace(" LEDs", "").replace(" Light", ""))
@@ -1345,11 +1678,21 @@ impl Room {
         }
         items.push(("undo".into(), "Undo last action".into(), "Undo".into()));
         for (kind, label, _) in gallery_kinds() {
-            if matches!(*kind, "weather" | "lights" | "media" | "activity" | "timers" | "system") {
+            if matches!(
+                *kind,
+                "weather" | "lights" | "media" | "activity" | "timers" | "system" | "terminal"
+            ) {
                 items.push((format!("add-{kind}"), format!("Add {label} widget"), "Widget".into()));
             }
         }
-        items.push(("page-0".into(), "Go to page 1".into(), "Nav".into()));
+        let pages = self.visible_page_count().max(1);
+        for i in 0..pages {
+            items.push((
+                format!("page-{i}"),
+                format!("Go to page {}", i + 1),
+                "Nav".into(),
+            ));
+        }
         items.push(("creator".into(), "Open Widget Creator".into(), "Widget".into()));
         if n.is_empty() {
             items.truncate(8);
@@ -1389,10 +1732,22 @@ impl Room {
             self.overlay = Overlay::None;
             return;
         }
-        if id == "page-0" {
-            self.page = 0;
+        if id == "page-next" {
+            self.palette_reply = self.next_page();
             self.overlay = Overlay::None;
             return;
+        }
+        if id == "page-prev" {
+            self.palette_reply = self.prev_page();
+            self.overlay = Overlay::None;
+            return;
+        }
+        if let Some(rest) = id.strip_prefix("page-") {
+            if let Ok(idx) = rest.parse::<i32>() {
+                self.palette_reply = self.go_to_page(idx + 1);
+                self.overlay = Overlay::None;
+                return;
+            }
         }
         if id == "creator" {
             self.overlay = Overlay::Creator;
@@ -2236,6 +2591,50 @@ mod tests {
                 assert_eq!(now.col, col);
                 assert_eq!(now.row, row);
             }
+        });
+    }
+
+    #[test]
+    fn page_commands_navigate_without_stealing_next_track() {
+        with_temp_room(|room| {
+            room.edit_mode = true;
+            assert!(room.visible_page_count() >= 2);
+            assert_eq!(room.page, 0);
+            assert_eq!(room.run_command("next page"), "Page 2.");
+            assert_eq!(room.page, 1);
+            assert_eq!(room.run_command("previous page"), "Page 1.");
+            assert_eq!(room.page, 0);
+            assert_eq!(room.run_command("go to page 2"), "Page 2.");
+            assert_eq!(room.page, 1);
+            assert_eq!(room.run_command("page one"), "Page 1.");
+            assert_eq!(room.page, 0);
+            assert_eq!(room.run_command("swap page"), "Page 2.");
+            assert_eq!(room.page, 1);
+            assert_eq!(room.run_command("page last"), "Page 2.");
+            let track_before = room.track;
+            let _ = room.run_command("next");
+            assert_ne!(room.track, track_before, "bare next still advances media");
+            assert_eq!(room.run_command("go to page 9"), "Only pages 1–2.");
+        });
+    }
+
+    #[test]
+    fn terminal_widget_runs_shell_commands_and_keeps_history() {
+        with_temp_room(|room| {
+            room.terminal_input = "echo hello-judie".into();
+            let reply = room.submit_terminal();
+            assert!(
+                reply.contains("hello-judie"),
+                "shell output missing, got {reply:?}"
+            );
+            assert!(room.terminal_input.is_empty());
+            assert!(room.terminal_lines.iter().any(|l| l.prompt && l.text.contains("echo hello-judie")));
+            assert!(room.terminal_lines.iter().any(|l| !l.prompt && l.text.contains("hello-judie")));
+            room.terminal_input = "clear".into();
+            let _ = room.submit_terminal();
+            assert!(room.terminal_lines.is_empty());
+            assert!(gallery_kinds().iter().any(|(k, _, _)| *k == "terminal"));
+            assert_eq!(supported_sizes("terminal"), &["1x1", "1x2", "2x2"]);
         });
     }
 }

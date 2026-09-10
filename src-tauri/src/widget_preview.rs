@@ -19,6 +19,7 @@ pub const KINDS: &[&str] = &[
     "quickControls",
     "server",
     "system",
+    "terminal",
     "timers",
     "weather",
     "custom",

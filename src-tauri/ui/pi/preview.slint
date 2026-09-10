@@ -1,4 +1,4 @@
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, CalCell, SlopNode } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, CalCell, SlopNode, TerminalLine } from "cards.slint";
 import { WidgetFace } from "faces.slint";
 
 // Preview presentation layer. Replaceable later with a static thumbnail (`source: "image"`)
@@ -50,6 +50,9 @@ export component WidgetPreview inherits Rectangle {
     in property <[SlopNode]> slop-nodes: [];
     in property <bool> dnd: false;
     in property <bool> use-layout: false;
+    in property <string> terminal-input: "";
+    in property <[TerminalLine]> terminal-lines: [];
+    in property <bool> terminal-kb-active: false;
 
     property <length> canon-w: root.size == "1x1" ? 240px : 480px;
     property <length> canon-h: root.size == "2x2" ? 480px : 240px;
@@ -110,5 +113,8 @@ export component WidgetPreview inherits Rectangle {
         slop-nodes: root.slop-nodes;
         dnd: root.dnd;
         use-layout: root.use-layout;
+        terminal-input: root.terminal-input;
+        terminal-lines: root.terminal-lines;
+        terminal-kb-active: root.terminal-kb-active;
     }
 }

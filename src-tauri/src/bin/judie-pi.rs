@@ -170,7 +170,26 @@ fn expanded_name(e: Expanded) -> SharedString {
         Expanded::Media => "media",
         Expanded::Calendar => "calendar",
         Expanded::Purifier => "purifier",
+        Expanded::Terminal => "terminal",
     })
+}
+
+fn dispatch_terminal(ui: &MainWindow) {
+    let job = pi_room::with(|room| room.take_terminal_job());
+    push_ui(ui);
+    let Some(pi_room::TerminalJob::Shell { cmdline, cwd }) = job else {
+        return;
+    };
+    let weak = ui.as_weak();
+    std::thread::spawn(move || {
+        let (code, output) = pi_room::Room::run_shell_command(&cmdline, &cwd);
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = weak.upgrade() {
+                pi_room::with(|room| room.append_shell_result(&output, code));
+                push_ui(&ui);
+            }
+        });
+    });
 }
 
 fn push_ui(ui: &MainWindow) {
@@ -235,6 +254,17 @@ fn push_ui(ui: &MainWindow) {
         ui.set_settings_tab(room.settings_tab.clamp(0, 2));
         ui.set_palette_query(room.palette_query.clone().into());
         ui.set_palette_reply(room.palette_reply.clone().into());
+        ui.set_terminal_input(room.terminal_input.clone().into());
+        ui.set_terminal_cwd(room.terminal_cwd_label().into());
+        let term_lines: Vec<TerminalLine> = room
+            .terminal_lines
+            .iter()
+            .map(|l| TerminalLine {
+                text: l.text.clone().into(),
+                prompt: l.prompt,
+            })
+            .collect();
+        ui.set_terminal_lines(ModelRc::new(VecModel::from(term_lines)));
         ui.set_edit_mode(room.edit_mode);
         ui.set_page_count(room.visible_page_count());
         ui.set_assistant_url(room.assistant_url.clone().into());
@@ -479,6 +509,10 @@ fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
             pi_room::with(|room| room.palette_query = text.to_string());
             ui.set_palette_query(text.into());
         }
+        "terminal" => {
+            pi_room::with(|room| room.terminal_input = text.to_string());
+            ui.set_terminal_input(text.into());
+        }
         "wifi-pass" => ui.set_wifi_pass(text.into()),
         "hidden-ssid" => ui.set_hidden_ssid(text.into()),
         "math" => ui.set_math_typed(text.into()),
@@ -586,6 +620,7 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
         "longitude" => ui.get_longitude().to_string(),
         "assistant-url" => ui.get_assistant_url().to_string(),
         "palette" => ui.get_palette_query().to_string(),
+        "terminal" => ui.get_terminal_input().to_string(),
         "wifi-pass" => ui.get_wifi_pass().to_string(),
         "hidden-ssid" => ui.get_hidden_ssid().to_string(),
         "math" => ui.get_math_typed().to_string(),
@@ -950,6 +985,7 @@ fn bind(ui: &MainWindow) {
                 "media" => Expanded::Media,
                 "calendar" => Expanded::Calendar,
                 "purifier" => Expanded::Purifier,
+                "terminal" => Expanded::Terminal,
                 _ => Expanded::None,
             };
         });
@@ -1149,6 +1185,11 @@ fn bind(ui: &MainWindow) {
             room.palette_reply = room.run_command(&q);
         });
         r();
+    });
+    let weak = ui.as_weak();
+    ui.on_submit_terminal(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        dispatch_terminal(&ui);
     });
     let r = refresh.clone();
     ui.on_run_palette_hit(move |id| {
@@ -1555,6 +1596,8 @@ fn bind(ui: &MainWindow) {
             } else {
                 ui.invoke_connect_wifi();
             }
+        } else if field == "terminal" {
+            dispatch_terminal(&ui);
         }
     });
     let weak = ui.as_weak();

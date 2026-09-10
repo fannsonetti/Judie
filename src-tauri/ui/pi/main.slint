@@ -1,5 +1,5 @@
 import { ScrollView, Slider, Button } from "std-widgets.slint";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 import { WidgetPreview } from "preview.slint";
@@ -88,6 +88,9 @@ export component MainWindow inherits Window {
     in-out property <bool> notice-devices: true;
     in-out property <string> palette-query: "";
     in-out property <string> palette-reply: "";
+    in-out property <string> terminal-input: "";
+    in-out property <string> terminal-cwd: "~";
+    in-out property <[TerminalLine]> terminal-lines: [];
     in-out property <[PaletteHit]> palette-hits: [];
     in-out property <[RoutineRow]> routines: [];
     in-out property <string> expanded: "";
@@ -199,6 +202,7 @@ export component MainWindow inherits Window {
     callback close-overlay();
     callback open-palette();
     callback submit-palette();
+    callback submit-terminal();
     callback palette-text(string);
     callback run-palette-hit(string);
     callback set-tab(int);
@@ -770,6 +774,9 @@ export component MainWindow inherits Window {
                         slop-nodes: root.slop-nodes;
                         dnd: root.dnd;
                         use-layout: w.use-layout;
+                        terminal-input: root.terminal-input;
+                        terminal-lines: root.terminal-lines;
+                        terminal-kb-active: root.kb-open && root.kb-field == "terminal";
                         toggle-master => { root.toggle-master(); }
                         brightness-changed(v) => { root.brightness-changed(v); }
                         set-color(c) => { root.set-color(c); }
@@ -780,6 +787,8 @@ export component MainWindow inherits Window {
                         volume-changed(v) => { root.volume-changed(v); }
                         quick(id) => { root.quick(id); }
                         set-purifier-mode(m) => { root.set-purifier-mode(m); }
+                        open-terminal-input => { root.open-keyboard("terminal"); }
+                        submit-terminal => { root.submit-terminal(); }
                     }
                 }
 
@@ -883,6 +892,9 @@ export component MainWindow inherits Window {
                         slop-nodes: root.slop-nodes;
                         dnd: root.dnd;
                         use-layout: root.drag-use-layout;
+                        terminal-input: root.terminal-input;
+                        terminal-lines: root.terminal-lines;
+                        terminal-kb-active: false;
                         toggle-master => { root.toggle-master(); }
                         brightness-changed(v) => { root.brightness-changed(v); }
                         set-color(c) => { root.set-color(c); }
@@ -893,6 +905,8 @@ export component MainWindow inherits Window {
                         volume-changed(v) => { root.volume-changed(v); }
                         quick(id) => { root.quick(id); }
                         set-purifier-mode(m) => { root.set-purifier-mode(m); }
+                        open-terminal-input => { }
+                        submit-terminal => { }
                     }
                 }
 
@@ -2000,6 +2014,61 @@ export component MainWindow inherits Window {
                 }
                 Text { text: "Filter " + root.purifier-filter + "%"; color: #7a7a7a; font-size: 14px; }
                 Bar { level: root.purifier-filter / 100; fill: #ffffff; }
+            }
+        }
+    }
+
+    if root.expanded == "terminal": Rectangle {
+        background: #000000cc;
+        TouchArea { clicked => { root.collapse(); } }
+        Rectangle {
+            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+            border-radius: 0px; background: #000000;
+            border-width: 1px; border-color: #3d3d3d;
+            VerticalLayout {
+                padding: 24px; spacing: 14px;
+                HorizontalLayout {
+                    Text { text: "SHELL"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: root.terminal-cwd; color: #7a7a7a; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Pill { label: "CLOSE"; clicked => { root.collapse(); } }
+                }
+                Flickable {
+                    vertical-stretch: 1;
+                    viewport-height: max(parent.height - 180px, root.terminal-lines.length * 28px);
+                    VerticalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        if root.terminal-lines.length == 0: Text {
+                            text: "Run normal Linux commands here — ls, df -h, systemctl status…";
+                            color: #7a7a7a;
+                            font-size: 14px;
+                            font-family: Dy.mono;
+                            wrap: word-wrap;
+                        }
+                        for line in root.terminal-lines: Text {
+                            text: line.text;
+                            color: line.prompt ? #8a8a8a : #e6e6e6;
+                            font-size: 15px;
+                            font-family: Dy.mono;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                FieldTap {
+                    label: "COMMAND";
+                    value: root.terminal-input;
+                    active: root.kb-open && root.kb-field == "terminal";
+                    label-size: 13px;
+                    value-size: 18px;
+                    tap-height: 64px;
+                    tapped => { root.open-keyboard("terminal"); }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    Pill { label: "RUN"; on: true; clicked => { root.submit-terminal(); } }
+                    Pill { label: "CLOSE"; clicked => { root.collapse(); } }
+                }
             }
         }
     }
