@@ -2609,6 +2609,5 @@ fn main() {
         });
     });
 
-    let _ = (pong_timer, tick_timer, net_timer, poll_timer);
     ui.run().expect("run");
 }

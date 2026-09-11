@@ -2338,8 +2338,12 @@ export component MainWindow inherits Window {
                     return reject;
                 }
             }
-            court := TouchArea {
+            Rectangle {
                 vertical-stretch: 1;
+                min-height: 400px;
+            court := TouchArea {
+                width: 100%;
+                height: 100%;
                 moved => {
                     if self.pressed {
                         if self.mouse-x < self.width / 2 {
@@ -2386,6 +2390,7 @@ export component MainWindow inherits Window {
                         background: #ffffff;
                     }
                 }
+            }
             }
         }
     }

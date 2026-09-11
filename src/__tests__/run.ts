@@ -1390,7 +1390,10 @@ test("pi polish: rail, device, sleep, timers, borders, and screen-off", () => {
   assert(rust.includes("let pong_timer = slint::Timer::default()"), "pong timer is kept");
   assert(rust.includes("let tick_timer = slint::Timer::default()"), "idle timer is kept");
   assert(rust.includes("let net_timer = slint::Timer::default()"), "net timer is kept");
-  assert(rust.includes("let _ = (pong_timer, tick_timer, net_timer, poll_timer)"), "timers live through ui.run");
+  assert(!rust.includes("let _ = (pong_timer"), "timers must not be dropped before ui.run");
+  const pongTimerAt = rust.indexOf("let pong_timer");
+  const runAt = rust.lastIndexOf("ui.run()");
+  assert(pongTimerAt > 0 && runAt > pongTimerAt, "pong timer stays in scope through ui.run");
   assert(!rust.includes("vcgencmd"), "HDMI transmitter stays up for tap-to-wake");
   assert(rust.includes("set_backlight"), "backlight sysfs dim");
   assert(rust.includes("if SCREEN_ASLEEP"), "asleep skips push_ui");
