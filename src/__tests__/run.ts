@@ -730,6 +730,7 @@ test("settings sheet follows the pointer without jumping", () => {
   assert(!inActionsZone(1920 * 0.8, 1920), "right third is not actions");
   assert(!inSettingsZone(1920 * 0.5, 1920), "center third is not settings");
   assert(canBeginOpen(false, 0), "home can open");
+  assert(!canBeginOpen(false, 0, true), "sidebar disables the top-right pull");
   assert(!canBeginOpen(true, 1), "settings cannot re-open");
   assert(!canBeginOpen(false, 0.5), "mid-pull does not start a second open");
   assert(canBeginClose(true, 1), "open settings can close from the bottom");
@@ -837,6 +838,8 @@ test("power actions are narrowly scoped", () => {
   assert(allowedPowerAction("poweroff") === "poweroff", "poweroff");
   assert(allowedPowerAction("shutdown") === "poweroff", "shutdown alias");
   assert(allowedPowerAction("uninstall") === "uninstall", "uninstall");
+  assert(allowedPowerAction("suspend") === "suspend", "suspend");
+  assert(allowedPowerAction("sleep") === "suspend", "sleep alias");
   for (const bad of ["reboot; rm -rf /", "apt-get remove vim", "", "/bin/sh"]) {
     let threw = false;
     try {
@@ -962,7 +965,7 @@ test("slint and css home type scale match the readability constants", () => {
   assert(slint.includes("header-h: 108px"), "slint header grew for clock+date");
   assert(slint.includes("root.date-text"), "date is in the header");
   assert(slint.includes("font-size: Dy.type-clock"), "header clock uses the type scale");
-  assert(css.includes("--type-clock: 52px"), "css clock");
+  assert(css.includes("--type-clock: calc(52px * var(--text-scale))"), "css clock");
   assert(css.includes("--status-h: 108px"), "css header");
   assert(faces.includes("Dy.type-clock"), "digital clock face uses the type scale");
   assert(faces.includes("Dy.type-value") && faces.includes("Dy.type-title"), "widget faces use the type scale");
@@ -978,6 +981,7 @@ test("accessibility settings and sidebar persist on both stacks", () => {
   assert(slint.includes("toggle-sidebar"), "pi sidebar toggle");
   assert(rust.includes("sidebar:") && rust.includes("blocky_font"), "persist a11y fields");
   assert(settings.includes('"accessibility"'), "react accessibility tab");
+  assert(settings.includes('"device"'), "react device tab");
   assert(config.includes("screenOffSecs") && config.includes("hitTarget"), "config a11y fields");
   assert(slint.includes("PONG") && slint.includes("pong-mode"), "pong expand");
   assert(readFileSync("src-tauri/ui/pi/faces.slint", "utf8").includes('root.kind == "clock"'), "analog face");
@@ -1053,7 +1057,7 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
   assert(slint.includes("in-out property <int> drop-col"), "drop-col is writable from rust");
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-  assert(pkg.version === "0.3.2", "package version is 0.3.2");
+  assert(pkg.version === "0.3.3", "package version is 0.3.3");
 });
 
 test("edit-mode widget delete control is a square white X", () => {
@@ -1144,9 +1148,9 @@ test("edit-mode widget delete control is a square white X", () => {
   assert(left.x + left.size > leftShellLeft + leftShellWidth, "badge occupies the gutter toward the next widget");
   assert(overlayAt > tilesAt, "adjacent widgets cannot paint over the X");
 
-  assert(pkg.version === "0.3.2", "npm version");
-  assert(cargo.includes('version = "0.3.2"'), "crate version");
-  assert(tauri.version === "0.3.2", "tauri version");
+  assert(pkg.version === "0.3.3", "npm version");
+  assert(cargo.includes('version = "0.3.3"'), "crate version");
+  assert(tauri.version === "0.3.3", "tauri version");
 });
 
 test("widget editor size carousel is compact and has three sizes", () => {
@@ -1220,9 +1224,9 @@ test("widget editor size carousel is compact and has three sizes", () => {
   assert(gallery.includes("aria-label={gallerySizeCaption(s)}"), "dot accessible names");
   assert(gallery.includes('role="dialog"'), "keyboard dialog");
 
-  assert(pkg.version === "0.3.2", "npm version");
-  assert(cargo.includes('version = "0.3.2"'), "crate version");
-  assert(tauri.version === "0.3.2", "tauri version");
+  assert(pkg.version === "0.3.3", "npm version");
+  assert(cargo.includes('version = "0.3.3"'), "crate version");
+  assert(tauri.version === "0.3.3", "tauri version");
 });
 
 function textHeightSafe(px: number) {
@@ -1266,7 +1270,7 @@ test("settings compact power, routines, general, and close gesture live on the s
   assert(slint.includes("root.delete-routine(r.id)"), "routine delete is immediate");
   assert(!slint.includes("x: (parent.width - 48px) / 2"), "misplaced handle is gone");
   assert(slint.includes("clip: true"), "settings sheet clips stray chrome");
-  const start = slint.indexOf("if root.settings-pull > 0.001");
+  const start = slint.indexOf("if root.settings-page || root.settings-pull > 0.001");
   const end = slint.indexOf("if root.net-menu-open: Rectangle");
   const sheet = slint.slice(start, end);
   assert(sheet.includes("y: parent.height - 28px"), "close edge is on the settings sheet");
@@ -1275,12 +1279,16 @@ test("settings compact power, routines, general, and close gesture live on the s
   assert(slint.includes("Run checks"), "diagnostics exist");
   assert(slint.includes("Nearby Wi-Fi"), "scan list exists");
   assert(slint.includes('kb-field == "wifi-pass"'), "password keyboard preview is masked");
-  assert(slint.includes("actions-edge"), "center third is the actions pull");
-  assert(slint.includes("arm-sheet-open(1,"), "center swipe opens actions");
+  assert(slint.includes("actions-edge"), "center clock sits in the header");
+  assert(!slint.includes("arm-sheet-open(1,"), "center swipe does not open a palette");
   assert(slint.includes("arm-sheet-open(0,"), "right swipe opens settings");
   assert(!slint.includes("clicked => { root.open-palette(); }"), "clock is not a palette click");
-  assert(sheet.includes("sheet-id == 1"), "actions live in the pull-down sheet");
+  assert(!sheet.includes("sheet-id == 1"), "palette sheet is gone");
   assert(!slint.includes("if root.palette-open: Rectangle"), "palette modal is gone");
+  assert(!sheet.includes("width: 48px"), "grey settings grabber is gone");
+  assert(slint.includes('expand("settings")'), "settings is a rail tab");
+  assert(slint.includes("sheet-can-open()"), "pull-down is gated");
+  assert(slint.includes("!root.sidebar && !root.settings-open"), "pull-down only when the sidebar is off");
 });
 
 test("keyboard is 600px and modifiers are hold-only", () => {
@@ -1288,7 +1296,10 @@ test("keyboard is 600px and modifiers are hold-only", () => {
   const kb = readFileSync("src-tauri/ui/pi/keyboard.slint", "utf8");
   const cards = readFileSync("src-tauri/ui/pi/cards.slint", "utf8");
   assert(slint.includes("height: 600px") && slint.includes("parent.height - 600px"), "keyboard overlay is 600px");
-  assert(cards.includes("min-height: 72px"), "keys stretch taller than 52px");
+  assert(slint.includes("x: root.rail-w") && slint.includes("parent.width - root.rail-w"), "keyboard sits in the content column");
+  assert(cards.includes("min-height: Dy.hit-target"), "keys use the hit-target scale");
+  assert(cards.includes("width: 40px") && cards.includes("height: 40px"), "Pi key icon is 40px");
+  assert(kb.includes("text: \"Hide\"") && kb.includes("min-width: 88px"), "Hide is a large hit target");
   assert(cards.includes("out property <bool> down"), "keys expose pressed state");
   assert(kb.includes("property <bool> shift: shift-l.down"), "shift is hold");
   assert(kb.includes("property <bool> ctrl: ctrl-l.down"), "ctrl is hold");
@@ -1351,6 +1362,58 @@ test("pi network helpers never leak credentials and classify failures", () => {
   assert(!ctl.includes("remembered_password"), "saved passwords are not replayed");
   assert(neverPersistSecrets(ctl));
   assert(wifi.includes("psk=%s"), "psk stays in the nm keyfile written by the helper");
+});
+
+test("pi polish: rail, device, sleep, timers, borders, and screen-off", () => {
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  const cards = readFileSync("src-tauri/ui/pi/cards.slint", "utf8");
+  const kb = readFileSync("src-tauri/ui/pi/keyboard.slint", "utf8");
+  const rust = readFileSync("src-tauri/src/bin/judie-pi.rs", "utf8");
+  const room = readFileSync("src-tauri/src/pi_room.rs", "utf8");
+  const power = readFileSync("src-tauri/linux/power", "utf8");
+  const modeset = readFileSync("src-tauri/linux/20-pi-modeset.conf", "utf8");
+  const postinst = readFileSync("scripts/package-armhf-deb.sh", "utf8");
+  const chrome = readFileSync("src/styles/chrome.css", "utf8");
+  const settings = readFileSync("src/components/home/SettingsOverlay.tsx", "utf8");
+  assert(slint.includes("height: 72px"), "rail tabs are taller");
+  assert(slint.includes("x: parent.width - 1.5px") && slint.includes("background: #ffffff"), "white rail edge");
+  assert(chrome.includes("box-shadow: inset -1.5px 0 0 #ffffff"), "css rail edge");
+  assert(chrome.includes("height: 72px"), "css rail tabs");
+  assert(slint.includes('text: "Device"') && slint.includes("settings-tab == 3"), "device settings tab");
+  assert(slint.includes('label: "Sleep"') && slint.includes('begin-confirm("sleep")'), "sleep on power");
+  assert(power.includes("suspend"), "power helper allows suspend");
+  assert(settings.includes('kind: "sleep"'), "react sleep confirm");
+  assert(room.includes("pub border: bool"), "slot border persists");
+  assert(cards.includes("in property <bool> show-border"), "tile chrome can drop the border");
+  assert(slint.includes("gallery-border") && slint.includes("set-gallery-border"), "gallery border toggle");
+  assert(kb.includes("Dy.hit-target") && kb.includes("Dy.type-control"), "keyboard uses type scale");
+  assert(rust.includes("let pong_timer = slint::Timer::default()"), "pong timer is kept");
+  assert(rust.includes("let tick_timer = slint::Timer::default()"), "idle timer is kept");
+  assert(rust.includes("let net_timer = slint::Timer::default()"), "net timer is kept");
+  assert(rust.includes("let _ = (pong_timer, tick_timer, net_timer, poll_timer)"), "timers live through ui.run");
+  assert(!rust.includes("vcgencmd"), "HDMI transmitter stays up for tap-to-wake");
+  assert(rust.includes("set_backlight"), "backlight sysfs dim");
+  assert(rust.includes("if SCREEN_ASLEEP"), "asleep skips push_ui");
+  assert(rust.includes("settings_tab.clamp(0, 4)"), "five settings tabs");
+  assert(!modeset.includes("AccelMethod"), "modesetting is not forced to software");
+  assert(postinst.includes("/dev/dri/card0"), "postinst prefers DRM modesetting");
+  assert(slint.includes("width: 100%") && slint.includes("clip: true"), "pong court fills the expand");
+  assert(slint.includes("PointerEventKind.down") && slint.includes("wake-screen()"), "first tap wakes");
+  const netAt = slint.indexOf("net-btn := TouchArea");
+  const volAt = slint.indexOf("vol-btn := TouchArea");
+  assert(netAt > 0 && volAt > netAt, "wifi is left of volume");
+  assert(slint.includes("x: parent.width - Dy.hit-target * 2 - 16px"), "wifi uses the inner header slot");
+  assert(slint.slice(volAt, volAt + 400).includes("x: parent.width - Dy.hit-target - 8px"), "volume is the rightmost header control");
+  assert(slint.slice(volAt, volAt + 900).includes("arm-sheet-open(0"), "far-right volume starts the settings pull");
+  assert(cards.includes("in property <float> zoom: 1.0"), "header glyphs scale");
+  assert(slint.includes("zoom: Dy.header-h / 108px"), "header icons follow header height");
+  const hideClock = slint.indexOf("if !root.hide-header-clock: VerticalLayout");
+  assert(hideClock > 0, "clock and date share one hide");
+  assert(slint.slice(hideClock, hideClock + 700).includes("root.date-text"), "hiding the clock also hides the date");
+  const bar = readFileSync("src/components/home/StatusBar.tsx", "utf8");
+  assert(bar.indexOf("status-net") < bar.indexOf("status-vol"), "react wifi is left of volume");
+  assert(bar.includes("hideClock") && bar.includes("status-date"), "react date is gated with the clock");
+  assert(chrome.includes("right: 8px"), "volume menu sits under the rightmost icon");
 });
 
 if (failed) {

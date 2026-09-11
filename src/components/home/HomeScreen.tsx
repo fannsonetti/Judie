@@ -9,7 +9,6 @@ import { EditModeControls } from "./EditModeControls";
 import { WidgetGallery } from "./WidgetGallery";
 import { WidgetCreatorOverlay } from "./WidgetCreatorOverlay";
 import { ExpandedOverlay } from "./ExpandedOverlay";
-import { CommandPalette } from "./CommandPalette";
 import { SettingsOverlay } from "./SettingsOverlay";
 import { RemoveConfirm } from "./RemoveConfirm";
 import { Toasts } from "./Toasts";
@@ -190,6 +189,7 @@ export function HomeScreen() {
   const textScale = useSettingsStore((s) => s.textScale);
   const uiScale = useSettingsStore((s) => s.uiScale);
   const headerH = useSettingsStore((s) => s.headerH);
+  const hitTarget = useSettingsStore((s) => s.hitTarget);
   const screenOffSecs = useSettingsStore((s) => s.screenOffSecs);
   const [asleep, setAsleep] = useState(false);
   const lastInput = useRef(performance.now());
@@ -199,9 +199,9 @@ export function HomeScreen() {
     root.style.setProperty("--status-h", `${headerH}px`);
     root.style.setProperty("--text-scale", String(textScale / 100));
     root.style.setProperty("--ui-scale", String(uiScale / 100));
-    root.style.setProperty("--type-clock", `${52 * (textScale / 100)}px`);
+    root.style.setProperty("--hit-target", `${hitTarget}px`);
     root.classList.toggle("blocky-font", blockyFont);
-  }, [headerH, textScale, uiScale, blockyFont]);
+  }, [headerH, textScale, uiScale, hitTarget, blockyFont]);
 
   useEffect(() => {
     const bump = () => {
@@ -276,7 +276,6 @@ export function HomeScreen() {
       <ExpandedOverlay />
       <WidgetGallery />
       <WidgetCreatorOverlay />
-      <CommandPalette />
       <SettingsOverlay />
       <WifiMenu link={link} />
       <AnsiKeyboard />

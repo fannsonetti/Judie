@@ -684,6 +684,7 @@ pub fn allowed_power_action(action: &str) -> Result<&'static str, String> {
         "reboot" => Ok("reboot"),
         "poweroff" | "shutdown" => Ok("poweroff"),
         "uninstall" => Ok("uninstall"),
+        "suspend" | "sleep" => Ok("suspend"),
         _ => Err("Unknown power action".into()),
     }
 }
@@ -703,6 +704,7 @@ pub fn power_status_label(action: &str) -> &'static str {
     match action {
         "reboot" => "Restarting the panel…",
         "poweroff" => "Shutting down…",
+        "suspend" => "Going to sleep…",
         "uninstall" => "Removing Judie. Settings stay on this computer…",
         _ => "Working…",
     }
@@ -744,6 +746,8 @@ mod power_tests {
         assert_eq!(allowed_power_action("poweroff").unwrap(), "poweroff");
         assert_eq!(allowed_power_action("shutdown").unwrap(), "poweroff");
         assert_eq!(allowed_power_action("uninstall").unwrap(), "uninstall");
+        assert_eq!(allowed_power_action("suspend").unwrap(), "suspend");
+        assert_eq!(allowed_power_action("sleep").unwrap(), "suspend");
         for bad in [
             "reboot; rm -rf /",
             "poweroff && reboot",
@@ -774,6 +778,8 @@ mod power_tests {
         assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), "poweroff");
         power("uninstall").expect("mock uninstall");
         assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), "uninstall");
+        power("suspend").expect("mock suspend");
+        assert_eq!(std::fs::read_to_string(&path).unwrap().trim(), "suspend");
         let _ = std::fs::remove_file(&path);
         std::env::remove_var("JUDIE_POWER_MOCK");
     }

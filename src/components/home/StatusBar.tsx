@@ -24,6 +24,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
   const setServices = useRoomStore((s) => s.setServices);
   const hideClock = useSettingsStore((s) => s.hideHeaderClock);
   const headerLine = useSettingsStore((s) => s.headerLine);
+  const headerH = useSettingsStore((s) => s.headerH);
   const hitTarget = useSettingsStore((s) => s.hitTarget);
   const volume = useSettingsStore((s) => s.volume);
   const update = useSettingsStore((s) => s.update);
@@ -110,7 +111,8 @@ export function StatusBar({ link }: { link: NetworkLink }) {
   const onPointerDown = (e: React.PointerEvent) => {
     const chrome = useChromeStore.getState();
     const open = useAssistantStore.getState().settingsOpen;
-    if (!canBeginOpen(open, chrome.settingsPull) || !inRightThird(e.clientX)) {
+    const sidebar = useSettingsStore.getState().sidebar;
+    if (!canBeginOpen(open, chrome.settingsPull, sidebar) || !inRightThird(e.clientX)) {
       pointer.current = null;
       openDrag.current = null;
       return;
@@ -154,33 +156,15 @@ export function StatusBar({ link }: { link: NetworkLink }) {
         </span>
         {dnd && <span className="status-dnd">DND</span>}
       </div>
-      <button
-        type="button"
-        className="status-center"
-        onClick={() => {
-          useChromeStore.getState().setNetMenuOpen(false);
-          useChromeStore.getState().setVolMenuOpen(false);
-          useAssistantStore.getState().setPaletteOpen(true);
-        }}
-      >
-        {!hideClock && <div className="status-time">{formatClock(now)}</div>}
-        <div className="status-date">{formatDateLong(now)}</div>
-      </button>
+      <div className="status-center">
+        {!hideClock && (
+          <>
+            <div className="status-time">{formatClock(now)}</div>
+            <div className="status-date">{formatDateLong(now)}</div>
+          </>
+        )}
+      </div>
       <div className="status-right">
-        <button
-          type="button"
-          className="status-vol"
-          aria-label="Volume"
-          style={{ width: hitTarget, minWidth: hitTarget }}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (dragged.current || useChromeStore.getState().settingsTracking) return;
-            useChromeStore.getState().setVolMenuOpen(!useChromeStore.getState().volMenuOpen);
-          }}
-        >
-          <VolumeGlyph />
-        </button>
         <button
           type="button"
           className="status-net"
@@ -193,7 +177,21 @@ export function StatusBar({ link }: { link: NetworkLink }) {
             useChromeStore.getState().setNetMenuOpen(!useChromeStore.getState().netMenuOpen);
           }}
         >
-          <NetGlyph kind={link.kind} bars={link.bars} />
+          <NetGlyph kind={link.kind} bars={link.bars} zoom={headerH / 108} />
+        </button>
+        <button
+          type="button"
+          className="status-vol"
+          aria-label="Volume"
+          style={{ width: hitTarget, minWidth: hitTarget }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (dragged.current || useChromeStore.getState().settingsTracking) return;
+            useChromeStore.getState().setVolMenuOpen(!useChromeStore.getState().volMenuOpen);
+          }}
+        >
+          <VolumeGlyph zoom={headerH / 108} />
         </button>
       </div>
       {volOpen && (
@@ -217,9 +215,11 @@ export function StatusBar({ link }: { link: NetworkLink }) {
   );
 }
 
-function VolumeGlyph() {
+function VolumeGlyph({ zoom = 1 }: { zoom?: number }) {
+  const w = Math.round(28 * zoom);
+  const h = Math.round(22 * zoom);
   return (
-    <svg width="28" height="22" viewBox="0 0 28 22" aria-hidden>
+    <svg width={w} height={h} viewBox="0 0 28 22" aria-hidden>
       <rect x="2" y="8" width="6" height="6" fill="#fff" />
       <rect x="8" y="4" width="4" height="14" fill="#fff" />
       <rect x="14" y="6" width="2" height="10" fill="#fff" />

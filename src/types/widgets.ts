@@ -34,6 +34,7 @@ export interface WidgetInstance {
   /** Grid row (0-based). */
   row?: number;
   customId?: string;
+  border?: boolean;
 }
 
 export interface SizeDims {

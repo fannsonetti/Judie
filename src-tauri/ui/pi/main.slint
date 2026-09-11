@@ -180,6 +180,11 @@ export component MainWindow inherits Window {
     in-out property <string> refresh-status: "";
     in-out property <string> preview-source: "live";
     in-out property <bool> gallery-use-layout: false;
+    in-out property <bool> gallery-border: true;
+    in-out property <string> display-output: "—";
+    in-out property <string> display-mode: "—";
+    in-out property <string> display-rate: "—";
+    in-out property <int> display-scale: 100;
     in-out property <string> wifi-detail: "";
     in-out property <string> net-iface: "—";
     in-out property <string> net-security: "—";
@@ -231,6 +236,9 @@ export component MainWindow inherits Window {
     callback toggle-hide-header-clock();
     callback toggle-header-line();
     callback set-screen-off(int);
+    callback set-display-rate(string);
+    callback set-display-scale(int);
+    callback set-gallery-border(bool);
     callback set-text-scale(int);
     callback set-ui-scale(int);
     callback set-header-h(int);
@@ -360,6 +368,7 @@ export component MainWindow inherits Window {
     property <string> drag-kind: "activity";
     in-out property <string> drag-size: "1x1";
     property <bool> drag-use-layout: false;
+    property <bool> drag-border: true;
     property <length> drag-dx: 0px;
     property <length> drag-dy: 0px;
     property <length> drag-ox: 0px;
@@ -413,22 +422,18 @@ export component MainWindow inherits Window {
         root.settings-animating = false;
         root.settings-pull = root.settings-goal;
         if root.settings-goal >= 0.5 {
-            if root.sheet-id == 1 {
-                root.open-palette();
-            } else {
-                root.open-settings();
-            }
+            root.open-settings();
         } else {
             root.close-overlay();
         }
     }
 
     function sheet-wanted() -> float {
-        return (root.settings-open || root.palette-open) ? 1.0 : 0.0;
+        return root.settings-open ? 1.0 : 0.0;
     }
 
     function sheet-can-open() -> bool {
-        return !root.settings-open && !root.palette-open && root.settings-pull < 0.08;
+        return !root.sidebar && !root.settings-open && root.settings-pull < 0.08;
     }
 
     function arm-sheet-open(id: int, window-y: length) {
@@ -507,12 +512,7 @@ export component MainWindow inherits Window {
         root.sheet-sync-overlay();
     }
 
-    changed palette-open => {
-        if root.palette-open {
-            root.sheet-id = 1;
-        }
-        root.sheet-sync-overlay();
-    }
+    property <bool> settings-page: root.sidebar && root.expanded == "settings";
 
     changed text-scale => { Dy.text-scale = root.text-scale / 100.0; }
     changed ui-scale => { Dy.ui-scale = root.ui-scale / 100.0; }
@@ -560,76 +560,60 @@ export component MainWindow inherits Window {
                 x: parent.width / 3;
                 width: parent.width / 3;
                 height: 100%;
-                pointer-event(ev) => {
-                    if ev.kind == PointerEventKind.down {
-                        root.arm-sheet-open(1, root.settings-pos(self.absolute-position.y, self.mouse-y));
-                    }
-                    if ev.kind == PointerEventKind.up {
-                        root.settings-finish(false);
-                    }
-                    if ev.kind == PointerEventKind.cancel {
-                        root.settings-finish(true);
-                    }
-                }
-                moved => {
-                    if self.pressed && !root.settings-open && !root.palette-open && (root.settings-tracking || root.settings-armed) && root.sheet-id == 1 {
-                        if !root.settings-tracking && root.settings-pos(self.absolute-position.y, self.mouse-y) - root.settings-start > 18px {
-                            root.settings-begin(0, root.settings-start);
-                        }
-                        if root.settings-tracking {
-                            root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
-                        }
-                    }
-                }
                 VerticalLayout {
                     padding-top: 8px;
                     padding-bottom: 8px;
                     spacing: 2px;
                     alignment: center;
-                    if !root.hide-header-clock: Text {
-                        text: root.clock;
-                        color: #ffffff;
-                        font-size: Dy.type-clock;
-                        font-weight: 700;
-                        font-family: Dy.mono;
-                        horizontal-alignment: center;
-                        overflow: elide;
-                    }
-                    Text {
-                        text: root.date-text;
-                        color: #8a8a8a;
-                        font-size: Dy.type-status;
-                        font-family: Dy.mono;
-                        horizontal-alignment: center;
-                        overflow: elide;
+                    if !root.hide-header-clock: VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        Text {
+                            text: root.clock;
+                            color: #ffffff;
+                            font-size: Dy.type-clock;
+                            font-weight: 700;
+                            font-family: Dy.mono;
+                            horizontal-alignment: center;
+                            overflow: elide;
+                        }
+                        Text {
+                            text: root.date-text;
+                            color: #8a8a8a;
+                            font-size: Dy.type-status;
+                            font-family: Dy.mono;
+                            horizontal-alignment: center;
+                            overflow: elide;
+                        }
                     }
                 }
             }
-            vol-btn := TouchArea {
+            net-btn := TouchArea {
                 x: parent.width - Dy.hit-target * 2 - 16px;
                 width: Dy.hit-target;
                 height: 100%;
                 clicked => {
-                    if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open && !root.palette-open {
+                    if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open {
                         root.note-input();
-                        if root.vol-menu-open { root.close-vol-menu(); } else { root.open-vol-menu(); }
+                        if root.net-menu-open { root.close-net-menu(); } else { root.open-net-menu(); }
                     }
                 }
-                VolumeGlyph {
-                    x: (parent.width - 28px) / 2;
-                    y: (parent.height - 22px) / 2;
-                    width: 36px;
-                    height: 28px;
+                NetGlyph {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    zoom: Dy.header-h / 108px;
+                    kind: root.net-kind;
+                    bars: root.net-bars;
                 }
             }
-            net-btn := TouchArea {
+            vol-btn := TouchArea {
                 x: parent.width - Dy.hit-target - 8px;
                 width: Dy.hit-target;
                 height: 100%;
                 clicked => {
-                    if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open && !root.palette-open {
+                    if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open {
                         root.note-input();
-                        if root.net-menu-open { root.close-net-menu(); } else { root.open-net-menu(); }
+                        if root.vol-menu-open { root.close-vol-menu(); } else { root.open-vol-menu(); }
                     }
                 }
                 pointer-event(ev) => {
@@ -653,13 +637,10 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                NetGlyph {
-                    x: (parent.width - 40px) / 2;
-                    y: (parent.height - 32px) / 2;
-                    width: 40px;
-                    height: 32px;
-                    kind: root.net-kind;
-                    bars: root.net-bars;
+                VolumeGlyph {
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    zoom: Dy.header-h / 108px;
                 }
             }
             settings-edge := TouchArea {
@@ -765,6 +746,7 @@ export component MainWindow inherits Window {
                     visible: w.page == root.page;
                     editing: root.edit-mode;
                     pending: root.pending-remove == w.id;
+                    show-border: w.border;
                     ghost: root.drag-id == w.id;
                     vis-x: 0px;
                     vis-y: 0px;
@@ -777,6 +759,7 @@ export component MainWindow inherits Window {
                         root.drag-id = w.id;
                         root.drag-kind = w.kind;
                         root.drag-use-layout = w.use-layout;
+                        root.drag-border = w.border;
                         root.drag-size = w.size;
                         root.drag-from-col = w.col;
                         root.drag-from-row = w.row;
@@ -945,6 +928,7 @@ export component MainWindow inherits Window {
                     pending: root.pending-remove == root.drag-id;
                     layer: true;
                     ghost: false;
+                    show-border: root.drag-border;
                     WidgetFace {
                         kind: root.drag-kind;
                         size: root.drag-size;
@@ -1029,10 +1013,12 @@ export component MainWindow inherits Window {
     }
 
     if root.pending-remove != "": Rectangle {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
         background: #000000cc;
         TouchArea { clicked => { root.cancel-remove(); } }
         Rectangle {
-            x: parent.width * 0.3; y: parent.height * 0.32; width: parent.width * 0.4; height: 320px;
+            x: (parent.width - min(520px, parent.width * 0.72)) / 2; y: parent.height * 0.32; width: min(520px, parent.width * 0.72); height: 320px;
             border-radius: 0px; background: #000000;
             border-width: 1px; border-color: #3d3d3d;
             VerticalLayout {
@@ -1088,11 +1074,11 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.settings-pull > 0.001: Rectangle {
+    if root.settings-page || root.settings-pull > 0.001: Rectangle {
         x: root.rail-w;
-        y: (root.settings-pull - 1.0) * parent.height;
+        y: root.settings-page ? Dy.header-h : (root.settings-pull - 1.0) * parent.height;
         width: parent.width - root.rail-w;
-        height: 100%;
+        height: root.settings-page ? (parent.height - Dy.header-h) : 100%;
         background: #000000;
         clip: true;
         TouchArea {
@@ -1106,79 +1092,31 @@ export component MainWindow inherits Window {
             padding-bottom: 20px;
             spacing: 10px;
             HorizontalLayout {
-                height: 4px;
-                alignment: center;
-                Rectangle {
-                    height: 4px;
-                    width: 48px;
-                    background: #3a3a3a;
-                }
-            }
-            if root.sheet-id == 1: VerticalLayout {
-                vertical-stretch: 1;
-                spacing: 12px;
-                Text { text: "JUDIE"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                FieldTap {
-                    label: "ASK JUDIE";
-                    value: root.palette-query;
-                    active: root.kb-open && root.kb-field == "palette";
-                    tapped => { root.open-keyboard("palette"); }
-                }
-                Flickable {
-                    vertical-stretch: 1;
-                    viewport-height: 12 * 40px;
-                    interactive: !root.settings-tracking;
-                    VerticalLayout {
-                        spacing: 4px;
-                        for hit in root.palette-hits: TouchArea {
-                            clicked => { root.run-palette-hit(hit.id); }
-                            Rectangle {
-                                height: 36px; border-radius: 0px; background: #000000;
-                                border-width: 1px; border-color: #2a2a2a;
-                                HorizontalLayout {
-                                    padding-left: 12px; padding-right: 12px;
-                                    Text { text: hit.title; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
-                                    Text { text: hit.hint; color: #7a7a7a; font-size: 11px; font-family: Dy.mono; vertical-alignment: center; }
-                                }
-                            }
-                        }
-                    }
-                }
-                Text {
-                    text: root.palette-reply;
-                    color: #7a7a7a;
-                    font-size: 12px;
-                    font-family: Dy.mono;
-                    wrap: word-wrap;
-                }
-                HorizontalLayout {
-                    spacing: 8px;
-                    Pill { label: "ASK"; on: true; clicked => { root.submit-palette(); } }
-                    Pill { label: "CLOSE"; clicked => { root.close-overlay(); } }
-                }
-            }
-            if root.sheet-id == 0: HorizontalLayout {
                 spacing: 28px;
                 height: 36px;
                 TouchArea {
                     clicked => { root.set-tab(0); }
-                    Text { text: "General"; color: root.settings-tab == 0 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "General"; color: root.settings-tab == 0 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 TouchArea {
                     clicked => { root.set-tab(1); }
-                    Text { text: "Network"; color: root.settings-tab == 1 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "Network"; color: root.settings-tab == 1 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 TouchArea {
                     clicked => { root.set-tab(2); }
-                    Text { text: "Power"; color: root.settings-tab == 2 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "Power"; color: root.settings-tab == 2 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 TouchArea {
                     clicked => { root.set-tab(3); }
-                    Text { text: "Accessibility"; color: root.settings-tab == 3 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "Device"; color: root.settings-tab == 3 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                }
+                TouchArea {
+                    clicked => { root.set-tab(4); }
+                    Text { text: "Accessibility"; color: root.settings-tab == 4 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 Rectangle { horizontal-stretch: 1; }
             }
-            if root.sheet-id == 0: Flickable {
+            Flickable {
                 vertical-stretch: 1;
                 viewport-height: settings-scroll.preferred-height;
                 interactive: !root.settings-tracking;
@@ -1400,6 +1338,12 @@ export component MainWindow inherits Window {
                                 clicked => { if !root.updating && !root.power-busy { root.begin-confirm("restart"); } }
                             }
                             PowerAction {
+                                label: "Sleep";
+                                glyph: "z";
+                                enabled: !root.updating && !root.power-busy;
+                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("sleep"); } }
+                            }
+                            PowerAction {
                                 label: "Shut Down";
                                 glyph: "○";
                                 enabled: !root.updating && !root.power-busy;
@@ -1512,28 +1456,8 @@ export component MainWindow inherits Window {
                         alignment: start;
                         spacing: 10px;
                         padding-bottom: 80px;
-                        Text { text: "Display"; color: #6a6a6a; font-size: 16px; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            Text { text: "Sidebar"; color: #ffffff; font-size: 20px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.sidebar; toggled => { root.toggle-sidebar(); } }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Blocky font"; color: #ffffff; font-size: 20px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.blocky-font; toggled => { root.toggle-blocky-font(); } }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Hide header clock"; color: #ffffff; font-size: 20px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.hide-header-clock; toggled => { root.toggle-hide-header-clock(); } }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Header separator"; color: #ffffff; font-size: 20px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.header-line; toggled => { root.toggle-header-line(); } }
-                        }
-                        Text { text: "Turn my screen off after"; color: #ffffff; font-size: 18px; font-family: Dy.mono; }
+                        Text { text: "Screen"; color: #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: "Turn my screen off after"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; }
                         TouchArea {
                             clicked => { root.screen-off-open = !root.screen-off-open; }
                             height: 48px;
@@ -1543,48 +1467,90 @@ export component MainWindow inherits Window {
                                 HorizontalLayout {
                                     padding-left: 12px;
                                     padding-right: 12px;
-                                    Text { text: root.screen-off-label + "  ▼"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                                    Text { text: root.screen-off-label + "  ▼"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                                 }
                             }
                         }
                         if root.screen-off-open: VerticalLayout {
                             spacing: 2px;
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(60); } Text { text: "1 minute"; color: root.screen-off-secs == 60 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(120); } Text { text: "2 minutes"; color: root.screen-off-secs == 120 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(180); } Text { text: "3 minutes"; color: root.screen-off-secs == 180 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(300); } Text { text: "5 minutes"; color: root.screen-off-secs == 300 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(600); } Text { text: "10 minutes"; color: root.screen-off-secs == 600 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(900); } Text { text: "15 minutes"; color: root.screen-off-secs == 900 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(1200); } Text { text: "20 minutes"; color: root.screen-off-secs == 1200 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(1500); } Text { text: "25 minutes"; color: root.screen-off-secs == 1500 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(1800); } Text { text: "30 minutes"; color: root.screen-off-secs == 1800 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(2700); } Text { text: "45 minutes"; color: root.screen-off-secs == 2700 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(3600); } Text { text: "1 hour"; color: root.screen-off-secs == 3600 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(7200); } Text { text: "2 hours"; color: root.screen-off-secs == 7200 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(10800); } Text { text: "3 hours"; color: root.screen-off-secs == 10800 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(14400); } Text { text: "4 hours"; color: root.screen-off-secs == 14400 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(18000); } Text { text: "5 hours"; color: root.screen-off-secs == 18000 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(0); } Text { text: "Never"; color: root.screen-off-secs == 0 ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(60); } Text { text: "1 minute"; color: root.screen-off-secs == 60 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(120); } Text { text: "2 minutes"; color: root.screen-off-secs == 120 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(180); } Text { text: "3 minutes"; color: root.screen-off-secs == 180 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(300); } Text { text: "5 minutes"; color: root.screen-off-secs == 300 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(600); } Text { text: "10 minutes"; color: root.screen-off-secs == 600 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(900); } Text { text: "15 minutes"; color: root.screen-off-secs == 900 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(1200); } Text { text: "20 minutes"; color: root.screen-off-secs == 1200 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(1500); } Text { text: "25 minutes"; color: root.screen-off-secs == 1500 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(1800); } Text { text: "30 minutes"; color: root.screen-off-secs == 1800 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(2700); } Text { text: "45 minutes"; color: root.screen-off-secs == 2700 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(3600); } Text { text: "1 hour"; color: root.screen-off-secs == 3600 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(7200); } Text { text: "2 hours"; color: root.screen-off-secs == 7200 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(10800); } Text { text: "3 hours"; color: root.screen-off-secs == 10800 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(14400); } Text { text: "4 hours"; color: root.screen-off-secs == 14400 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(18000); } Text { text: "5 hours"; color: root.screen-off-secs == 18000 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(0); } Text { text: "Never"; color: root.screen-off-secs == 0 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
                         }
-                        Text { text: "Text scale"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                        Text { text: "Display"; color: #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: root.display-output + "  " + root.display-mode + "  @  " + root.display-rate + " Hz"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
+                        Text { text: "Refresh rate"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Pill { label: "60"; on: root.display-rate == "60.00" || root.display-rate == "60"; clicked => { root.set-display-rate("60"); } }
+                            Pill { label: "50"; on: root.display-rate == "50.00" || root.display-rate == "50"; clicked => { root.set-display-rate("50"); } }
+                            Pill { label: "30"; on: root.display-rate == "30.00" || root.display-rate == "30"; clicked => { root.set-display-rate("30"); } }
+                        }
+                        Text { text: "Pixel size"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Pill { label: "Full"; on: root.display-scale == 100; clicked => { root.set-display-scale(100); } }
+                            Pill { label: "Performance"; on: root.display-scale == 50; clicked => { root.set-display-scale(50); } }
+                        }
+                        Text { text: root.display-scale == 50 ? "Half pixels. Judie restarts so the layout still fills the screen." : "Native panel size."; color: #8a8a8a; font-size: Dy.type-dense; font-family: Dy.mono; wrap: word-wrap; }
+                    }
+                    if root.settings-tab == 4: VerticalLayout {
+                        alignment: start;
+                        spacing: 10px;
+                        padding-bottom: 80px;
+                        Text { text: "Display"; color: #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; }
+                        HorizontalLayout {
+                            Text { text: "Sidebar"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Toggle { on: root.sidebar; toggled => { root.toggle-sidebar(); } }
+                        }
+                        HorizontalLayout {
+                            Text { text: "Blocky font"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Toggle { on: root.blocky-font; toggled => { root.toggle-blocky-font(); } }
+                        }
+                        HorizontalLayout {
+                            Text { text: "Hide header clock"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Toggle { on: root.hide-header-clock; toggled => { root.toggle-hide-header-clock(); } }
+                        }
+                        HorizontalLayout {
+                            Text { text: "Header separator"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Toggle { on: root.header-line; toggled => { root.toggle-header-line(); } }
+                        }
+                        Text { text: "Text scale"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 80; maximum: 200; value: root.text-scale; changed(v) => { root.set-text-scale(round(v)); } }
                             FieldTap { width: 88px; tap-height: 52px; label: "80–200"; value: "\{root.text-scale}"; active: root.kb-field == "text-scale"; tapped => { root.open-keyboard("text-scale"); } }
                         }
-                        Text { text: "UI / padding scale"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                        Text { text: "UI / padding scale"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 75; maximum: 150; value: root.ui-scale; changed(v) => { root.set-ui-scale(round(v)); } }
                             FieldTap { width: 88px; tap-height: 52px; label: "75–150"; value: "\{root.ui-scale}"; active: root.kb-field == "ui-scale"; tapped => { root.open-keyboard("ui-scale"); } }
                         }
-                        Text { text: "Header height"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                        Text { text: "Header height"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 88; maximum: 140; value: root.header-h-px; changed(v) => { root.set-header-h(round(v)); } }
                             FieldTap { width: 88px; tap-height: 52px; label: "88–140"; value: "\{root.header-h-px}"; active: root.kb-field == "header-h"; tapped => { root.open-keyboard("header-h"); } }
                         }
-                        Text { text: "Hit-target size"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                        Text { text: "Hit-target size"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 48; maximum: 96; value: root.hit-target-px; changed(v) => { root.set-hit-target(round(v)); } }
@@ -1594,13 +1560,13 @@ export component MainWindow inherits Window {
                 }
             }
         }
-        TouchArea {
+        if !root.settings-page: TouchArea {
             y: parent.height - 28px;
             width: 100%;
             height: 28px;
             pointer-event(ev) => {
                 if ev.kind == PointerEventKind.down {
-                    if root.settings-open || root.palette-open || root.settings-pull > 0.92 {
+                    if root.settings-open || root.settings-pull > 0.92 {
                         root.settings-armed = true;
                         root.settings-kind = 1;
                         root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
@@ -1717,7 +1683,9 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi": ConfirmSheet {
+    if root.confirm-kind == "restart" || root.confirm-kind == "sleep" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi": ConfirmSheet {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
         title: root.confirm-title;
         body: root.confirm-body;
         primary: root.confirm-kind == "forget-wifi" ? "Forget" : "Continue";
@@ -1727,6 +1695,8 @@ export component MainWindow inherits Window {
     }
 
     if root.confirm-kind == "uninstall2": Rectangle {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
         background: #000000cc;
         TouchArea { clicked => { root.cancel-confirm(); } }
         Rectangle {
@@ -1748,6 +1718,8 @@ export component MainWindow inherits Window {
     }
 
     if root.confirm-kind == "uninstall3": Rectangle {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
         background: #000000cc;
         TouchArea { clicked => { root.cancel-confirm(); } }
         Rectangle {
@@ -1770,10 +1742,12 @@ export component MainWindow inherits Window {
     }
 
     if root.gallery-open: Rectangle {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
         background: #000000cc;
         TouchArea { clicked => { root.close-gallery(); } }
         Rectangle {
-            x: (parent.width - 760px) / 2;
+            x: (parent.width - min(760px, parent.width - 40px)) / 2;
             y: (parent.height - 540px) / 2;
             width: 760px;
             height: 540px;
@@ -1986,6 +1960,12 @@ export component MainWindow inherits Window {
                     }
                     HorizontalLayout {
                         spacing: 10px;
+                        Text { text: "Border"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
+                        Rectangle { horizontal-stretch: 1; }
+                        Toggle { on: root.gallery-border; toggled => { root.set-gallery-border(!root.gallery-border); } }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
                         Pill { label: "Cancel"; clicked => { root.close-gallery(); } }
                         Rectangle { horizontal-stretch: 1; }
                         Pill { label: "Add Widget"; on: true; clicked => { root.gallery-add(); } }
@@ -1996,6 +1976,8 @@ export component MainWindow inherits Window {
     }
 
     if root.creator-open: Rectangle {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
         background: #000000cc;
         TouchArea { clicked => { root.close-creator(); } }
         Rectangle {
@@ -2377,7 +2359,10 @@ export component MainWindow inherits Window {
                     }
                 }
                 Rectangle {
+                    width: 100%;
+                    height: 100%;
                     background: #000000;
+                    clip: true;
                     Rectangle { x: parent.width / 2 - 1px; width: 2px; height: 100%; background: #2a2a2a; }
                     Rectangle {
                         x: 12px;
@@ -2405,7 +2390,7 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.expanded != "": TouchArea {
+    if root.expanded != "" && !root.settings-page: TouchArea {
         x: root.rail-w;
         y: parent.height - 28px;
         width: parent.width - root.rail-w;
@@ -2426,17 +2411,6 @@ export component MainWindow inherits Window {
                 Rectangle { width: 48px; height: 4px; background: #3a3a3a; }
             }
         }
-    }
-
-    if root.kb-open: AnsiKeyboard {
-        y: parent.height - 600px;
-        width: 100%;
-        height: 600px;
-        field: root.kb-field;
-        preview: root.kb-field == "wifi-pass" ? (root.kb-text == "" ? "" : "••••••••") : root.kb-text;
-        typed(ch) => { root.keyboard-key(ch); }
-        command(cmd) => { root.keyboard-command(cmd); }
-        close => { root.keyboard-close(); }
     }
 
     if root.updating: Rectangle {
@@ -2525,6 +2499,12 @@ export component MainWindow inherits Window {
         width: root.rail-w;
         height: 100%;
         background: #000000;
+        Rectangle {
+            x: parent.width - 1.5px;
+            width: 1.5px;
+            height: 100%;
+            background: #ffffff;
+        }
         VerticalLayout {
             padding-left: 16px;
             padding-right: 16px;
@@ -2539,7 +2519,7 @@ export component MainWindow inherits Window {
                 Text {
                     text: "PANEL";
                     color: #ffffff;
-                    font-size: 22px;
+                    font-size: Dy.type-hero;
                     font-weight: 700;
                     font-family: Dy.mono;
                     vertical-alignment: center;
@@ -2549,127 +2529,127 @@ export component MainWindow inherits Window {
             Rectangle { height: 18px; }
             Flickable {
                 vertical-stretch: 1;
-                viewport-height: 10 * 56px;
+                viewport-height: 10 * 76px;
                 VerticalLayout {
                     spacing: 4px;
                     TouchArea {
                         clicked => { root.collapse(); root.close-overlay(); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
-                            background: (root.expanded == "" && !root.settings-open) ? #ffffff : #000000;
+                            background: (root.expanded == "" && !root.settings-page) ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px;
                                 spacing: 12px;
-                                Text { text: "⌂"; color: (root.expanded == "" && !root.settings-open) ? #000000 : #c8c8c8; font-size: 18px; vertical-alignment: center; }
-                                Text { text: "HOME"; color: (root.expanded == "" && !root.settings-open) ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "⌂"; color: (root.expanded == "" && !root.settings-page) ? #000000 : #c8c8c8; font-size: Dy.type-value; vertical-alignment: center; }
+                                Text { text: "HOME"; color: (root.expanded == "" && !root.settings-page) ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("lights"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "lights" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "💡"; color: root.expanded == "lights" ? #000000 : #c8c8c8; font-size: 16px; vertical-alignment: center; }
-                                Text { text: "LIGHTS"; color: root.expanded == "lights" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "💡"; color: root.expanded == "lights" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "LIGHTS"; color: root.expanded == "lights" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("climate"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "climate" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "°"; color: root.expanded == "climate" ? #000000 : #c8c8c8; font-size: 18px; vertical-alignment: center; }
-                                Text { text: "CLIMATE"; color: root.expanded == "climate" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "°"; color: root.expanded == "climate" ? #000000 : #c8c8c8; font-size: Dy.type-value; vertical-alignment: center; }
+                                Text { text: "CLIMATE"; color: root.expanded == "climate" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("calendar"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "calendar" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "▦"; color: root.expanded == "calendar" ? #000000 : #c8c8c8; font-size: 16px; vertical-alignment: center; }
-                                Text { text: "CALENDAR"; color: root.expanded == "calendar" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "▦"; color: root.expanded == "calendar" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "CALENDAR"; color: root.expanded == "calendar" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("weather"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "weather" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "*"; color: root.expanded == "weather" ? #000000 : #c8c8c8; font-size: 18px; vertical-alignment: center; }
-                                Text { text: "WEATHER"; color: root.expanded == "weather" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "*"; color: root.expanded == "weather" ? #000000 : #c8c8c8; font-size: Dy.type-value; vertical-alignment: center; }
+                                Text { text: "WEATHER"; color: root.expanded == "weather" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("media"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "media" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "▶"; color: root.expanded == "media" ? #000000 : #c8c8c8; font-size: 16px; vertical-alignment: center; }
-                                Text { text: "MEDIA"; color: root.expanded == "media" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "▶"; color: root.expanded == "media" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "MEDIA"; color: root.expanded == "media" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("purifier"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "purifier" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "◎"; color: root.expanded == "purifier" ? #000000 : #c8c8c8; font-size: 16px; vertical-alignment: center; }
-                                Text { text: "PURIFIER"; color: root.expanded == "purifier" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "◎"; color: root.expanded == "purifier" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "PURIFIER"; color: root.expanded == "purifier" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("terminal"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "terminal" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: ">_"; color: root.expanded == "terminal" ? #000000 : #c8c8c8; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
-                                Text { text: "TERMINAL"; color: root.expanded == "terminal" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: ">_"; color: root.expanded == "terminal" ? #000000 : #c8c8c8; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: "TERMINAL"; color: root.expanded == "terminal" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
                         clicked => { root.expand("pong"); }
-                        height: 52px;
+                        height: 72px;
                         Rectangle {
                             background: root.expanded == "pong" ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "○"; color: root.expanded == "pong" ? #000000 : #c8c8c8; font-size: 16px; vertical-alignment: center; }
-                                Text { text: "PONG"; color: root.expanded == "pong" ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "○"; color: root.expanded == "pong" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "PONG"; color: root.expanded == "pong" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
                     TouchArea {
-                        clicked => { root.open-settings(); }
-                        height: 52px;
+                        clicked => { root.expand("settings"); }
+                        height: 72px;
                         Rectangle {
-                            background: root.settings-open ? #ffffff : #000000;
+                            background: root.settings-page ? #ffffff : #000000;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "⚙"; color: root.settings-open ? #000000 : #c8c8c8; font-size: 16px; vertical-alignment: center; }
-                                Text { text: "SETTINGS"; color: root.settings-open ? #000000 : #c8c8c8; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "⚙"; color: root.settings-page ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "SETTINGS"; color: root.settings-page ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2678,10 +2658,26 @@ export component MainWindow inherits Window {
         }
     }
 
+    if root.kb-open: AnsiKeyboard {
+        x: root.rail-w;
+        y: parent.height - 600px;
+        width: parent.width - root.rail-w;
+        height: 600px;
+        field: root.kb-field;
+        preview: root.kb-field == "wifi-pass" ? (root.kb-text == "" ? "" : "••••••••") : root.kb-text;
+        typed(ch) => { root.keyboard-key(ch); }
+        command(cmd) => { root.keyboard-command(cmd); }
+        close => { root.keyboard-close(); }
+    }
+
     if root.screen-sleep: Rectangle {
         background: #000000;
         TouchArea {
-            clicked => { root.wake-screen(); }
+            pointer-event(ev) => {
+                if ev.kind == PointerEventKind.down {
+                    root.wake-screen();
+                }
+            }
         }
     }
 }

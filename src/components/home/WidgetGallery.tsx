@@ -52,6 +52,7 @@ export function WidgetGallery() {
   const [sizeIndex, setSizeIndex] = useState(0);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [border, setBorder] = useState(true);
   const q = query.trim().toLowerCase();
 
   const visible = types.filter((t) => WIDGET_LABELS[t].toLowerCase().includes(q));
@@ -144,8 +145,8 @@ export function WidgetGallery() {
 
   const addCurrent = () => {
     if (!canAdd || !activeSize) return;
-    if (current.kind === "custom") addWidget("custom", activeSize, undefined, current.id);
-    else addWidget(current.type, activeSize);
+    if (current.kind === "custom") addWidget("custom", activeSize, undefined, current.id, border);
+    else addWidget(current.type, activeSize, undefined, undefined, border);
     setGalleryOpen(false);
   };
 
@@ -305,6 +306,15 @@ export function WidgetGallery() {
                 ))}
               </div>
               <p className="wg-size-caption">{gallerySizeCaption(activeSize)}</p>
+              <div className="settings-inline wg-border-row">
+                <span>Border</span>
+                <button
+                  type="button"
+                  className={`os-toggle${border ? " on" : ""}`}
+                  aria-pressed={border}
+                  onClick={() => setBorder((v) => !v)}
+                />
+              </div>
               <div className="wg-actions">
                 <button type="button" className="wg-cancel" onClick={() => setGalleryOpen(false)}>
                   Cancel

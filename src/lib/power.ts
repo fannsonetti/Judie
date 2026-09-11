@@ -1,9 +1,10 @@
-export const POWER_ACTIONS = ["reboot", "poweroff", "uninstall"] as const;
+export const POWER_ACTIONS = ["reboot", "poweroff", "uninstall", "suspend"] as const;
 export type PowerAction = (typeof POWER_ACTIONS)[number];
 
 export function allowedPowerAction(raw: string): PowerAction {
-  if (raw === "reboot" || raw === "poweroff" || raw === "uninstall") return raw;
+  if (raw === "reboot" || raw === "poweroff" || raw === "uninstall" || raw === "suspend") return raw;
   if (raw === "shutdown") return "poweroff";
+  if (raw === "sleep") return "suspend";
   throw new Error("Unknown power action");
 }
 
@@ -29,5 +30,6 @@ export function uninstallWarning(_kind: "pi" | "desktop" = "pi") {
 export function powerStatusLabel(action: PowerAction) {
   if (action === "reboot") return "Restarting…";
   if (action === "poweroff") return "Shutting down…";
+  if (action === "suspend") return "Going to sleep…";
   return "Removing Judie. Settings stay on this computer…";
 }

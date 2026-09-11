@@ -582,24 +582,22 @@ select.settings-input {
 .settings-sheet.os-sheet.tracking {
   touch-action: none;
 }
-.settings-handle {
-  height: 28px;
-  flex-shrink: 0;
-  cursor: ns-resize;
+.settings-sheet.os-sheet.as-page {
+  transform: none;
 }
-.settings-handle::after {
-  content: "";
-  display: block;
-  width: 48px;
-  height: 3px;
-  margin: 12px auto 0;
-  background: #2a2a2a;
+.settings-backdrop.as-page {
+  top: var(--status-h);
+  pointer-events: auto;
+}
+.settings-handle {
+  display: none;
 }
 .settings-tabs.os-tabs button {
   background: transparent;
   border-radius: 0;
   color: #6a6a6a;
   font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: var(--type-control);
 }
 .settings-tabs.os-tabs button.on {
   background: transparent;
@@ -944,23 +942,32 @@ select.settings-input {
   flex-direction: column;
   gap: 6px;
 }
-.osk-bar { display: flex; align-items: center; gap: 10px; height: 28px; color: #fff; font-family: ui-monospace, monospace; }
-.osk-field { color: #8a8a8a; font-size: 12px; }
-.osk-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.osk-bar button { color: #8a8a8a; background: none; font-size: 12px; }
+.osk-bar { display: flex; align-items: center; gap: 10px; min-height: var(--hit-target, 72px); color: #fff; font-family: ui-monospace, monospace; }
+.osk-field { color: #8a8a8a; font-size: var(--type-status); }
+.osk-preview { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--type-control); }
+.osk-bar button {
+  color: #fff;
+  background: none;
+  font-size: var(--type-control);
+  font-weight: 700;
+  min-width: 88px;
+  min-height: var(--hit-target, 72px);
+  border: 1.5px solid #5a5a5a;
+}
 .osk-row { display: flex; gap: 5px; flex: 1; }
 .osk-key {
   position: relative;
   min-width: 0;
+  min-height: var(--hit-target, 72px);
   border: 1.5px solid #2a2a2a;
   background: #000;
   color: #fff;
   font-family: ui-monospace, monospace;
-  font-size: 15px;
+  font-size: calc(var(--type-control) + 4px);
   font-weight: 600;
 }
 .osk-key.on { border-color: #fff; background: #141414; }
-.osk-sub { position: absolute; left: 4px; top: 3px; font-size: 8px; color: #4a4a4a; }
+.osk-sub { position: absolute; left: 4px; top: 3px; font-size: var(--type-dense); color: #4a4a4a; }
 .os-confirm {
   background: #000;
   border: 1.5px solid #5a5a5a;
@@ -979,6 +986,7 @@ select.settings-input {
   flex-direction: column;
   padding: 16px;
   z-index: 30;
+  box-shadow: inset -1.5px 0 0 #ffffff;
 }
 .side-rail-brand {
   display: flex;
@@ -988,7 +996,7 @@ select.settings-input {
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.2em;
-  font-size: 22px;
+  font-size: var(--type-hero);
   font-family: ui-monospace, monospace;
 }
 .side-rail-rule {
@@ -1007,13 +1015,13 @@ select.settings-input {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 52px;
+  height: 72px;
   padding: 0 12px;
   color: #c8c8c8;
   text-align: left;
   letter-spacing: 0.12em;
   font-family: ui-monospace, monospace;
-  font-size: 16px;
+  font-size: var(--type-value);
 }
 .side-rail-tab.on {
   background: #fff;
@@ -1028,7 +1036,7 @@ select.settings-input {
 .vol-menu {
   position: absolute;
   top: calc(var(--status-h) - 8px);
-  right: 88px;
+  right: 8px;
   width: 260px;
   background: #000;
   border: 1.5px solid #2a2a2a;

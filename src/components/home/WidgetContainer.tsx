@@ -254,6 +254,7 @@ export function WidgetContainer({
 
   const shellClass = [
     "widget-shell",
+    widget.border === false ? "no-border" : "",
     editMode ? "edit-jiggle" : "",
     isPendingRemove ? "pending-remove" : "",
   ]

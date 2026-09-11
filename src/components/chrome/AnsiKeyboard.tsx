@@ -25,7 +25,7 @@ function Key({
         onPress();
       }}
     >
-      {icon ? <img src={icon} alt="" width={22} height={22} /> : label}
+      {icon ? <img src={icon} alt="" width={40} height={40} /> : label}
       {sub ? <span className="osk-sub">{sub}</span> : null}
     </button>
   );

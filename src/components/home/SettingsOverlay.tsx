@@ -42,10 +42,11 @@ import {
   type RoutineDraft,
 } from "../../lib/routineEditor";
 
-type Tab = "general" | "network" | "power" | "accessibility";
+type Tab = "general" | "network" | "power" | "device" | "accessibility";
 type Confirm =
   | null
   | { kind: "restart" }
+  | { kind: "sleep" }
   | { kind: "shutdown" }
   | { kind: "uninstall1" }
   | { kind: "uninstall2"; prompt: string; answer: number }
@@ -83,9 +84,10 @@ export function SettingsOverlay() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
   const [screenOffOpen, setScreenOffOpen] = useState(false);
+  const sidebar = settings.sidebar;
 
   const displayed = useVisualSettingsPull(pull, tracking);
-  const visible = open || tracking || displayed > 0.01 || pull > 0.01;
+  const visible = sidebar ? open : open || tracking || displayed > 0.01 || pull > 0.01;
 
   useEffect(() => {
     if (tracking) return;
@@ -229,7 +231,7 @@ export function SettingsOverlay() {
     }
   };
 
-  const runDeviceAction = async (action: "reboot" | "poweroff" | "uninstall") => {
+  const runDeviceAction = async (action: "reboot" | "poweroff" | "uninstall" | "suspend") => {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
@@ -244,6 +246,11 @@ export function SettingsOverlay() {
     try {
       if (action === "reboot") await relaunchJudie();
       else if (action === "poweroff") await quitJudie();
+      else if (action === "suspend") {
+        setPowerStatus("Sleep is available on the Pi kiosk.");
+        busyRef.current = false;
+        setBusy(false);
+      }
       else await uninstallJudie();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Could not complete the action");
@@ -257,6 +264,11 @@ export function SettingsOverlay() {
     if (confirm.kind === "restart") {
       setConfirm(null);
       await runDeviceAction("reboot");
+      return;
+    }
+    if (confirm.kind === "sleep") {
+      setConfirm(null);
+      await runDeviceAction("suspend");
       return;
     }
     if (confirm.kind === "shutdown") {
@@ -302,12 +314,13 @@ export function SettingsOverlay() {
   if (!visible) return null;
 
   return (
-    <div className="settings-backdrop" onClick={close}>
+    <div className={`settings-backdrop${sidebar ? " as-page" : ""}`} onClick={sidebar ? undefined : close}>
       <div
-        className={`settings-sheet os-sheet${tracking ? " tracking" : ""}`}
-        style={{ transform: `translate3d(0, ${(displayed - 1) * 100}%, 0)` }}
+        className={`settings-sheet os-sheet${tracking ? " tracking" : ""}${sidebar ? " as-page" : ""}`}
+        style={sidebar ? undefined : { transform: `translate3d(0, ${(displayed - 1) * 100}%, 0)` }}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => {
+          if (sidebar) return;
           if (closeDrag.current) return;
           if (!open && pull < 0.92) return;
           if (!inCloseEdge(e.clientY, window.innerHeight || 1)) return;
@@ -341,12 +354,11 @@ export function SettingsOverlay() {
           window.addEventListener("pointercancel", cancel);
         }}
       >
-        <div className="settings-handle" />
         <header className="settings-header">
           <h2>Settings</h2>
         </header>
         <nav className="settings-tabs os-tabs" aria-label="Settings">
-          {(["general", "network", "power", "accessibility"] as const).map((id) => (
+          {(["general", "network", "power", "device", "accessibility"] as const).map((id) => (
             <button key={id} type="button" className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
               {id === "accessibility" ? "Accessibility" : id[0].toUpperCase() + id.slice(1)}
             </button>
@@ -479,6 +491,10 @@ export function SettingsOverlay() {
                   <span className="os-power-glyph" aria-hidden>↻</span>
                   Restart
                 </button>
+                <button type="button" className="os-power-btn" disabled={busy} onClick={() => setConfirm({ kind: "sleep" })}>
+                  <span className="os-power-glyph" aria-hidden>z</span>
+                  Sleep
+                </button>
                 <button type="button" className="os-power-btn" disabled={busy} onClick={() => setConfirm({ kind: "shutdown" })}>
                   <span className="os-power-glyph" aria-hidden>○</span>
                   Shut Down
@@ -548,6 +564,63 @@ export function SettingsOverlay() {
               {actionError && <p className="settings-note">{actionError}</p>}
             </>
           )}
+          {tab === "device" && (
+            <div className="settings-device">
+              <p className="os-kicker">Turn my screen off after</p>
+              <button type="button" className="os-version-trigger" onClick={() => setScreenOffOpen(!screenOffOpen)}>
+                {screenOffLabel(settings.screenOffSecs)} ▼
+              </button>
+              {screenOffOpen && (
+                <div className="os-version-list">
+                  {SCREEN_OFF_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.secs}
+                      type="button"
+                      className="os-row"
+                      onClick={() => {
+                        update({ screenOffSecs: opt.secs });
+                        setScreenOffOpen(false);
+                      }}
+                    >
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="os-kicker">Display</p>
+              <p className="settings-note">HDMI-1  —  @  — Hz</p>
+              <p className="os-kicker">Refresh rate</p>
+              <div className="os-pills">
+                {["60", "50", "30"].map((hz) => (
+                  <button key={hz} type="button" className="os-pill">
+                    {hz}
+                  </button>
+                ))}
+              </div>
+              <p className="os-kicker">Pixel size</p>
+              <div className="os-pills">
+                <button
+                  type="button"
+                  className={`os-pill${settings.displayScale !== 50 ? " on" : ""}`}
+                  onClick={() => update({ displayScale: 100 })}
+                >
+                  Full
+                </button>
+                <button
+                  type="button"
+                  className={`os-pill${settings.displayScale === 50 ? " on" : ""}`}
+                  onClick={() => update({ displayScale: 50 })}
+                >
+                  Performance
+                </button>
+              </div>
+              <p className="settings-note">
+                {settings.displayScale === 50
+                  ? "Half pixels. Judie restarts on the Pi so the layout still fills the screen."
+                  : "Native panel size."}
+              </p>
+            </div>
+          )}
           {tab === "accessibility" && (
             <div className="settings-a11y">
               <p className="os-kicker">Display</p>
@@ -576,27 +649,6 @@ export function SettingsOverlay() {
                 <span>Header separator</span>
                 <button type="button" className={`os-toggle${settings.headerLine ? " on" : ""}`} aria-pressed={settings.headerLine} onClick={() => update({ headerLine: !settings.headerLine })} />
               </div>
-              <p className="os-kicker">Turn my screen off after</p>
-              <button type="button" className="os-version-trigger" onClick={() => setScreenOffOpen(!screenOffOpen)}>
-                {screenOffLabel(settings.screenOffSecs)} ▼
-              </button>
-              {screenOffOpen && (
-                <div className="os-version-list">
-                  {SCREEN_OFF_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.secs}
-                      type="button"
-                      className="os-row"
-                      onClick={() => {
-                        update({ screenOffSecs: opt.secs });
-                        setScreenOffOpen(false);
-                      }}
-                    >
-                      <span>{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
               <ScaleRow label="Text scale" min={80} max={200} value={settings.textScale} onChange={(n) => update({ textScale: n })} />
               <ScaleRow label="UI / padding scale" min={75} max={150} value={settings.uiScale} onChange={(n) => update({ uiScale: n })} />
               <ScaleRow label="Header height" min={88} max={140} value={settings.headerH} onChange={(n) => update({ headerH: n })} />
@@ -608,6 +660,9 @@ export function SettingsOverlay() {
 
       {confirm?.kind === "restart" && (
         <ConfirmSheet title="Restart Judie?" body="The app will close and open again." onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
+      )}
+      {confirm?.kind === "sleep" && (
+        <ConfirmSheet title="Sleep?" body="The panel will suspend. A tap on the screen wakes it." onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />
       )}
       {confirm?.kind === "shutdown" && (
         <ConfirmSheet title="Shut down Judie?" body="Judie will quit until you open it again." primary="Shutdown" onAccept={() => void accept()} onDismiss={() => setConfirm(null)} />

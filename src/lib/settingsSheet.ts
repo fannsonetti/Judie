@@ -25,8 +25,8 @@ export function clampPull(n: number): number {
   return Math.max(0, Math.min(1, n));
 }
 
-export function canBeginOpen(settingsOpen: boolean, pull: number): boolean {
-  return !settingsOpen && pull < 0.08;
+export function canBeginOpen(settingsOpen: boolean, pull: number, sidebar = false): boolean {
+  return !sidebar && !settingsOpen && pull < 0.08;
 }
 
 export function canBeginClose(settingsOpen: boolean, pull: number): boolean {

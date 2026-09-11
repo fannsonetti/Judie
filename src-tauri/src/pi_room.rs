@@ -76,6 +76,8 @@ pub struct Slot {
     pub label: String,
     #[serde(default)]
     pub custom_id: String,
+    #[serde(default = "default_true")]
+    pub border: bool,
 }
 
 #[derive(Clone)]
@@ -189,6 +191,10 @@ struct Persist {
     header_h: Option<i32>,
     #[serde(default)]
     hit_target: Option<i32>,
+    #[serde(default)]
+    display_scale: Option<i32>,
+    #[serde(default)]
+    display_native: String,
 }
 
 pub const GRID_COLS: i32 = 6;
@@ -222,6 +228,7 @@ fn slot(id: &str, kind: &str, size: &str, col: i32, row: i32) -> Slot {
         page: 0,
         label: String::new(),
         custom_id: String::new(),
+        border: true,
     }
 }
 
@@ -538,6 +545,8 @@ fn save_persist(room: &Room) {
         ui_scale: Some(room.ui_scale),
         header_h: Some(room.header_h),
         hit_target: Some(room.hit_target),
+        display_scale: Some(room.display_scale),
+        display_native: room.display_native.clone(),
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
@@ -1002,6 +1011,9 @@ pub struct Room {
     pub ui_scale: i32,
     pub header_h: i32,
     pub hit_target: i32,
+    pub gallery_border: bool,
+    pub display_scale: i32,
+    pub display_native: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1024,6 +1036,7 @@ pub enum Expanded {
     Terminal,
     Climate,
     Pong,
+    Settings,
 }
 
 fn expand_layout_text(kind: &str, text: &str, room: &Room) -> String {
@@ -1186,6 +1199,12 @@ impl Default for Room {
             ui_scale: persist.ui_scale.unwrap_or(100).clamp(75, 150),
             header_h: persist.header_h.unwrap_or(108).clamp(88, 140),
             hit_target: persist.hit_target.unwrap_or(72).clamp(48, 96),
+            gallery_border: true,
+            display_scale: match persist.display_scale.unwrap_or(100) {
+                50 => 50,
+                _ => 100,
+            },
+            display_native: persist.display_native,
         };
         let preset = migrate_units_preset(&persist.temp_unit, &persist.distance_unit);
         room.apply_units_preset(preset);
@@ -1266,6 +1285,15 @@ impl Room {
         let ok = SCREEN_OFF_OPTIONS.iter().any(|(_, s)| *s == secs);
         self.screen_off_secs = if ok { secs.max(0) } else { 0 };
         self.persist();
+    }
+
+    pub fn set_display_scale(&mut self, scale: i32) {
+        self.display_scale = if scale == 50 { 50 } else { 100 };
+        self.persist();
+    }
+
+    pub fn set_gallery_border(&mut self, on: bool) {
+        self.gallery_border = on;
     }
 
     pub fn apply_units_preset(&mut self, preset: &str) {
@@ -1950,6 +1978,7 @@ impl Room {
             page,
             label,
             custom_id: custom_id.into(),
+            border: self.gallery_border,
         });
         self.page = page;
         self.overlay = Overlay::None;

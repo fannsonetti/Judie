@@ -1,7 +1,7 @@
 #!/bin/sh
-# Passwordless helper: power reboot | poweroff | uninstall
+# Passwordless helper: power reboot | poweroff | uninstall | suspend
 #
-# Only these three actions are accepted. The frontend cannot pass a shell.
+# Only these actions are accepted. The frontend cannot pass a shell.
 #
 # Do not stop judie.service. Stopping the kiosk blanks tty1 (cursor on black)
 # and systemd can kill this helper with the kiosk cgroup.
@@ -15,8 +15,8 @@ fail() { echo "$1" >&2; exit 1; }
 
 ACTION="${1:-}"
 case "$ACTION" in
-  reboot|poweroff|uninstall) ;;
-  *) fail "usage: power reboot|poweroff|uninstall" ;;
+  reboot|poweroff|uninstall|suspend) ;;
+  *) fail "usage: power reboot|poweroff|uninstall|suspend" ;;
 esac
 
 [ "$#" -eq 1 ] || fail "refused extra arguments"
@@ -33,6 +33,9 @@ case "$ACTION" in
     ;;
   poweroff)
     /sbin/poweroff
+    ;;
+  suspend)
+    /bin/systemctl suspend
     ;;
   uninstall)
     command -v apt-get >/dev/null 2>&1 || fail "apt-get missing"

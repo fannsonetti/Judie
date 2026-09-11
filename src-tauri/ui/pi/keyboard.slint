@@ -24,18 +24,18 @@ export component AnsiKeyboard inherits Rectangle {
 
         HorizontalLayout {
             spacing: 10px;
-            height: 28px;
+            height: Dy.hit-target;
             Text {
                 text: root.field;
                 color: Dy.muted;
-                font-size: 12px;
+                font-size: Dy.type-status;
                 font-family: Dy.mono;
                 vertical-alignment: center;
             }
             Text {
                 text: root.preview;
                 color: Dy.text;
-                font-size: 16px;
+                font-size: Dy.type-control;
                 font-family: Dy.mono;
                 vertical-alignment: center;
                 horizontal-stretch: 1;
@@ -43,14 +43,20 @@ export component AnsiKeyboard inherits Rectangle {
             }
             TouchArea {
                 clicked => { root.close(); }
-                width: 56px;
-                Text {
-                    text: "Hide";
-                    color: Dy.muted;
-                    font-size: 12px;
-                    font-family: Dy.mono;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+                width: Dy.hit-target * 1.4;
+                min-width: 88px;
+                Rectangle {
+                    border-width: 1.5px;
+                    border-color: Dy.border-hi;
+                    Text {
+                        text: "Hide";
+                        color: Dy.text;
+                        font-size: Dy.type-control;
+                        font-family: Dy.mono;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
                 }
             }
         }

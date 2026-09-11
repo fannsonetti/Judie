@@ -99,8 +99,11 @@ mkdir -p /etc/X11/xorg.conf.d
 if [ -f /usr/lib/judie/10-noscreenblank.conf ]; then
   cp /usr/lib/judie/10-noscreenblank.conf /etc/X11/xorg.conf.d/10-noscreenblank.conf
 fi
-# fbdev needs /dev/fb0. This Pi often only has DRM (card0); modesetting then.
-if [ -e /dev/fb0 ] && [ -f /usr/lib/judie/20-pi-fbdev.conf ]; then
+# Prefer modesetting 24-bit when DRM is present. fbdev + ShadowFB is slower.
+if [ -e /dev/dri/card0 ] && [ -f /usr/lib/judie/20-pi-modeset.conf ]; then
+  cp /usr/lib/judie/20-pi-modeset.conf /etc/X11/xorg.conf.d/20-pi-modeset.conf
+  rm -f /etc/X11/xorg.conf.d/20-pi-fbdev.conf
+elif [ -e /dev/fb0 ] && [ -f /usr/lib/judie/20-pi-fbdev.conf ]; then
   cp /usr/lib/judie/20-pi-fbdev.conf /etc/X11/xorg.conf.d/20-pi-fbdev.conf
   rm -f /etc/X11/xorg.conf.d/20-pi-modeset.conf
 elif [ -f /usr/lib/judie/20-pi-modeset.conf ]; then

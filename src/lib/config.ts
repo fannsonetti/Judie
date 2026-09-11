@@ -23,6 +23,7 @@ export interface InstallationConfig {
   headerH: number;
   hitTarget: number;
   volume: number;
+  displayScale: number;
   proactive: {
     timers: boolean;
     calendar: boolean;
@@ -79,6 +80,7 @@ export const DEFAULT_INSTALLATION: InstallationConfig = {
   headerH: 108,
   hitTarget: 72,
   volume: 62,
+  displayScale: 100,
   proactive: {
     timers: true,
     calendar: true,

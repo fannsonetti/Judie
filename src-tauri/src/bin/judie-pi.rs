@@ -174,6 +174,7 @@ fn expanded_name(e: Expanded) -> SharedString {
         Expanded::Terminal => "terminal",
         Expanded::Climate => "climate",
         Expanded::Pong => "pong",
+        Expanded::Settings => "settings",
     })
 }
 
@@ -240,17 +241,155 @@ fn play_beep(freq: u32, ms: u32) {
     });
 }
 
+fn set_backlight(on: bool) {
+    let Ok(entries) = std::fs::read_dir("/sys/class/backlight") else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let dir = entry.path();
+        let max = std::fs::read_to_string(dir.join("max_brightness"))
+            .ok()
+            .and_then(|s| s.trim().parse::<u32>().ok())
+            .unwrap_or(1);
+        let value = if on { max } else { 0 };
+        let _ = std::fs::write(dir.join("brightness"), value.to_string());
+    }
+}
+
 fn set_display_power(on: bool) {
     if on {
         let _ = std::process::Command::new("xset").args(["dpms", "force", "on"]).status();
-        let _ = std::process::Command::new("vcgencmd").args(["display_power", "1"]).status();
+        set_backlight(true);
         SCREEN_ASLEEP.store(false, std::sync::atomic::Ordering::Relaxed);
     } else {
         let _ = std::process::Command::new("xset").args(["+dpms"]).status();
         let _ = std::process::Command::new("xset").args(["dpms", "force", "off"]).status();
-        let _ = std::process::Command::new("vcgencmd").args(["display_power", "0"]).status();
+        set_backlight(false);
         SCREEN_ASLEEP.store(true, std::sync::atomic::Ordering::Relaxed);
     }
+}
+
+#[derive(Clone)]
+struct DisplayInfo {
+    output: String,
+    mode: String,
+    rate: String,
+}
+
+fn parse_xrandr() -> DisplayInfo {
+    let fallback = DisplayInfo {
+        output: "HDMI-1".into(),
+        mode: "—".into(),
+        rate: "—".into(),
+    };
+    let Ok(out) = std::process::Command::new("xrandr").args(["--current"]).output() else {
+        return fallback;
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut output = fallback.output.clone();
+    let mut mode = fallback.mode.clone();
+    let mut rate = fallback.rate.clone();
+    let mut current = false;
+    for line in text.lines() {
+        if line.contains(" connected") {
+            output = line
+                .split_whitespace()
+                .next()
+                .unwrap_or("HDMI-1")
+                .to_string();
+            current = true;
+            continue;
+        }
+        if current && line.contains('*') {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if let Some(m) = parts.first() {
+                mode = m.to_string();
+            }
+            if let Some(r) = parts.iter().find(|p| p.contains('*')) {
+                rate = r.trim_matches(|c: char| !c.is_ascii_digit() && c != '.').to_string();
+            }
+            break;
+        }
+        if current && line.contains(" connected") {
+            break;
+        }
+    }
+    DisplayInfo { output, mode, rate }
+}
+
+fn apply_xrandr_mode(output: &str, mode: &str, rate: Option<&str>) -> bool {
+    let mut cmd = std::process::Command::new("xrandr");
+    cmd.args(["--output", output, "--mode", mode]);
+    if let Some(r) = rate {
+        if !r.is_empty() && r != "—" {
+            cmd.args(["--rate", r]);
+        }
+    }
+    cmd.status().map(|s| s.success()).unwrap_or(false)
+}
+
+fn ensure_mode(output: &str, w: u32, h: u32, hz: u32) -> Option<String> {
+    let name = format!("{w}x{h}");
+    if apply_xrandr_mode(output, &name, Some(&hz.to_string())) {
+        return Some(name);
+    }
+    let cvt = std::process::Command::new("cvt")
+        .args([w.to_string(), h.to_string(), hz.to_string()])
+        .output()
+        .ok()?;
+    let line = String::from_utf8_lossy(&cvt.stdout)
+        .lines()
+        .find(|l| l.contains("Modeline"))?
+        .to_string();
+    let rest = line.splitn(2, "Modeline").nth(1)?.trim();
+    let mut parts = rest.split_whitespace();
+    let modeline = parts.next()?.trim_matches('"').to_string();
+    let timing: Vec<String> = parts.map(|s| s.to_string()).collect();
+    if timing.is_empty() {
+        return None;
+    }
+    let mut newmode = vec!["--newmode".into(), modeline.clone()];
+    newmode.extend(timing);
+    let _ = std::process::Command::new("xrandr").args(&newmode).status();
+    let _ = std::process::Command::new("xrandr")
+        .args(["--addmode", output, &modeline])
+        .status();
+    if apply_xrandr_mode(output, &modeline, None) {
+        Some(modeline)
+    } else {
+        None
+    }
+}
+
+fn apply_persisted_display() {
+    let (scale, native) = pi_room::with(|room| (room.display_scale, room.display_native.clone()));
+    let info = parse_xrandr();
+    if native.is_empty() {
+        if info.mode != "—" {
+            pi_room::with(|room| {
+                room.display_native = info.mode.clone();
+                room.save();
+            });
+        }
+    }
+    if scale == 50 {
+        let parts: Vec<&str> = info.mode.split('x').collect();
+        let w = parts.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1920) / 2;
+        let h = parts.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1200) / 2;
+        let _ = ensure_mode(&info.output, w.max(320), h.max(240), 60);
+        let phys = framebuffer_size().map(|s| s.width).unwrap_or(w.max(320));
+        let factor = (phys as f32 / 1920.0).clamp(0.25, 1.0);
+        unsafe {
+            std::env::set_var("SLINT_SCALE_FACTOR", format!("{factor:.4}"));
+        }
+    }
+}
+
+fn restart_kiosk() {
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+        std::process::exit(0);
+    });
 }
 
 fn pong_step() {
@@ -337,6 +476,10 @@ fn dispatch_terminal(ui: &MainWindow) {
 }
 
 fn push_ui(ui: &MainWindow) {
+    if SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed) {
+        ui.set_screen_sleep(true);
+        return;
+    }
     let now = chrono::Local::now();
     ui.set_clock(now.format("%H:%M").to_string().into());
     ui.set_clock_hm(now.format("%H:%M").to_string().into());
@@ -387,7 +530,10 @@ fn push_ui(ui: &MainWindow) {
         let track = room.current_track();
         ui.set_track_title(track.title.clone().into());
         ui.set_track_artist(track.artist.clone().into());
-        ui.set_volume(i32::from(room.volume));
+        let vol = i32::from(room.volume);
+        if ui.get_volume() != vol {
+            ui.set_volume(vol);
+        }
         ui.set_sidebar(room.sidebar);
         ui.set_blocky_font(room.blocky_font);
         ui.set_hide_header_clock(room.hide_header_clock);
@@ -415,7 +561,13 @@ fn push_ui(ui: &MainWindow) {
         ui.set_units_metric(room.units_metric);
         ui.set_temp_unit(room.temp_unit.clone().into());
         ui.set_distance_unit(room.distance_unit.clone().into());
-        ui.set_settings_tab(room.settings_tab.clamp(0, 3));
+        ui.set_settings_tab(room.settings_tab.clamp(0, 4));
+        ui.set_gallery_border(room.gallery_border);
+        ui.set_display_scale(room.display_scale);
+        let display = parse_xrandr();
+        ui.set_display_output(display.output.into());
+        ui.set_display_mode(display.mode.into());
+        ui.set_display_rate(display.rate.into());
         ui.set_palette_query(room.palette_query.clone().into());
         ui.set_palette_reply(room.palette_reply.clone().into());
         ui.set_terminal_input(room.terminal_input.clone().into());
@@ -586,6 +738,7 @@ fn push_ui(ui: &MainWindow) {
                     label: s.label.clone().into(),
                     custom_id: s.custom_id.clone().into(),
                     use_layout: s.kind == "custom" || room.has_face_layout(&s.kind, &s.size),
+                    border: s.border,
                 }
             })
             .collect();
@@ -1102,7 +1255,6 @@ fn bind(ui: &MainWindow) {
             room.volume = v.clamp(0, 100) as u8;
             room.save();
         });
-        note_input();
         r();
     });
     ui.on_note_input(move || {
@@ -1145,6 +1297,38 @@ fn bind(ui: &MainWindow) {
     ui.on_set_screen_off(move |secs| {
         pi_room::with(|room| room.set_screen_off(secs));
         note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_display_rate(move |rate| {
+        let info = parse_xrandr();
+        let ok = apply_xrandr_mode(&info.output, &info.mode, Some(rate.as_str()));
+        if !ok && info.mode != "—" {
+            let _ = apply_xrandr_mode(&info.output, &info.mode, None);
+        }
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_display_scale(move |scale| {
+        let info = parse_xrandr();
+        pi_room::with(|room| {
+            if room.display_native.is_empty() && info.mode != "—" {
+                room.display_native = info.mode.clone();
+            }
+            room.set_display_scale(scale);
+        });
+        if scale == 50 {
+            let parts: Vec<&str> = info.mode.split('x').collect();
+            let w = parts.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1920) / 2;
+            let h = parts.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1200) / 2;
+            let _ = ensure_mode(&info.output, w.max(320), h.max(240), 60);
+        } else {
+            let native = pi_room::with(|room| room.display_native.clone());
+            if !native.is_empty() {
+                let _ = apply_xrandr_mode(&info.output, &native, Some("60"));
+            }
+        }
+        restart_kiosk();
         r();
     });
     let r = refresh.clone();
@@ -1268,7 +1452,7 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_set_tab(move |t| {
-        pi_room::with(|room| room.settings_tab = t.clamp(0, 3));
+        pi_room::with(|room| room.settings_tab = t.clamp(0, 4));
         r();
     });
     let r = refresh.clone();
@@ -1305,11 +1489,13 @@ fn bind(ui: &MainWindow) {
         r();
     });
     let r = refresh.clone();
+    let weak = ui.as_weak();
     ui.on_expand(move |kind| {
         pi_room::with(|room| {
             if room.edit_mode {
                 return;
             }
+            room.overlay = Overlay::None;
             room.expanded = match kind.as_str() {
                 "weather" => Expanded::Weather,
                 "lights" => Expanded::Lights,
@@ -1319,10 +1505,19 @@ fn bind(ui: &MainWindow) {
                 "terminal" => Expanded::Terminal,
                 "climate" => Expanded::Climate,
                 "pong" => Expanded::Pong,
+                "settings" => Expanded::Settings,
                 _ => Expanded::None,
             };
         });
         r();
+        if kind.as_str() == "settings" {
+            if let Some(ui) = weak.upgrade() {
+                load_wifi_status(&ui);
+                load_releases(&ui);
+                ui.invoke_scan_wifi();
+                ui.invoke_run_diag();
+            }
+        }
     });
     let r = refresh.clone();
     ui.on_collapse(move || {
@@ -1414,6 +1609,11 @@ fn bind(ui: &MainWindow) {
         pi_room::with(|room| {
             let _ = room.gallery_add_selected();
         });
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_gallery_border(move |on| {
+        pi_room::with(|room| room.set_gallery_border(on));
         r();
     });
     let r = refresh.clone();
@@ -2072,6 +2272,11 @@ fn bind(ui: &MainWindow) {
                 ui.set_confirm_body("The panel will reboot. Judie stays on screen until the computer restarts.".into());
                 ui.set_confirm_kind("restart".into());
             }
+            "sleep" => {
+                ui.set_confirm_title("Sleep?".into());
+                ui.set_confirm_body("The panel will suspend. A tap on the screen wakes it.".into());
+                ui.set_confirm_kind("sleep".into());
+            }
             "shutdown" => {
                 ui.set_confirm_title("Shut down?".into());
                 ui.set_confirm_body("The panel will power off. Judie stays on screen until the computer shuts down.".into());
@@ -2121,6 +2326,10 @@ fn bind(ui: &MainWindow) {
             "restart" => {
                 ui.set_confirm_kind("".into());
                 begin_power_action(&ui, "reboot");
+            }
+            "sleep" => {
+                ui.set_confirm_kind("".into());
+                begin_power_action(&ui, "suspend");
             }
             "shutdown" => {
                 ui.set_confirm_kind("".into());
@@ -2242,6 +2451,7 @@ fn main() {
     ensure_display();
     host::warm();
     pi_room::with(|_| {});
+    apply_persisted_display();
 
     let ui = match MainWindow::new() {
         Ok(ui) => ui,
@@ -2265,7 +2475,8 @@ fn main() {
 
     note_input();
     let weak = ui.as_weak();
-    slint::Timer::default().start(TimerMode::Repeated, Duration::from_millis(16), move || {
+    let pong_timer = slint::Timer::default();
+    pong_timer.start(TimerMode::Repeated, Duration::from_millis(16), move || {
         if let Some(ui) = weak.upgrade() {
             if ui.get_expanded() == "pong" {
                 pong_step();
@@ -2282,11 +2493,15 @@ fn main() {
     });
 
     let weak = ui.as_weak();
-    slint::Timer::default().start(TimerMode::Repeated, Duration::from_secs(1), move || {
+    let tick_timer = slint::Timer::default();
+    tick_timer.start(TimerMode::Repeated, Duration::from_secs(1), move || {
         if let Some(ui) = weak.upgrade() {
-            pi_room::with(|room| room.tick_media());
+            let asleep = SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed);
+            if !asleep {
+                pi_room::with(|room| room.tick_media());
+            }
             let timeout = pi_room::with(|room| room.screen_off_secs);
-            if timeout > 0 && !SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed) {
+            if timeout > 0 && !asleep {
                 let idle = LAST_INPUT
                     .lock()
                     .unwrap()
@@ -2297,12 +2512,15 @@ fn main() {
                     ui.set_screen_sleep(true);
                 }
             }
-            push_ui(&ui);
+            if !SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed) {
+                push_ui(&ui);
+            }
         }
     });
 
     let weak = ui.as_weak();
-    slint::Timer::default().start(TimerMode::Repeated, Duration::from_secs(5), move || {
+    let net_timer = slint::Timer::default();
+    net_timer.start(TimerMode::Repeated, Duration::from_secs(5), move || {
         if let Some(ui) = weak.upgrade() {
             load_link(&ui);
             if ui.get_net_menu_open() && !ui.get_wifi_busy() {
@@ -2337,7 +2555,8 @@ fn main() {
     });
 
     let weak = ui.as_weak();
-    slint::Timer::default().start(TimerMode::SingleShot, Duration::from_secs(45), move || {
+    let poll_timer = slint::Timer::default();
+    poll_timer.start(TimerMode::SingleShot, Duration::from_secs(45), move || {
         poll_latest(weak.clone());
     });
 
@@ -2390,5 +2609,6 @@ fn main() {
         });
     });
 
+    let _ = (pong_timer, tick_timer, net_timer, poll_timer);
     ui.run().expect("run");
 }

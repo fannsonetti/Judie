@@ -43,6 +43,7 @@ export const useSettingsStore = create<SettingsState>()(
           headerH: p.headerH ?? current.headerH,
           hitTarget: p.hitTarget ?? current.hitTarget,
           volume: p.volume ?? current.volume,
+          displayScale: p.displayScale ?? current.displayScale,
           proactive: { ...DEFAULT_INSTALLATION.proactive, ...p.proactive },
         };
       },

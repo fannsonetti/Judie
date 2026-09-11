@@ -82,7 +82,7 @@ interface LayoutState {
   confirmRemoveWidget: () => void;
   cancelRemoveWidget: () => void;
   removeWidget: (id: string) => void;
-  addWidget: (type: WidgetType, size: WidgetSize, page?: number, customId?: string) => void;
+  addWidget: (type: WidgetType, size: WidgetSize, page?: number, customId?: string, border?: boolean) => void;
   moveWidgetToPage: (id: string, page: number) => void;
 }
 
@@ -225,7 +225,7 @@ export const useLayoutStore = create<LayoutState>()(
           widgets: normalizeOrders(s.widgets.filter((w) => w.id !== id)),
         })),
 
-      addWidget: (type, size, page, customId) =>
+      addWidget: (type, size, page, customId, border) =>
         set((s) => {
           const targetPage = Math.max(0, Math.min(MAX_PAGES - 1, page ?? s.currentPage));
           const supported = sizesFor(type, customId);
@@ -242,6 +242,7 @@ export const useLayoutStore = create<LayoutState>()(
             col: free.col,
             row: free.row,
             customId: type === "custom" ? customId : undefined,
+            border: border !== false,
           };
           return { widgets: [...s.widgets, widget], galleryOpen: false };
         }),
