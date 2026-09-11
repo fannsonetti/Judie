@@ -1395,8 +1395,8 @@ test("pi polish: rail, device, sleep, timers, borders, and screen-off", () => {
   assert(rust.includes("set_backlight"), "backlight sysfs dim");
   assert(rust.includes("if SCREEN_ASLEEP"), "asleep skips push_ui");
   assert(rust.includes("settings_tab.clamp(0, 4)"), "five settings tabs");
-  assert(!modeset.includes("AccelMethod"), "modesetting is not forced to software");
-  assert(postinst.includes("/dev/dri/card0"), "postinst prefers DRM modesetting");
+  assert(modeset.includes("AccelMethod") && modeset.includes("PageFlip"), "modesetting stays software + no page flip");
+  assert(postinst.includes("/dev/fb0") && postinst.includes("20-pi-fbdev.conf"), "postinst prefers fbdev when the framebuffer exists");
   assert(slint.includes("width: 100%") && slint.includes("clip: true"), "pong court fills the expand");
   assert(slint.includes("PointerEventKind.down") && slint.includes("wake-screen()"), "first tap wakes");
   const netAt = slint.indexOf("net-btn := TouchArea");
