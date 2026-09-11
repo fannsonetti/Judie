@@ -1,7 +1,7 @@
 import { GRID_COLS, GRID_ROWS, SIZE_DIMS, WidgetSize } from "../types/widgets";
 
 export const NOVA_FRAME = { w: 1920, h: 1200 };
-export const NOVA_STATUS_H = 88;
+export const NOVA_STATUS_H = 108;
 export const NOVA_SAFE_BOTTOM = 20;
 export const NOVA_PAGE_TOP = 4;
 
@@ -23,10 +23,10 @@ export interface FrameSize {
  * 6×4 home grid with square cells. Uses the smaller axis so widgets keep a
  * fixed 1:1 cell ratio; leftover space becomes side (or vertical) padding.
  */
-export function measureWidgetGrid(width: number, height: number): GridMetrics {
+export function measureWidgetGrid(width: number, height: number, cols = GRID_COLS): GridMetrics {
   const gap = Math.max(12, Math.min(20, width * 0.012));
-  const cell = Math.min(width / GRID_COLS, height / GRID_ROWS);
-  const gridW = cell * GRID_COLS;
+  const cell = Math.min(width / cols, height / GRID_ROWS);
+  const gridW = cell * cols;
   const gridH = cell * GRID_ROWS;
   return {
     cellW: cell,

@@ -53,6 +53,15 @@ export component WidgetPreview inherits Rectangle {
     in property <string> terminal-input: "";
     in property <[TerminalLine]> terminal-lines: [];
     in property <bool> terminal-kb-active: false;
+    in property <string> clock-hm: "12:00";
+    in property <string> clock-hms: "12:00:00";
+    in property <float> hour-deg: 0;
+    in property <float> minute-deg: 0;
+    in property <float> second-deg: 0;
+    in property <int> pong-ly: 42;
+    in property <int> pong-ry: 42;
+    in property <int> pong-bx: 50;
+    in property <int> pong-by: 50;
 
     property <length> canon-w: root.size == "1x1" ? 240px : 480px;
     property <length> canon-h: root.size == "2x2" ? 480px : 240px;
@@ -116,5 +125,14 @@ export component WidgetPreview inherits Rectangle {
         terminal-input: root.terminal-input;
         terminal-lines: root.terminal-lines;
         terminal-kb-active: root.terminal-kb-active;
+        clock-hm: root.clock-hm;
+        clock-hms: root.clock-hms;
+        hour-deg: root.hour-deg;
+        minute-deg: root.minute-deg;
+        second-deg: root.second-deg;
+        pong-ly: root.pong-ly;
+        pong-ry: root.pong-ry;
+        pong-bx: root.pong-bx;
+        pong-by: root.pong-by;
     }
 }

@@ -13,8 +13,11 @@ pub const KINDS: &[&str] = &[
     "activity",
     "calendar",
     "climate",
+    "clock",
+    "digitalClock",
     "lights",
     "media",
+    "pong",
     "purifier",
     "quickControls",
     "server",
@@ -68,7 +71,11 @@ mod tests {
     fn every_kind_has_three_sizes_and_a_fixture() {
         for kind in KINDS {
             assert!(!fixture_values(kind).is_empty(), "{kind}");
-            for size in SIZES {
+            let sizes: &[&str] = match *kind {
+                "clock" | "pong" => &["1x1", "2x2"],
+                _ => SIZES,
+            };
+            for size in sizes {
                 let (w, h) = canonical(size);
                 assert!(w > 0 && h > 0);
                 let (pw, ph) = scaled_box(size, 1.0);

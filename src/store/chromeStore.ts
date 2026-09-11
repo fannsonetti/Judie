@@ -12,6 +12,7 @@ interface ChromeState {
   settingsPull: number;
   settingsTracking: boolean;
   netMenuOpen: boolean;
+  volMenuOpen: boolean;
   kbOpen: boolean;
   kbField: string;
   kbText: string;
@@ -26,6 +27,7 @@ interface ChromeState {
   setSettingsTracking: (on: boolean) => void;
   settleSettings: (settingsPull: number) => void;
   setNetMenuOpen: (open: boolean) => void;
+  setVolMenuOpen: (open: boolean) => void;
   openKeyboard: (field: string, seed: string) => void;
   closeKeyboard: () => void;
   typeKey: (ch: string) => void;
@@ -37,6 +39,7 @@ export const useChromeStore = create<ChromeState>((set, get) => ({
   settingsPull: 0,
   settingsTracking: false,
   netMenuOpen: false,
+  volMenuOpen: false,
   kbOpen: false,
   kbField: "",
   kbText: "",
@@ -50,7 +53,8 @@ export const useChromeStore = create<ChromeState>((set, get) => ({
   setSettingsPull: (settingsPull) => set({ settingsPull }),
   setSettingsTracking: (settingsTracking) => set({ settingsTracking }),
   settleSettings: (settingsPull) => set({ settingsTracking: false, settingsPull }),
-  setNetMenuOpen: (netMenuOpen) => set({ netMenuOpen }),
+  setNetMenuOpen: (netMenuOpen) => set({ netMenuOpen, volMenuOpen: netMenuOpen ? false : get().volMenuOpen }),
+  setVolMenuOpen: (volMenuOpen) => set({ volMenuOpen, netMenuOpen: volMenuOpen ? false : get().netMenuOpen }),
   openKeyboard: (kbField, seed) =>
     set({ kbOpen: true, kbField, kbText: seed, kbShift: false, kbFn: false }),
   closeKeyboard: () => set({ kbOpen: false, kbField: "" }),

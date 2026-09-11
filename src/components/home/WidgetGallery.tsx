@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   WidgetType,
   WIDGET_LABELS,
+  WIDGET_SUPPORTED_SIZES,
 } from "../../types/widgets";
 import { useLayoutStore } from "../../store/layoutStore";
 import { useCustomWidgetStore } from "../../store/customWidgetStore";
@@ -68,8 +69,8 @@ export function WidgetGallery() {
             : { kind: "builtin", type: types[0] };
 
   const custom = current.kind === "custom" ? customWidgets.find((w) => w.id === current.id) : null;
-  const sizes = GALLERY_SIZE_ORDER;
-  const activeSize = gallerySizeAt(sizeIndex);
+  const sizes = current.kind === "custom" ? GALLERY_SIZE_ORDER : WIDGET_SUPPORTED_SIZES[current.type];
+  const activeSize = gallerySizeAt(sizeIndex, sizes);
   const name = current.kind === "custom" ? (custom?.name ?? "Custom") : WIDGET_LABELS[current.type];
   const selKey = current.kind === "custom" ? `c:${current.id}` : `b:${current.type}`;
   const canAdd =
@@ -137,7 +138,7 @@ export function WidgetGallery() {
   };
 
   const go = (next: number) => {
-    setSizeIndex(galleryIndexForSize(gallerySizeAt(next)));
+    setSizeIndex(galleryIndexForSize(gallerySizeAt(next, sizes), sizes));
     setDragX(0);
   };
 
@@ -168,7 +169,7 @@ export function WidgetGallery() {
     const dx = e.clientX - start.x;
     const dy = Math.abs(e.clientY - start.y);
     if (Math.abs(dx) > Math.abs(dy)) {
-      go(gallerySwipeIndex(sizeIndex, dx));
+      go(gallerySwipeIndex(sizeIndex, dx, 48, sizes.length - 1));
     } else {
       setDragX(0);
     }

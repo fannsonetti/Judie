@@ -138,17 +138,22 @@ export global Dy {
     out property <color> text: #ffffff;
     out property <color> muted: #8a8a8a;
     out property <color> dim: #4a4a4a;
-    out property <string> mono: "DejaVu Sans Mono";
-    // Home-screen type scale. Clock stays the strongest text (2× the previous 22px).
-    out property <length> type-clock: 44px;
-    out property <length> type-hero: 32px;
-    out property <length> type-value: 28px;
-    out property <length> type-title: 16px;
-    out property <length> type-control: 16px;
-    out property <length> type-secondary: 14px;
-    out property <length> type-status: 14px;
-    out property <length> type-dense: 12px;
-    out property <length> header-h: 88px;
+    in-out property <string> mono: "DejaVu Sans Mono";
+    out property <string> code: "DejaVu Sans Mono";
+    in-out property <float> text-scale: 1.0;
+    in-out property <float> ui-scale: 1.0;
+    in-out property <length> header-h: 108px;
+    in-out property <length> hit-target: 72px;
+    // Home-screen type scale. Clock stays the strongest text.
+    out property <length> type-clock: 52px * text-scale;
+    out property <length> type-hero: 32px * text-scale;
+    out property <length> type-value: 28px * text-scale;
+    out property <length> type-title: 16px * text-scale;
+    out property <length> type-control: 16px * text-scale;
+    out property <length> type-secondary: 14px * text-scale;
+    out property <length> type-status: 14px * text-scale;
+    out property <length> type-dense: 12px * text-scale;
+    out property <length> pad: 8px * ui-scale;
 }
 
 export component Card inherits Rectangle {
@@ -166,8 +171,8 @@ export component Card inherits Rectangle {
     }
 
     VerticalLayout {
-        padding: 12px;
-        spacing: 6px;
+        padding: Dy.pad;
+        spacing: 6px * Dy.ui-scale;
         @children
     }
 }
@@ -761,8 +766,8 @@ export component TileShell inherits Rectangle {
         border-color: root.pending ? #ffffff : Dy.border;
         clip: true;
         VerticalLayout {
-            padding: 12px;
-            spacing: 6px;
+            padding: Dy.pad;
+            spacing: 6px * Dy.ui-scale;
             @children
         }
     }
@@ -795,4 +800,38 @@ export component TileShell inherits Rectangle {
         width: 100%;
         height: 100%;
     }
+}
+
+export component VolumeGlyph inherits Rectangle {
+    width: 28px;
+    height: 22px;
+    background: transparent;
+    Rectangle { x: 2px; y: 8px; width: 6px; height: 6px; background: #ffffff; }
+    Rectangle { x: 8px; y: 4px; width: 4px; height: 14px; background: #ffffff; }
+    Rectangle { x: 14px; y: 6px; width: 2px; height: 10px; background: #ffffff; }
+    Rectangle { x: 18px; y: 3px; width: 2px; height: 16px; background: #ffffff; }
+    Rectangle { x: 22px; y: 0px; width: 2px; height: 22px; background: #ffffff; }
+}
+
+export component PiMark inherits Rectangle {
+    width: 64px;
+    height: 48px;
+    background: transparent;
+    property <float> s: 64.0 / 160.0;
+    Rectangle { x: 6px * root.s; y: 18px * root.s; width: 148px * root.s; height: 14px * root.s; background: #ffffff; }
+    Rectangle { x: 6px * root.s; y: 18px * root.s; width: 14px * root.s; height: 40px * root.s; background: #ffffff; }
+    Rectangle { x: 144px * root.s; y: 18px * root.s; width: 10px * root.s; height: 26px * root.s; background: #ffffff; }
+    Rectangle { x: 52px * root.s; y: 18px * root.s; width: 22px * root.s; height: 92px * root.s; background: #ffffff; }
+    Rectangle { x: 102px * root.s; y: 18px * root.s; width: 12px * root.s; height: 76px * root.s; background: #ffffff; }
+}
+
+export struct ScreenOffChoice {
+    label: string,
+    secs: int,
+}
+
+export struct RailTab {
+    id: string,
+    label: string,
+    glyph: string,
 }

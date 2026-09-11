@@ -1,11 +1,12 @@
 import { useEffect, useRef, type CSSProperties, type RefObject } from "react";
-import { ExpandableWidgetType, PlacedWidget, SIZE_DIMS } from "../../types/widgets";
+import { ExpandableWidgetType, GRID_ROWS, PlacedWidget, SIZE_DIMS } from "../../types/widgets";
 import { nearestPlace } from "../../lib/layout";
 import { dropCell, leftoverDelta } from "../../lib/widgetDrag";
 import { useLayoutStore } from "../../store/layoutStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { WidgetFace } from "../widgets/WidgetFace";
 
-const EXPANDABLE = new Set<string>(["weather", "lights", "media", "purifier", "calendar"]);
+const EXPANDABLE = new Set<string>(["weather", "lights", "media", "purifier", "calendar", "climate", "pong", "terminal"]);
 const SETTLE_MS = 280;
 
 function lerp(a: number, b: number, t: number) {
@@ -118,8 +119,9 @@ export function WidgetContainer({
   };
 
   const snapFromDelta = (dx: number, dy: number) => {
-    const raw = dropCell(widget.col, widget.row, dx, dy, cellW, dims.cols, dims.rows);
-    return nearestPlace(useLayoutStore.getState().widgets, widget.id, raw.col, raw.row);
+    const cols = useSettingsStore.getState().sidebar ? 4 : 6;
+    const raw = dropCell(widget.col, widget.row, dx, dy, cellW, dims.cols, dims.rows, cols);
+    return nearestPlace(useLayoutStore.getState().widgets, widget.id, raw.col, raw.row, GRID_ROWS, cols);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {

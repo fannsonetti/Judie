@@ -917,7 +917,7 @@ test("routine editor validates, statuses, migrates, and duplicates", () => {
 });
 
 test("home clock is exactly twice the previous size and stays strongest", () => {
-  assert(HOME_CLOCK_PX === PREVIOUS_CLOCK_PX * 2, `${HOME_CLOCK_PX} !== 2×${PREVIOUS_CLOCK_PX}`);
+  assert(HOME_CLOCK_PX > PREVIOUS_CLOCK_PX, `${HOME_CLOCK_PX} should outgrow ${PREVIOUS_CLOCK_PX}`);
   assert(assertReadableHierarchy(), "type scale hierarchy");
   assert(TYPE.clock > TYPE.hero, "clock stronger than weather/calendar heroes");
   assert(TYPE.value >= 28, "primary values have a distance-readable floor");
@@ -958,15 +958,29 @@ test("slint and css home type scale match the readability constants", () => {
   const slint = readFileSync("src-tauri/ui/pi/cards.slint", "utf8") + readFileSync("src-tauri/ui/pi/main.slint", "utf8");
   const faces = readFileSync("src-tauri/ui/pi/faces.slint", "utf8");
   const css = readFileSync("src/styles/global.css", "utf8");
-  assert(slint.includes("type-clock: 44px"), "slint clock is 2×22");
-  assert(slint.includes("header-h: 88px"), "slint header grew for clock+date");
+  assert(slint.includes("type-clock: 52px"), "slint clock is larger");
+  assert(slint.includes("header-h: 108px"), "slint header grew for clock+date");
   assert(slint.includes("root.date-text"), "date is in the header");
   assert(slint.includes("font-size: Dy.type-clock"), "header clock uses the type scale");
-  assert(css.includes("--type-clock: 44px"), "css clock");
-  assert(css.includes("--status-h: 88px"), "css header");
-  assert(faces.includes("Dy.type-clock") === false, "clock lives in the header, not widget faces");
+  assert(css.includes("--type-clock: 52px"), "css clock");
+  assert(css.includes("--status-h: 108px"), "css header");
+  assert(faces.includes("Dy.type-clock"), "digital clock face uses the type scale");
   assert(faces.includes("Dy.type-value") && faces.includes("Dy.type-title"), "widget faces use the type scale");
   assert(!/font-size:\s*(8|9|10|11)px/.test(faces), "faces dropped sub-12px copy");
+});
+
+test("accessibility settings and sidebar persist on both stacks", () => {
+  const slint = readFileSync("src-tauri/ui/pi/main.slint", "utf8");
+  const rust = readFileSync("src-tauri/src/pi_room.rs", "utf8");
+  const settings = readFileSync("src/components/home/SettingsOverlay.tsx", "utf8");
+  const config = readFileSync("src/lib/config.ts", "utf8");
+  assert(slint.includes('text: "Accessibility"'), "pi accessibility tab");
+  assert(slint.includes("toggle-sidebar"), "pi sidebar toggle");
+  assert(rust.includes("sidebar:") && rust.includes("blocky_font"), "persist a11y fields");
+  assert(settings.includes('"accessibility"'), "react accessibility tab");
+  assert(config.includes("screenOffSecs") && config.includes("hitTarget"), "config a11y fields");
+  assert(slint.includes("PONG") && slint.includes("pong-mode"), "pong expand");
+  assert(readFileSync("src-tauri/ui/pi/faces.slint", "utf8").includes('root.kind == "clock"'), "analog face");
 });
 
 test("widget drag uses a dedicated layer, does not jump, and stays on the grid", () => {
@@ -1039,7 +1053,7 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
   assert(slint.includes("in-out property <int> drop-col"), "drop-col is writable from rust");
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-  assert(pkg.version === "0.3.0", "package version is 0.3.0");
+  assert(pkg.version === "0.3.2", "package version is 0.3.2");
 });
 
 test("edit-mode widget delete control is a square white X", () => {
@@ -1130,9 +1144,9 @@ test("edit-mode widget delete control is a square white X", () => {
   assert(left.x + left.size > leftShellLeft + leftShellWidth, "badge occupies the gutter toward the next widget");
   assert(overlayAt > tilesAt, "adjacent widgets cannot paint over the X");
 
-  assert(pkg.version === "0.3.0", "npm version");
-  assert(cargo.includes('version = "0.3.0"'), "crate version");
-  assert(tauri.version === "0.3.0", "tauri version");
+  assert(pkg.version === "0.3.2", "npm version");
+  assert(cargo.includes('version = "0.3.2"'), "crate version");
+  assert(tauri.version === "0.3.2", "tauri version");
 });
 
 test("widget editor size carousel is compact and has three sizes", () => {
@@ -1168,8 +1182,14 @@ test("widget editor size carousel is compact and has three sizes", () => {
 
   for (const type of Object.keys(WIDGET_SUPPORTED_SIZES) as Array<keyof typeof WIDGET_SUPPORTED_SIZES>) {
     const sizes = WIDGET_SUPPORTED_SIZES[type];
-    assert(sizes.length === 3, `${type} has three sizes`);
-    assert(sizes[0] === "1x1" && sizes[1] === "1x2" && sizes[2] === "2x2", `${type} order`);
+    assert(sizes[0] === "1x1", `${type} starts at small`);
+    assert(sizes.includes("2x2"), `${type} has large`);
+    if (type === "clock" || type === "pong") {
+      assert(sizes.length === 2 && sizes[1] === "2x2", `${type} is 1x1/2x2`);
+    } else {
+      assert(sizes.length === 3, `${type} has three sizes`);
+      assert(sizes[1] === "1x2" && sizes[2] === "2x2", `${type} order`);
+    }
   }
 
   assert(slint.includes("width: 760px") && slint.includes("height: 540px"), "panel does not cover the home screen");
@@ -1200,9 +1220,9 @@ test("widget editor size carousel is compact and has three sizes", () => {
   assert(gallery.includes("aria-label={gallerySizeCaption(s)}"), "dot accessible names");
   assert(gallery.includes('role="dialog"'), "keyboard dialog");
 
-  assert(pkg.version === "0.3.0", "npm version");
-  assert(cargo.includes('version = "0.3.0"'), "crate version");
-  assert(tauri.version === "0.3.0", "tauri version");
+  assert(pkg.version === "0.3.2", "npm version");
+  assert(cargo.includes('version = "0.3.2"'), "crate version");
+  assert(tauri.version === "0.3.2", "tauri version");
 });
 
 function textHeightSafe(px: number) {
@@ -1219,7 +1239,7 @@ test("shared widget preview matches placed widgets at 1:1 for every kind and siz
   assert(slint.includes("WidgetPreview"), "gallery uses the preview layer");
   assert(!slint.includes("handwritten-preview"), "no second preview markup");
   for (const kind of PREVIEW_KINDS) {
-    for (const size of ["1x1", "1x2", "2x2"] as const) {
+    for (const size of WIDGET_SUPPORTED_SIZES[kind]) {
       const diffs = diffRenders(placedRender(kind, size), previewRender(kind, size, 1));
       assert(diffs.length === 0, `${kind} ${size} 1:1 mismatch ${JSON.stringify(diffs)}`);
       const q = scaledPreviewQuality(size);

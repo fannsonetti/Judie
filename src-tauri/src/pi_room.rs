@@ -169,11 +169,40 @@ struct Persist {
     deleted_builtin_ids: Vec<String>,
     #[serde(default)]
     face_layouts: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
+    #[serde(default)]
+    volume: Option<u8>,
+    #[serde(default)]
+    sidebar: bool,
+    #[serde(default)]
+    blocky_font: bool,
+    #[serde(default)]
+    hide_header_clock: bool,
+    #[serde(default)]
+    header_line: bool,
+    #[serde(default)]
+    screen_off_secs: Option<i32>,
+    #[serde(default)]
+    text_scale: Option<i32>,
+    #[serde(default)]
+    ui_scale: Option<i32>,
+    #[serde(default)]
+    header_h: Option<i32>,
+    #[serde(default)]
+    hit_target: Option<i32>,
 }
 
 pub const GRID_COLS: i32 = 6;
+pub const GRID_COLS_SIDE: i32 = 4;
 pub const GRID_ROWS: i32 = 4;
 pub const MAX_PAGES: i32 = 6;
+
+pub fn grid_cols(sidebar: bool) -> i32 {
+    if sidebar {
+        GRID_COLS_SIDE
+    } else {
+        GRID_COLS
+    }
+}
 
 fn size_dims(size: &str) -> (i32, i32) {
     match size {
@@ -211,8 +240,15 @@ fn default_slots() -> Vec<Slot> {
     ]
 }
 
-pub fn supported_sizes(_kind: &str) -> &'static [&'static str] {
-    &["1x1", "1x2", "2x2"]
+const SIZES_ALL: &[&str] = &["1x1", "1x2", "2x2"];
+const SIZES_SQUARE: &[&str] = &["1x1", "2x2"];
+
+pub fn supported_sizes(kind: &str) -> &'static [&'static str] {
+    match kind {
+        "clock" | "pong" => SIZES_SQUARE,
+        "digitalClock" => SIZES_ALL,
+        _ => SIZES_ALL,
+    }
 }
 
 pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
@@ -220,8 +256,11 @@ pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] 
         ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
         ("calendar", "Calendar", "Upcoming events and the month at a glance."),
         ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
+        ("clock", "Clock", "An analog clock face."),
+        ("digitalClock", "Digital Clock", "A digital time readout."),
         ("lights", "Lights", "Toggles, brightness, and colour for the room."),
         ("media", "Media", "Now playing, volume, and skip."),
+        ("pong", "Pong", "A two-player or vs-AI pong court."),
         ("purifier", "Air Purifier", "Air quality, filter, and purifier mode."),
         ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
         ("server", "Server Status", "Health and latency of local services."),
@@ -232,8 +271,36 @@ pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] 
     ]
 }
 
-fn occupied_grid(slots: &[Slot], page: i32, skip: Option<&str>) -> Vec<Vec<bool>> {
-    let mut grid = vec![vec![false; GRID_COLS as usize]; GRID_ROWS as usize];
+pub const SCREEN_OFF_OPTIONS: &[(&str, i32)] = &[
+    ("1 minute", 60),
+    ("2 minutes", 120),
+    ("3 minutes", 180),
+    ("5 minutes", 300),
+    ("10 minutes", 600),
+    ("15 minutes", 900),
+    ("20 minutes", 1200),
+    ("25 minutes", 1500),
+    ("30 minutes", 1800),
+    ("45 minutes", 2700),
+    ("1 hour", 3600),
+    ("2 hours", 7200),
+    ("3 hours", 10800),
+    ("4 hours", 14400),
+    ("5 hours", 18000),
+    ("Never", 0),
+];
+
+pub fn screen_off_label(secs: i32) -> &'static str {
+    SCREEN_OFF_OPTIONS
+        .iter()
+        .find(|(_, s)| *s == secs)
+        .map(|(l, _)| *l)
+        .unwrap_or("Never")
+}
+
+fn occupied_grid(slots: &[Slot], page: i32, skip: Option<&str>, cols: i32) -> Vec<Vec<bool>> {
+    let cols = cols.max(1);
+    let mut grid = vec![vec![false; cols as usize]; GRID_ROWS as usize];
     for s in slots {
         if s.page != page {
             continue;
@@ -244,7 +311,7 @@ fn occupied_grid(slots: &[Slot], page: i32, skip: Option<&str>) -> Vec<Vec<bool>
         let (w, h) = size_dims(&s.size);
         for r in s.row..s.row + h {
             for c in s.col..s.col + w {
-                if r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS {
+                if r >= 0 && r < GRID_ROWS && c >= 0 && c < cols {
                     grid[r as usize][c as usize] = true;
                 }
             }
@@ -253,11 +320,11 @@ fn occupied_grid(slots: &[Slot], page: i32, skip: Option<&str>) -> Vec<Vec<bool>
     grid
 }
 
-fn first_free_on_page(slots: &[Slot], size: &str, page: i32) -> Option<(i32, i32)> {
+fn first_free_on_page(slots: &[Slot], size: &str, page: i32, cols: i32) -> Option<(i32, i32)> {
     let (w, h) = size_dims(size);
-    let grid = occupied_grid(slots, page, None);
+    let grid = occupied_grid(slots, page, None, cols);
     for row in 0..=GRID_ROWS - h {
-        for col in 0..=GRID_COLS - w {
+        for col in 0..=cols - w {
             let mut ok = true;
             'cells: for r in row..row + h {
                 for c in col..col + w {
@@ -275,30 +342,30 @@ fn first_free_on_page(slots: &[Slot], size: &str, page: i32) -> Option<(i32, i32
     None
 }
 
-fn first_free(slots: &[Slot], size: &str, prefer_page: i32) -> Option<(i32, i32, i32)> {
+fn first_free(slots: &[Slot], size: &str, prefer_page: i32, cols: i32) -> Option<(i32, i32, i32)> {
     let start = prefer_page.clamp(0, MAX_PAGES - 1);
     for page in start..MAX_PAGES {
-        if let Some((col, row)) = first_free_on_page(slots, size, page) {
+        if let Some((col, row)) = first_free_on_page(slots, size, page, cols) {
             return Some((col, row, page));
         }
     }
     for page in 0..start {
-        if let Some((col, row)) = first_free_on_page(slots, size, page) {
+        if let Some((col, row)) = first_free_on_page(slots, size, page, cols) {
             return Some((col, row, page));
         }
     }
     None
 }
 
-fn can_place(slots: &[Slot], size: &str, page: i32, col: i32, row: i32, skip: Option<&str>) -> bool {
+fn can_place(slots: &[Slot], size: &str, page: i32, col: i32, row: i32, skip: Option<&str>, cols: i32) -> bool {
     let (w, h) = size_dims(size);
-    if col < 0 || row < 0 || col + w > GRID_COLS || row + h > GRID_ROWS {
+    if col < 0 || row < 0 || col + w > cols || row + h > GRID_ROWS {
         return false;
     }
     if page < 0 || page >= MAX_PAGES {
         return false;
     }
-    let grid = occupied_grid(slots, page, skip);
+    let grid = occupied_grid(slots, page, skip, cols);
     for r in row..row + h {
         for c in col..col + w {
             if grid[r as usize][c as usize] {
@@ -461,6 +528,16 @@ fn save_persist(room: &Room) {
             .collect(),
         deleted_builtin_ids: room.deleted_builtin_ids.clone(),
         face_layouts: room.face_layouts.clone(),
+        volume: Some(room.volume),
+        sidebar: room.sidebar,
+        blocky_font: room.blocky_font,
+        hide_header_clock: room.hide_header_clock,
+        header_line: room.header_line,
+        screen_off_secs: Some(room.screen_off_secs),
+        text_scale: Some(room.text_scale),
+        ui_scale: Some(room.ui_scale),
+        header_h: Some(room.header_h),
+        hit_target: Some(room.hit_target),
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
@@ -916,6 +993,15 @@ pub struct Room {
     pub routine_edits: Vec<RoutineEdit>,
     pub expanded: Expanded,
     pub face_layouts: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
+    pub sidebar: bool,
+    pub blocky_font: bool,
+    pub hide_header_clock: bool,
+    pub header_line: bool,
+    pub screen_off_secs: i32,
+    pub text_scale: i32,
+    pub ui_scale: i32,
+    pub header_h: i32,
+    pub hit_target: i32,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -936,6 +1022,8 @@ pub enum Expanded {
     Calendar,
     Purifier,
     Terminal,
+    Climate,
+    Pong,
 }
 
 fn expand_layout_text(kind: &str, text: &str, room: &Room) -> String {
@@ -985,7 +1073,7 @@ impl Default for Room {
             scene: "Night".into(),
             dnd: false,
             playing: false,
-            volume: 62,
+            volume: persist.volume.unwrap_or(62).clamp(0, 100),
             track: 0,
             queue: vec![
                 Track { title: "Rain on Window".into(), artist: "Steady rain and distant thunder".into(), duration: 248 },
@@ -1089,6 +1177,15 @@ impl Default for Room {
                 }
                 m
             },
+            sidebar: persist.sidebar,
+            blocky_font: persist.blocky_font,
+            hide_header_clock: persist.hide_header_clock,
+            header_line: persist.header_line,
+            screen_off_secs: persist.screen_off_secs.unwrap_or(0).max(0),
+            text_scale: persist.text_scale.unwrap_or(100).clamp(80, 200),
+            ui_scale: persist.ui_scale.unwrap_or(100).clamp(75, 150),
+            header_h: persist.header_h.unwrap_or(108).clamp(88, 140),
+            hit_target: persist.hit_target.unwrap_or(72).clamp(48, 96),
         };
         let preset = migrate_units_preset(&persist.temp_unit, &persist.distance_unit);
         room.apply_units_preset(preset);
@@ -1107,6 +1204,67 @@ impl Room {
     }
 
     pub fn save(&self) {
+        self.persist();
+    }
+
+    pub fn cols(&self) -> i32 {
+        grid_cols(self.sidebar)
+    }
+
+    pub fn set_sidebar(&mut self, on: bool) {
+        if self.sidebar == on {
+            return;
+        }
+        self.sidebar = on;
+        self.reflow_slots();
+        self.persist();
+    }
+
+    pub fn reflow_slots(&mut self) {
+        let cols = self.cols();
+        let old = std::mem::take(&mut self.slots);
+        for mut s in old {
+            let (w, _) = size_dims(&s.size);
+            if s.col + w <= cols && can_place(&self.slots, &s.size, s.page, s.col, s.row, None, cols) {
+                self.slots.push(s);
+                continue;
+            }
+            if let Some((col, row, page)) = first_free(&self.slots, &s.size, s.page, cols) {
+                s.col = col;
+                s.row = row;
+                s.page = page;
+                self.slots.push(s);
+            }
+        }
+        let max = (self.visible_page_count() - 1).max(0);
+        if self.page > max {
+            self.page = max;
+        }
+    }
+
+    pub fn set_text_scale(&mut self, v: i32) {
+        self.text_scale = v.clamp(80, 200);
+        self.persist();
+    }
+
+    pub fn set_ui_scale(&mut self, v: i32) {
+        self.ui_scale = v.clamp(75, 150);
+        self.persist();
+    }
+
+    pub fn set_header_h(&mut self, v: i32) {
+        self.header_h = v.clamp(88, 140);
+        self.persist();
+    }
+
+    pub fn set_hit_target(&mut self, v: i32) {
+        self.hit_target = v.clamp(48, 96);
+        self.persist();
+    }
+
+    pub fn set_screen_off(&mut self, secs: i32) {
+        let ok = SCREEN_OFF_OPTIONS.iter().any(|(_, s)| *s == secs);
+        self.screen_off_secs = if ok { secs.max(0) } else { 0 };
         self.persist();
     }
 
@@ -1770,7 +1928,7 @@ impl Room {
             supported_sizes(kind)
         };
         let size = if sizes.contains(&size) { size } else { sizes[0] };
-        let Some((col, row, page)) = first_free(&self.slots, size, page) else {
+        let Some((col, row, page)) = first_free(&self.slots, size, page, self.cols()) else {
             return Err("No space on this page".into());
         };
         let id = format!("{kind}-{}", self.slots.len() + 1);
@@ -1852,13 +2010,13 @@ impl Room {
         let page = self.slots[idx].page;
         let col = self.slots[idx].col;
         let row = self.slots[idx].row;
-        if can_place(&self.slots, &next, page, col, row, Some(id)) {
+        if can_place(&self.slots, &next, page, col, row, Some(id), self.cols()) {
             self.slots[idx].size = next;
             self.persist();
             return;
         }
         let others: Vec<Slot> = self.slots.iter().filter(|s| s.id != id).cloned().collect();
-        if let Some((c, r)) = first_free_on_page(&others, &next, page) {
+        if let Some((c, r)) = first_free_on_page(&others, &next, page, self.cols()) {
             self.slots[idx].size = next;
             self.slots[idx].col = c;
             self.slots[idx].row = r;
@@ -1873,9 +2031,10 @@ impl Room {
         let size = self.slots[idx].size.clone();
         let page = self.slots[idx].page;
         let (w, h) = size_dims(&size);
-        let col = col.clamp(0, GRID_COLS - w);
+        let cols = self.cols();
+        let col = col.clamp(0, cols - w);
         let row = row.clamp(0, GRID_ROWS - h);
-        if can_place(&self.slots, &size, page, col, row, Some(id)) {
+        if can_place(&self.slots, &size, page, col, row, Some(id), cols) {
             self.slots[idx].col = col;
             self.slots[idx].row = row;
             self.persist();
@@ -1884,8 +2043,8 @@ impl Room {
         let mut best = None;
         let mut best_d = i32::MAX;
         for r in 0..=GRID_ROWS - h {
-            for c in 0..=GRID_COLS - w {
-                if can_place(&self.slots, &size, page, c, r, Some(id)) {
+            for c in 0..=cols - w {
+                if can_place(&self.slots, &size, page, c, r, Some(id), cols) {
                     let d = (c - col).abs() + (r - row).abs();
                     if d < best_d {
                         best_d = d;
@@ -2571,6 +2730,9 @@ mod tests {
         with_temp_room(|room| {
             assert_eq!(supported_sizes("climate"), &["1x1", "1x2", "2x2"]);
             assert_eq!(supported_sizes("timers").len(), 3);
+            assert_eq!(supported_sizes("clock"), &["1x1", "2x2"]);
+            assert_eq!(supported_sizes("pong"), &["1x1", "2x2"]);
+            assert_eq!(supported_sizes("digitalClock"), &["1x1", "1x2", "2x2"]);
             let before: Vec<(String, String, i32, i32)> = room
                 .slots
                 .iter()
@@ -2635,6 +2797,8 @@ mod tests {
             assert!(room.terminal_lines.is_empty());
             assert!(gallery_kinds().iter().any(|(k, _, _)| *k == "terminal"));
             assert_eq!(supported_sizes("terminal"), &["1x1", "1x2", "2x2"]);
+            assert!(gallery_kinds().iter().any(|(k, _, _)| *k == "clock"));
+            assert!(gallery_kinds().iter().any(|(k, _, _)| *k == "pong"));
         });
     }
 }

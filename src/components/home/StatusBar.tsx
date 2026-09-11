@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRoomStore } from "../../store/roomStore";
 import { useAssistantStore } from "../../store/assistantStore";
 import { useChromeStore } from "../../store/chromeStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { formatClock, formatDateLong } from "../../lib/time";
 import { JUDIE_VERSION } from "../../lib/version";
 import { NetGlyph } from "../chrome/NetGlyph";
@@ -21,6 +22,12 @@ export function StatusBar({ link }: { link: NetworkLink }) {
   const dnd = useRoomStore((s) => s.doNotDisturb);
   const setServerStatus = useRoomStore((s) => s.setServerStatus);
   const setServices = useRoomStore((s) => s.setServices);
+  const hideClock = useSettingsStore((s) => s.hideHeaderClock);
+  const headerLine = useSettingsStore((s) => s.headerLine);
+  const hitTarget = useSettingsStore((s) => s.hitTarget);
+  const volume = useSettingsStore((s) => s.volume);
+  const update = useSettingsStore((s) => s.update);
+  const volOpen = useChromeStore((s) => s.volMenuOpen);
   const pointer = useRef<{ y: number; x: number } | null>(null);
   const dragged = useRef(false);
   const openDrag = useRef<SettingsDrag | null>(null);
@@ -125,6 +132,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
     const chrome = useChromeStore.getState();
     chrome.setSettingsTracking(true);
     chrome.setNetMenuOpen(false);
+    chrome.setVolMenuOpen(false);
     chrome.setSettingsPull(next.pull);
   };
 
@@ -134,7 +142,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
 
   return (
     <header
-      className="status-bar"
+      className={`status-bar${headerLine ? " with-line" : ""}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -151,17 +159,33 @@ export function StatusBar({ link }: { link: NetworkLink }) {
         className="status-center"
         onClick={() => {
           useChromeStore.getState().setNetMenuOpen(false);
+          useChromeStore.getState().setVolMenuOpen(false);
           useAssistantStore.getState().setPaletteOpen(true);
         }}
       >
-        <div className="status-time">{formatClock(now)}</div>
+        {!hideClock && <div className="status-time">{formatClock(now)}</div>}
         <div className="status-date">{formatDateLong(now)}</div>
       </button>
       <div className="status-right">
         <button
           type="button"
+          className="status-vol"
+          aria-label="Volume"
+          style={{ width: hitTarget, minWidth: hitTarget }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (dragged.current || useChromeStore.getState().settingsTracking) return;
+            useChromeStore.getState().setVolMenuOpen(!useChromeStore.getState().volMenuOpen);
+          }}
+        >
+          <VolumeGlyph />
+        </button>
+        <button
+          type="button"
           className="status-net"
           aria-label="Network"
+          style={{ width: hitTarget, minWidth: hitTarget }}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -172,7 +196,36 @@ export function StatusBar({ link }: { link: NetworkLink }) {
           <NetGlyph kind={link.kind} bars={link.bars} />
         </button>
       </div>
+      {volOpen && (
+        <div
+          className="vol-menu"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div>Volume  {volume}%</div>
+          <input
+            className="slider"
+            type="range"
+            min={0}
+            max={100}
+            value={volume}
+            onChange={(e) => update({ volume: Number(e.target.value) })}
+          />
+        </div>
+      )}
     </header>
+  );
+}
+
+function VolumeGlyph() {
+  return (
+    <svg width="28" height="22" viewBox="0 0 28 22" aria-hidden>
+      <rect x="2" y="8" width="6" height="6" fill="#fff" />
+      <rect x="8" y="4" width="4" height="14" fill="#fff" />
+      <rect x="14" y="6" width="2" height="10" fill="#fff" />
+      <rect x="18" y="3" width="2" height="16" fill="#fff" />
+      <rect x="22" y="0" width="2" height="22" fill="#fff" />
+    </svg>
   );
 }
 

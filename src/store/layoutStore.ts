@@ -8,6 +8,8 @@ import {
   WIDGET_SUPPORTED_SIZES,
   MAX_PAGES,
   GRID_ROWS,
+  GRID_COLS,
+  gridColumnCount,
 } from "../types/widgets";
 import {
   canPlaceWidget,
@@ -26,6 +28,11 @@ import {
 import { getCustomWidget } from "../store/customWidgetStore";
 import { filledSizes } from "../slopbox/schema";
 import { acceptRemoveRequest } from "../lib/widgetDrag";
+import { useSettingsStore } from "./settingsStore";
+
+function cols() {
+  return gridColumnCount(useSettingsStore.getState().sidebar);
+}
 
 function sizesFor(type: WidgetType, customId?: string): WidgetSize[] {
   if (type === "custom") {
@@ -65,7 +72,9 @@ interface LayoutState {
   setDragging: (id: string | null) => void;
 
   expandWidget: (id: string, type: ExpandableWidgetType) => void;
+  expandKind: (type: ExpandableWidgetType) => void;
   collapseWidget: () => void;
+  reflowForSidebar: () => void;
 
   placeWidget: (id: string, col: number, row: number) => boolean;
   resizeWidget: (id: string) => void;
@@ -119,14 +128,43 @@ export const useLayoutStore = create<LayoutState>()(
 
       expandWidget: (id, type) => {
         if (get().editMode) return;
-        set({ expandedId: id, expandedType: type });
+        set({ expandedId: id, expandedType: type, galleryOpen: false, creatorOpen: false });
+      },
+
+      expandKind: (type) => {
+        if (get().editMode) return;
+        const existing = get().widgets.find((w) => w.type === type);
+        set({
+          expandedId: existing?.id ?? type,
+          expandedType: type,
+          galleryOpen: false,
+          creatorOpen: false,
+        });
       },
 
       collapseWidget: () => set({ expandedId: null, expandedType: null }),
 
+      reflowForSidebar: () =>
+        set((s) => {
+          const c = cols();
+          const sorted = [...s.widgets].sort((a, b) => a.page - b.page || a.order - b.order);
+          const widgets: WidgetInstance[] = [];
+          for (const w of sorted) {
+            let page = w.page;
+            let free = firstFreeCell(widgets, w.size, page, GRID_ROWS, c);
+            while (!free && page < MAX_PAGES - 1) {
+              page += 1;
+              free = firstFreeCell(widgets, w.size, page, GRID_ROWS, c);
+            }
+            if (!free) continue;
+            widgets.push({ ...w, page, col: free.col, row: free.row });
+          }
+          return { widgets: normalizeOrders(widgets) };
+        }),
+
       placeWidget: (id, col, row) => {
         const { widgets } = get();
-        const at = nearestPlace(widgets, id, col, row);
+        const at = nearestPlace(widgets, id, col, row, GRID_ROWS, cols());
         if (!at) return false;
         set({
           widgets: widgets.map((w) => (w.id === id ? { ...w, col: at.col, row: at.row } : w)),
@@ -144,7 +182,7 @@ export const useLayoutStore = create<LayoutState>()(
 
           const col = target.col ?? 0;
           const row = target.row ?? 0;
-          if (canPlaceWidget(s.widgets, id, col, row, nextSize)) {
+          if (canPlaceWidget(s.widgets, id, col, row, nextSize, GRID_ROWS, cols())) {
             return {
               widgets: s.widgets.map((w) => (w.id === id ? { ...w, size: nextSize } : w)),
             };
@@ -154,7 +192,8 @@ export const useLayoutStore = create<LayoutState>()(
             s.widgets.filter((w) => w.id !== id),
             nextSize,
             target.page,
-            GRID_ROWS
+            GRID_ROWS,
+            cols()
           );
           if (!free) return s;
           return {
@@ -192,7 +231,7 @@ export const useLayoutStore = create<LayoutState>()(
           const supported = sizesFor(type, customId);
           if (!supported.length) return s;
           const finalSize = supported.includes(size) ? size : supported[0];
-          const free = firstFreeCell(s.widgets, finalSize, targetPage, GRID_ROWS);
+          const free = firstFreeCell(s.widgets, finalSize, targetPage, GRID_ROWS, cols());
           if (!free) return s;
           const widget: WidgetInstance = {
             id: createId(type),
@@ -213,7 +252,7 @@ export const useLayoutStore = create<LayoutState>()(
           const widget = s.widgets.find((w) => w.id === id);
           if (!widget) return s;
           const others = s.widgets.filter((w) => w.id !== id);
-          const free = firstFreeCell(others, widget.size, target, GRID_ROWS);
+          const free = firstFreeCell(others, widget.size, target, GRID_ROWS, cols());
           if (!free) return s;
           const widgets = s.widgets.map((w) =>
             w.id === id
@@ -250,7 +289,7 @@ export const useLayoutStore = create<LayoutState>()(
           }
           widgets = [];
           for (const [, list] of byPage) {
-            const packed = packWidgets(list, GRID_ROWS);
+            const packed = packWidgets(list, GRID_ROWS, GRID_COLS);
             widgets.push(
               ...packed.map((p) => ({
                 ...list.find((w) => w.id === p.id)!,
@@ -277,6 +316,6 @@ export const useLayoutStore = create<LayoutState>()(
 );
 
 /** Placed widgets for the current page (for grids / previews). */
-export function placedForPage(widgets: WidgetInstance[], page: number) {
-  return placeWidgets(widgets.filter((w) => w.page === page));
+export function placedForPage(widgets: WidgetInstance[], page: number, columns = GRID_COLS) {
+  return placeWidgets(widgets.filter((w) => w.page === page), GRID_ROWS, columns);
 }

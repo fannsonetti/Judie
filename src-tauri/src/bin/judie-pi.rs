@@ -19,6 +19,7 @@ use pi_room::{Expanded, Overlay};
 use slint::{Model, ModelRc, SharedString, TimerMode, VecModel};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use chrono::Timelike;
 
 /// Bare Xorg has no WM, so `set_fullscreen` (EWMH) is a no-op. Size the window
 /// to the framebuffer so Judie fills HDMI without matchbox/openbox.
@@ -171,7 +172,150 @@ fn expanded_name(e: Expanded) -> SharedString {
         Expanded::Calendar => "calendar",
         Expanded::Purifier => "purifier",
         Expanded::Terminal => "terminal",
+        Expanded::Climate => "climate",
+        Expanded::Pong => "pong",
     })
+}
+
+struct PongGame {
+    running: bool,
+    mode: i32,
+    ly: f32,
+    ry: f32,
+    bx: f32,
+    by: f32,
+    vx: f32,
+    vy: f32,
+    ls: i32,
+    rs: i32,
+}
+
+impl PongGame {
+    const fn new() -> Self {
+        Self {
+            running: false,
+            mode: 0,
+            ly: 50.0,
+            ry: 50.0,
+            bx: 50.0,
+            by: 50.0,
+            vx: 1.1,
+            vy: 0.8,
+            ls: 0,
+            rs: 0,
+        }
+    }
+}
+
+static PONG: Mutex<PongGame> = Mutex::new(PongGame::new());
+static LAST_INPUT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+static SCREEN_ASLEEP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn note_input() {
+    *LAST_INPUT.lock().unwrap() = Some(std::time::Instant::now());
+}
+
+fn play_beep(freq: u32, ms: u32) {
+    std::thread::spawn(move || {
+        use std::io::Write;
+        let rate = 22050u32;
+        let n = rate * ms / 1000;
+        let mut pcm = Vec::with_capacity((n as usize) * 2);
+        for i in 0..n {
+            let s = ((i as f32 * freq as f32 * 2.0 * std::f32::consts::PI / rate as f32).sin() * 9000.0) as i16;
+            pcm.extend_from_slice(&s.to_le_bytes());
+        }
+        let _ = std::process::Command::new("aplay")
+            .args(["-q", "-t", "raw", "-r", "22050", "-c", "1", "-f", "S16_LE", "-"])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .and_then(|mut child| {
+                if let Some(stdin) = child.stdin.as_mut() {
+                    let _ = stdin.write_all(&pcm);
+                }
+                child.wait()
+            });
+    });
+}
+
+fn set_display_power(on: bool) {
+    if on {
+        let _ = std::process::Command::new("xset").args(["dpms", "force", "on"]).status();
+        let _ = std::process::Command::new("vcgencmd").args(["display_power", "1"]).status();
+        SCREEN_ASLEEP.store(false, std::sync::atomic::Ordering::Relaxed);
+    } else {
+        let _ = std::process::Command::new("xset").args(["+dpms"]).status();
+        let _ = std::process::Command::new("xset").args(["dpms", "force", "off"]).status();
+        let _ = std::process::Command::new("vcgencmd").args(["display_power", "0"]).status();
+        SCREEN_ASLEEP.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+fn pong_step() {
+    let mut g = PONG.lock().unwrap();
+    if !g.running {
+        return;
+    }
+    g.bx += g.vx;
+    g.by += g.vy;
+    if g.by <= 3.0 {
+        g.by = 3.0;
+        g.vy = g.vy.abs();
+        play_beep(520, 35);
+    }
+    if g.by >= 97.0 {
+        g.by = 97.0;
+        g.vy = -g.vy.abs();
+        play_beep(520, 35);
+    }
+    if g.bx <= 7.0 {
+        if (g.by - g.ly).abs() < 14.0 {
+            g.bx = 7.0;
+            g.vx = g.vx.abs();
+            g.vy += (g.by - g.ly) * 0.04;
+            play_beep(880, 40);
+        } else {
+            g.rs += 1;
+            g.bx = 50.0;
+            g.by = 50.0;
+            g.vx = 1.1;
+            play_beep(180, 140);
+        }
+    }
+    if g.bx >= 93.0 {
+        if (g.by - g.ry).abs() < 14.0 {
+            g.bx = 93.0;
+            g.vx = -g.vx.abs();
+            g.vy += (g.by - g.ry) * 0.04;
+            play_beep(880, 40);
+        } else {
+            g.ls += 1;
+            g.bx = 50.0;
+            g.by = 50.0;
+            g.vx = -1.1;
+            play_beep(180, 140);
+        }
+    }
+    if g.mode < 3 {
+        let lag = match g.mode {
+            0 => 0.28,
+            1 => 0.5,
+            _ => 0.82,
+        };
+        let jitter = match g.mode {
+            0 => 7.0,
+            1 => 2.5,
+            _ => 0.4,
+        };
+        let n = (mix_rand() % 21) as f32 - 10.0;
+        let target = g.by + n * jitter / 10.0;
+        g.ry += (target - g.ry) * lag;
+    }
+    g.ly = g.ly.clamp(8.0, 92.0);
+    g.ry = g.ry.clamp(8.0, 92.0);
+    g.vy = g.vy.clamp(-2.2, 2.2);
 }
 
 fn dispatch_terminal(ui: &MainWindow) {
@@ -195,6 +339,14 @@ fn dispatch_terminal(ui: &MainWindow) {
 fn push_ui(ui: &MainWindow) {
     let now = chrono::Local::now();
     ui.set_clock(now.format("%H:%M").to_string().into());
+    ui.set_clock_hm(now.format("%H:%M").to_string().into());
+    ui.set_clock_hms(now.format("%H:%M:%S").to_string().into());
+    let h = now.hour() as f32;
+    let m = now.minute() as f32;
+    let s = now.second() as f32;
+    ui.set_hour_deg(((h % 12.0) * 30.0) + m * 0.5);
+    ui.set_minute_deg(m * 6.0);
+    ui.set_second_deg(s * 6.0);
     ui.set_date_text(now.format("%A %e %B").to_string().split_whitespace().collect::<Vec<_>>().join(" ").into());
     ui.set_month_name(now.format("%B").to_string().into());
     ui.set_host_ip(pi_ctl::lan_addrs().into());
@@ -236,6 +388,18 @@ fn push_ui(ui: &MainWindow) {
         ui.set_track_title(track.title.clone().into());
         ui.set_track_artist(track.artist.clone().into());
         ui.set_volume(i32::from(room.volume));
+        ui.set_sidebar(room.sidebar);
+        ui.set_blocky_font(room.blocky_font);
+        ui.set_hide_header_clock(room.hide_header_clock);
+        ui.set_header_line(room.header_line);
+        ui.set_screen_off_secs(room.screen_off_secs);
+        ui.set_screen_off_label(pi_room::screen_off_label(room.screen_off_secs).into());
+        ui.set_text_scale(room.text_scale);
+        ui.set_ui_scale(room.ui_scale);
+        ui.set_header_h_px(room.header_h);
+        ui.set_hit_target_px(room.hit_target);
+        ui.set_grid_cols(room.cols());
+        ui.set_screen_sleep(SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed));
         ui.set_media_progress(room.progress);
         ui.set_indoor(format!("{:.1}°", room.indoor).into());
         ui.set_outdoor(format!("{}°", room.outdoor).into());
@@ -251,7 +415,7 @@ fn push_ui(ui: &MainWindow) {
         ui.set_units_metric(room.units_metric);
         ui.set_temp_unit(room.temp_unit.clone().into());
         ui.set_distance_unit(room.distance_unit.clone().into());
-        ui.set_settings_tab(room.settings_tab.clamp(0, 2));
+        ui.set_settings_tab(room.settings_tab.clamp(0, 3));
         ui.set_palette_query(room.palette_query.clone().into());
         ui.set_palette_reply(room.palette_reply.clone().into());
         ui.set_terminal_input(room.terminal_input.clone().into());
@@ -294,6 +458,16 @@ fn push_ui(ui: &MainWindow) {
                 .into(),
         );
         ui.set_expanded(expanded_name(room.expanded));
+        let pong = PONG.lock().unwrap();
+        ui.set_pong_ly(pong.ly.round() as i32);
+        ui.set_pong_ry(pong.ry.round() as i32);
+        ui.set_pong_bx(pong.bx.round() as i32);
+        ui.set_pong_by(pong.by.round() as i32);
+        ui.set_pong_ls(pong.ls);
+        ui.set_pong_rs(pong.rs);
+        ui.set_pong_mode(pong.mode);
+        ui.set_pong_running(pong.running);
+        drop(pong);
         let (settings, palette, gallery, creator) = overlay_name(room.overlay);
         ui.set_settings_open(settings);
         ui.set_palette_open(palette);
@@ -483,6 +657,31 @@ fn push_ui(ui: &MainWindow) {
     });
 }
 
+fn apply_scale_kb(ui: &MainWindow, field: &str, text: &str) {
+    let Ok(n) = text.parse::<i32>() else {
+        return;
+    };
+    match field {
+        "text-scale" => {
+            pi_room::with(|room| room.set_text_scale(n));
+            ui.set_text_scale(pi_room::with(|r| r.text_scale));
+        }
+        "ui-scale" => {
+            pi_room::with(|room| room.set_ui_scale(n));
+            ui.set_ui_scale(pi_room::with(|r| r.ui_scale));
+        }
+        "header-h" => {
+            pi_room::with(|room| room.set_header_h(n));
+            ui.set_header_h_px(pi_room::with(|r| r.header_h));
+        }
+        "hit-target" => {
+            pi_room::with(|room| room.set_hit_target(n));
+            ui.set_hit_target_px(pi_room::with(|r| r.hit_target));
+        }
+        _ => {}
+    }
+}
+
 fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
     match field {
         "room-name" => {
@@ -530,6 +729,10 @@ fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
             ui.set_gallery_query(text.into());
             push_ui(ui);
         }
+        "text-scale" => apply_scale_kb(ui, "text-scale", text),
+        "ui-scale" => apply_scale_kb(ui, "ui-scale", text),
+        "header-h" => apply_scale_kb(ui, "header-h", text),
+        "hit-target" => apply_scale_kb(ui, "hit-target", text),
         _ => {
             if apply_routine_kb(ui, field, text) {
                 return;
@@ -628,6 +831,10 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
         "creator-name" => ui.get_creator_name().to_string(),
         "creator-node" => ui.get_creator_node_text().to_string(),
         "gallery-query" => ui.get_gallery_query().to_string(),
+        "text-scale" => ui.get_text_scale().to_string(),
+        "ui-scale" => ui.get_ui_scale().to_string(),
+        "header-h" => ui.get_header_h_px().to_string(),
+        "hit-target" => ui.get_hit_target_px().to_string(),
         _ => {
             if let Some((key, id)) = routine_field_parts(field) {
                 return pi_room::with(|room| {
@@ -891,7 +1098,131 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_volume_changed(move |v| {
-        pi_room::with(|room| room.volume = v.clamp(0, 100) as u8);
+        pi_room::with(|room| {
+            room.volume = v.clamp(0, 100) as u8;
+            room.save();
+        });
+        note_input();
+        r();
+    });
+    ui.on_note_input(move || {
+        note_input();
+    });
+    let r = refresh.clone();
+    ui.on_toggle_sidebar(move || {
+        pi_room::with(|room| room.set_sidebar(!room.sidebar));
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_toggle_blocky_font(move || {
+        pi_room::with(|room| {
+            room.blocky_font = !room.blocky_font;
+            room.save();
+        });
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_toggle_hide_header_clock(move || {
+        pi_room::with(|room| {
+            room.hide_header_clock = !room.hide_header_clock;
+            room.save();
+        });
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_toggle_header_line(move || {
+        pi_room::with(|room| {
+            room.header_line = !room.header_line;
+            room.save();
+        });
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_screen_off(move |secs| {
+        pi_room::with(|room| room.set_screen_off(secs));
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_text_scale(move |v| {
+        pi_room::with(|room| room.set_text_scale(v));
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_ui_scale(move |v| {
+        pi_room::with(|room| room.set_ui_scale(v));
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_header_h(move |v| {
+        pi_room::with(|room| room.set_header_h(v));
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_hit_target(move |v| {
+        pi_room::with(|room| room.set_hit_target(v));
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_wake_screen(move || {
+        note_input();
+        set_display_power(true);
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_set_pong_mode(move |m| {
+        if let Ok(mut g) = PONG.lock() {
+            g.mode = m.clamp(0, 3);
+        }
+        note_input();
+        r();
+    });
+    ui.on_pong_move(move |side, y| {
+        if let Ok(mut g) = PONG.lock() {
+            let y = (y * 100.0).clamp(8.0, 92.0);
+            if side == 0 {
+                g.ly = y;
+            } else {
+                g.ry = y;
+            }
+        }
+        note_input();
+    });
+    let r = refresh.clone();
+    ui.on_pong_nudge(move |side, dy| {
+        if let Ok(mut g) = PONG.lock() {
+            let y = if side == 0 { g.ly } else { g.ry } + dy * 100.0;
+            let y = y.clamp(8.0, 92.0);
+            if side == 0 {
+                g.ly = y;
+            } else {
+                g.ry = y;
+            }
+        }
+        note_input();
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_pong_start(move || {
+        if let Ok(mut g) = PONG.lock() {
+            g.running = true;
+            g.bx = 50.0;
+            g.by = 50.0;
+            g.vx = if (g.ls + g.rs) % 2 == 0 { 1.15 } else { -1.15 };
+            g.vy = 0.85;
+            g.ls = 0;
+            g.rs = 0;
+        }
+        play_beep(660, 80);
+        note_input();
         r();
     });
     let r = refresh.clone();
@@ -937,7 +1268,7 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_set_tab(move |t| {
-        pi_room::with(|room| room.settings_tab = t.clamp(0, 2));
+        pi_room::with(|room| room.settings_tab = t.clamp(0, 3));
         r();
     });
     let r = refresh.clone();
@@ -986,6 +1317,8 @@ fn bind(ui: &MainWindow) {
                 "calendar" => Expanded::Calendar,
                 "purifier" => Expanded::Purifier,
                 "terminal" => Expanded::Terminal,
+                "climate" => Expanded::Climate,
+                "pong" => Expanded::Pong,
                 _ => Expanded::None,
             };
         });
@@ -1639,12 +1972,15 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_gallery_set_index(move |i| {
-        let size = match i {
-            1 => "1x2",
-            2 => "2x2",
-            _ => "1x1",
-        };
-        pi_room::with(|room| room.gallery_size = size.into());
+        pi_room::with(|room| {
+            let sizes = if room.gallery_kind == "custom" {
+                &["1x1", "1x2", "2x2"][..]
+            } else {
+                pi_room::supported_sizes(&room.gallery_kind)
+            };
+            let idx = (i.max(0) as usize).min(sizes.len().saturating_sub(1));
+            room.gallery_size = sizes.get(idx).copied().unwrap_or("1x1").into();
+        });
         r();
     });
     let r = refresh.clone();
@@ -1691,6 +2027,8 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_open_net_menu(move || {
         let Some(ui) = weak.upgrade() else { return };
+        note_input();
+        ui.set_vol_menu_open(false);
         ui.set_net_menu_open(true);
         ui.set_wifi_detail("".into());
         load_link(&ui);
@@ -1701,6 +2039,19 @@ fn bind(ui: &MainWindow) {
         if let Some(ui) = weak.upgrade() {
             ui.set_net_menu_open(false);
             ui.set_wifi_detail("".into());
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_open_vol_menu(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        note_input();
+        ui.set_net_menu_open(false);
+        ui.set_vol_menu_open(true);
+    });
+    let weak = ui.as_weak();
+    ui.on_close_vol_menu(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_vol_menu_open(false);
         }
     });
     let weak = ui.as_weak();
@@ -1912,10 +2263,40 @@ fn main() {
     load_link(&ui);
     poll_latest(ui.as_weak());
 
+    note_input();
+    let weak = ui.as_weak();
+    slint::Timer::default().start(TimerMode::Repeated, Duration::from_millis(16), move || {
+        if let Some(ui) = weak.upgrade() {
+            if ui.get_expanded() == "pong" {
+                pong_step();
+                let pong = PONG.lock().unwrap();
+                ui.set_pong_ly(pong.ly.round() as i32);
+                ui.set_pong_ry(pong.ry.round() as i32);
+                ui.set_pong_bx(pong.bx.round() as i32);
+                ui.set_pong_by(pong.by.round() as i32);
+                ui.set_pong_ls(pong.ls);
+                ui.set_pong_rs(pong.rs);
+                ui.set_pong_running(pong.running);
+            }
+        }
+    });
+
     let weak = ui.as_weak();
     slint::Timer::default().start(TimerMode::Repeated, Duration::from_secs(1), move || {
         if let Some(ui) = weak.upgrade() {
             pi_room::with(|room| room.tick_media());
+            let timeout = pi_room::with(|room| room.screen_off_secs);
+            if timeout > 0 && !SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed) {
+                let idle = LAST_INPUT
+                    .lock()
+                    .unwrap()
+                    .map(|t| t.elapsed().as_secs() as i32)
+                    .unwrap_or(0);
+                if idle >= timeout {
+                    set_display_power(false);
+                    ui.set_screen_sleep(true);
+                }
+            }
             push_ui(&ui);
         }
     });

@@ -11,6 +11,9 @@ import { ServerWidget } from "./ServerWidget";
 import { ActivityWidget } from "./ActivityWidget";
 import { TimersWidget } from "./TimersWidget";
 import { SystemWidget } from "./SystemWidget";
+import { ClockWidget } from "./ClockWidget";
+import { DigitalClockWidget } from "./DigitalClockWidget";
+import { PongWidget } from "./PongWidget";
 import { SlopWidget } from "./SlopWidget";
 
 export function WidgetFace({
@@ -38,6 +41,15 @@ export function WidgetFace({
       break;
     case "climate":
       face = <ClimateWidget size={size} />;
+      break;
+    case "clock":
+      face = <ClockWidget size={size} />;
+      break;
+    case "digitalClock":
+      face = <DigitalClockWidget size={size} />;
+      break;
+    case "pong":
+      face = <PongWidget size={size} />;
       break;
     case "purifier":
       face = <PurifierWidget size={size} />;

@@ -548,13 +548,14 @@ select.settings-input {
   }
 }
 
-.status-net {
+.status-net,
+.status-vol {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
+  width: 72px;
   height: 100%;
-  min-width: 48px;
+  min-width: 72px;
   background: transparent;
   border: none;
   color: #fff;
@@ -901,14 +902,15 @@ select.settings-input {
 }
 .wifi-menu {
   position: absolute;
-  top: 52px;
+  top: var(--status-h);
   right: 16px;
   width: min(400px, calc(100% - 24px));
-  max-height: min(640px, calc(100% - 80px));
+  height: auto;
+  max-height: 50%;
   overflow: auto;
   background: #000;
   border: 1.5px solid #2a2a2a;
-  padding: 16px;
+  padding: 10px;
   z-index: 61;
 }
 .wifi-menu-title { color: #fff; font-size: 16px; font-family: ui-monospace, monospace; margin-bottom: 10px; }
@@ -967,4 +969,100 @@ select.settings-input {
 }
 .os-confirm p { white-space: pre-wrap; }
 .settings-backdrop { background: rgba(0,0,0,0.8); }
+
+.side-rail {
+  width: calc(100% / 6 * 2);
+  flex-shrink: 0;
+  height: 100%;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  z-index: 30;
+}
+.side-rail-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  font-size: 22px;
+  font-family: ui-monospace, monospace;
+}
+.side-rail-rule {
+  height: 1px;
+  background: #fff;
+  opacity: 0.35;
+  margin: 8px 0 18px;
+}
+.side-rail-tabs {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.side-rail-tab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 12px;
+  color: #c8c8c8;
+  text-align: left;
+  letter-spacing: 0.12em;
+  font-family: ui-monospace, monospace;
+  font-size: 16px;
+}
+.side-rail-tab.on {
+  background: #fff;
+  color: #000;
+}
+.side-rail-glyph { width: 22px; text-align: center; }
+.vol-menu-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 59;
+}
+.vol-menu {
+  position: absolute;
+  top: calc(var(--status-h) - 8px);
+  right: 88px;
+  width: 260px;
+  background: #000;
+  border: 1.5px solid #2a2a2a;
+  padding: 12px;
+  z-index: 61;
+  color: #fff;
+  font-family: ui-monospace, monospace;
+}
+.sleep-layer {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 200;
+}
+.settings-scale { margin: 12px 0; }
+.settings-num {
+  width: 72px;
+  background: #000;
+  border: 1.5px solid #fff;
+  color: #fff;
+  padding: 6px 8px;
+  font-family: ui-monospace, monospace;
+}
+.os-body { padding-bottom: 10px; }
+
+@font-face {
+  font-family: "Press Start 2P";
+  src: url("../../src-tauri/ui/pi/fonts/PixeloidSans.ttf") format("truetype");
+  font-display: swap;
+}
+html.blocky-font,
+html.blocky-font button,
+html.blocky-font input {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+}
+
 

@@ -18,10 +18,11 @@ function fits(
   col: number,
   w: number,
   h: number,
-  maxRows: number
+  maxRows: number,
+  cols = GRID_COLS
 ): boolean {
   if (col < 0 || row < 0) return false;
-  if (col + w > GRID_COLS) return false;
+  if (col + w > cols) return false;
   if (row + h > maxRows) return false;
   for (let r = row; r < row + h; r++) {
     for (let c = col; c < col + w; c++) {
@@ -36,19 +37,20 @@ function mark(
   row: number,
   col: number,
   w: number,
-  h: number
+  h: number,
+  cols = GRID_COLS
 ) {
   for (let r = row; r < row + h; r++) {
-    if (!occupied[r]) occupied[r] = Array(GRID_COLS).fill(false);
+    if (!occupied[r]) occupied[r] = Array(cols).fill(false);
     for (let c = col; c < col + w; c++) {
       occupied[r][c] = true;
     }
   }
 }
 
-function ensureRows(occupied: boolean[][], maxRows: number) {
+function ensureRows(occupied: boolean[][], maxRows: number, cols = GRID_COLS) {
   for (let row = 0; row < maxRows; row++) {
-    if (!occupied[row]) occupied[row] = Array(GRID_COLS).fill(false);
+    if (!occupied[row]) occupied[row] = Array(cols).fill(false);
   }
 }
 
@@ -56,12 +58,13 @@ function findFirstFit(
   occupied: boolean[][],
   w: number,
   h: number,
-  maxRows: number
+  maxRows: number,
+  cols = GRID_COLS
 ): { col: number; row: number } | null {
-  ensureRows(occupied, maxRows);
+  ensureRows(occupied, maxRows, cols);
   for (let row = 0; row < maxRows; row++) {
-    for (let col = 0; col <= GRID_COLS - w; col++) {
-      if (fits(occupied, row, col, w, h, maxRows)) {
+    for (let col = 0; col <= cols - w; col++) {
+      if (fits(occupied, row, col, w, h, maxRows, cols)) {
         return { col, row };
       }
     }
@@ -76,24 +79,25 @@ function findFirstFit(
  */
 export function placeWidgets(
   widgets: WidgetInstance[],
-  maxRows: number = GRID_ROWS
+  maxRows: number = GRID_ROWS,
+  cols = GRID_COLS
 ): PlacedWidget[] {
   const sorted = [...widgets].sort((a, b) => a.order - b.order);
   const occupied: boolean[][] = [];
   const placed: PlacedWidget[] = [];
-  ensureRows(occupied, maxRows);
+  ensureRows(occupied, maxRows, cols);
 
   for (const widget of sorted) {
     const { cols: w, rows: h } = sizeDims(widget.size);
     const preferred =
       typeof widget.col === "number" &&
       typeof widget.row === "number" &&
-      fits(occupied, widget.row, widget.col, w, h, maxRows)
+      fits(occupied, widget.row, widget.col, w, h, maxRows, cols)
         ? { col: widget.col, row: widget.row }
-        : findFirstFit(occupied, w, h, maxRows);
+        : findFirstFit(occupied, w, h, maxRows, cols);
 
     if (!preferred) continue;
-    mark(occupied, preferred.row, preferred.col, w, h);
+    mark(occupied, preferred.row, preferred.col, w, h, cols);
     placed.push({ ...widget, col: preferred.col, row: preferred.row });
   }
 
@@ -103,13 +107,14 @@ export function placeWidgets(
 /** Auto-pack left-to-right / top-to-bottom (ignores stored col/row). */
 export function packWidgets(
   widgets: WidgetInstance[],
-  maxRows: number = 40
+  maxRows: number = 40,
+  cols = GRID_COLS
 ): PlacedWidget[] {
   const cleared = widgets.map((w) => {
     const { col: _c, row: _r, ...rest } = w;
     return rest as WidgetInstance;
   });
-  return placeWidgets(cleared, maxRows);
+  return placeWidgets(cleared, maxRows, cols);
 }
 
 export function canPlaceWidget(
@@ -118,22 +123,23 @@ export function canPlaceWidget(
   col: number,
   row: number,
   size?: WidgetSize,
-  maxRows: number = GRID_ROWS
+  maxRows: number = GRID_ROWS,
+  cols = GRID_COLS
 ): boolean {
   const widget = widgets.find((w) => w.id === id);
   if (!widget) return false;
   const { cols: w, rows: h } = sizeDims(size ?? widget.size);
   const occupied: boolean[][] = [];
-  ensureRows(occupied, maxRows);
+  ensureRows(occupied, maxRows, cols);
 
   for (const other of widgets) {
     if (other.id === id) continue;
     if (typeof other.col !== "number" || typeof other.row !== "number") continue;
     const dims = sizeDims(other.size);
-    mark(occupied, other.row, other.col, dims.cols, dims.rows);
+    mark(occupied, other.row, other.col, dims.cols, dims.rows, cols);
   }
 
-  return fits(occupied, row, col, w, h, maxRows);
+  return fits(occupied, row, col, w, h, maxRows, cols);
 }
 
 /** Clamp a drop to the usable grid, then the nearest collision-free cell. */
@@ -142,21 +148,22 @@ export function nearestPlace(
   id: string,
   col: number,
   row: number,
-  maxRows: number = GRID_ROWS
+  maxRows: number = GRID_ROWS,
+  cols = GRID_COLS
 ): { col: number; row: number } | null {
   const widget = widgets.find((w) => w.id === id);
   if (!widget) return null;
   const { cols: w, rows: h } = sizeDims(widget.size);
-  const c0 = Math.max(0, Math.min(GRID_COLS - w, Math.round(col)));
+  const c0 = Math.max(0, Math.min(cols - w, Math.round(col)));
   const r0 = Math.max(0, Math.min(maxRows - h, Math.round(row)));
-  if (canPlaceWidget(widgets, id, c0, r0, widget.size, maxRows)) {
+  if (canPlaceWidget(widgets, id, c0, r0, widget.size, maxRows, cols)) {
     return { col: c0, row: r0 };
   }
   let best: { col: number; row: number } | null = null;
   let bestD = Infinity;
   for (let r = 0; r <= maxRows - h; r++) {
-    for (let c = 0; c <= GRID_COLS - w; c++) {
-      if (!canPlaceWidget(widgets, id, c, r, widget.size, maxRows)) continue;
+    for (let c = 0; c <= cols - w; c++) {
+      if (!canPlaceWidget(widgets, id, c, r, widget.size, maxRows, cols)) continue;
       const d = Math.abs(c - c0) + Math.abs(r - r0);
       if (d < bestD) {
         bestD = d;
@@ -171,23 +178,24 @@ export function firstFreeCell(
   widgets: WidgetInstance[],
   size: WidgetSize,
   page: number,
-  maxRows: number = GRID_ROWS
+  maxRows: number = GRID_ROWS,
+  cols = GRID_COLS
 ): { col: number; row: number } | null {
   const occupied: boolean[][] = [];
-  ensureRows(occupied, maxRows);
+  ensureRows(occupied, maxRows, cols);
   const { cols: w, rows: h } = sizeDims(size);
 
   for (const other of widgets.filter((x) => x.page === page)) {
     if (typeof other.col !== "number" || typeof other.row !== "number") continue;
     const dims = sizeDims(other.size);
-    mark(occupied, other.row, other.col, dims.cols, dims.rows);
+    mark(occupied, other.row, other.col, dims.cols, dims.rows, cols);
   }
 
-  return findFirstFit(occupied, w, h, maxRows);
+  return findFirstFit(occupied, w, h, maxRows, cols);
 }
 
 /** Snap stored positions from a placed layout (migration / normalize). */
-export function withPlacedPositions(widgets: WidgetInstance[]): WidgetInstance[] {
+export function withPlacedPositions(widgets: WidgetInstance[], cols = GRID_COLS): WidgetInstance[] {
   const byPage = new Map<number, WidgetInstance[]>();
   for (const w of widgets) {
     const list = byPage.get(w.page) ?? [];
@@ -197,7 +205,7 @@ export function withPlacedPositions(widgets: WidgetInstance[]): WidgetInstance[]
 
   const result: WidgetInstance[] = [];
   for (const [, list] of byPage) {
-    const placed = placeWidgets(list);
+    const placed = placeWidgets(list, GRID_ROWS, cols);
     const byId = new Map(placed.map((p) => [p.id, p]));
     for (const w of list.sort((a, b) => a.order - b.order)) {
       const p = byId.get(w.id);

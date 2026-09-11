@@ -1,9 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { SIZE_DIMS, WIDGET_LABELS, WidgetInstance } from "../../types/widgets";
+import { SIZE_DIMS, WIDGET_LABELS, WidgetInstance, GRID_ROWS } from "../../types/widgets";
 import { placeWidgets } from "../../lib/layout";
 import { REMOVE_BTN_SIZE, removeBtnBox } from "../../lib/widgetDrag";
 import { measureWidgetGrid } from "../../lib/widgetGrid";
 import { useLayoutStore } from "../../store/layoutStore";
+import { useSettingsStore } from "../../store/settingsStore";
 import { WidgetContainer } from "./WidgetContainer";
 
 interface Props {
@@ -16,6 +17,8 @@ export function WidgetGrid({ widgets }: Props) {
   const editMode = useLayoutStore((s) => s.editMode);
   const draggingId = useLayoutStore((s) => s.draggingId);
   const requestRemoveWidget = useLayoutStore((s) => s.requestRemoveWidget);
+  const sidebar = useSettingsStore((s) => s.sidebar);
+  const cols = sidebar ? 4 : 6;
   const [metrics, setMetrics] = useState({
     cellW: 160,
     cellH: 160,
@@ -30,16 +33,16 @@ export function WidgetGrid({ widgets }: Props) {
 
     const measure = () => {
       const rect = el.getBoundingClientRect();
-      setMetrics(measureWidgetGrid(rect.width, rect.height));
+      setMetrics(measureWidgetGrid(rect.width, rect.height, cols));
     };
 
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [cols]);
 
-  const placed = placeWidgets(widgets);
+  const placed = placeWidgets(widgets, GRID_ROWS, cols);
 
   return (
     <div className="widget-grid" ref={ref}>

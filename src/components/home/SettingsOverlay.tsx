@@ -28,6 +28,8 @@ import {
 import { JUDIE_VERSION } from "../../lib/version";
 import { applyUnitsPreset, UNITS_PRESETS, unitsPresetFromConfig } from "../../lib/units";
 import { powerMockEnabled, powerStatusLabel, uninstallWarning } from "../../lib/power";
+import { SCREEN_OFF_OPTIONS, screenOffLabel } from "../../lib/config";
+import { networkReconnect, networkSetDhcp } from "../../lib/network";
 import { ConfirmSheet } from "../chrome/ConfirmSheet";
 import { FieldTap } from "../chrome/FieldTap";
 import { RoutineEditorCard, draftsFromRoutines } from "./RoutineEditorCard";
@@ -40,7 +42,7 @@ import {
   type RoutineDraft,
 } from "../../lib/routineEditor";
 
-type Tab = "general" | "network" | "power";
+type Tab = "general" | "network" | "power" | "accessibility";
 type Confirm =
   | null
   | { kind: "restart" }
@@ -80,6 +82,7 @@ export function SettingsOverlay() {
   const closeDrag = useRef<SettingsDrag | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [routineDrafts, setRoutineDrafts] = useState<RoutineDraft[]>([]);
+  const [screenOffOpen, setScreenOffOpen] = useState(false);
 
   const displayed = useVisualSettingsPull(pull, tracking);
   const visible = open || tracking || displayed > 0.01 || pull > 0.01;
@@ -343,9 +346,9 @@ export function SettingsOverlay() {
           <h2>Settings</h2>
         </header>
         <nav className="settings-tabs os-tabs" aria-label="Settings">
-          {(["general", "network", "power"] as const).map((id) => (
+          {(["general", "network", "power", "accessibility"] as const).map((id) => (
             <button key={id} type="button" className={tab === id ? "on" : ""} onClick={() => setTab(id)}>
-              {id[0].toUpperCase() + id.slice(1)}
+              {id === "accessibility" ? "Accessibility" : id[0].toUpperCase() + id.slice(1)}
             </button>
           ))}
         </nav>
@@ -545,6 +548,61 @@ export function SettingsOverlay() {
               {actionError && <p className="settings-note">{actionError}</p>}
             </>
           )}
+          {tab === "accessibility" && (
+            <div className="settings-a11y">
+              <p className="os-kicker">Display</p>
+              <div className="settings-inline">
+                <span>Sidebar</span>
+                <button
+                  type="button"
+                  className={`os-toggle${settings.sidebar ? " on" : ""}`}
+                  aria-pressed={settings.sidebar}
+                  onClick={() => {
+                    const next = !settings.sidebar;
+                    update({ sidebar: next });
+                    useLayoutStore.getState().reflowForSidebar();
+                  }}
+                />
+              </div>
+              <div className="settings-inline">
+                <span>Blocky font</span>
+                <button type="button" className={`os-toggle${settings.blockyFont ? " on" : ""}`} aria-pressed={settings.blockyFont} onClick={() => update({ blockyFont: !settings.blockyFont })} />
+              </div>
+              <div className="settings-inline">
+                <span>Hide header clock</span>
+                <button type="button" className={`os-toggle${settings.hideHeaderClock ? " on" : ""}`} aria-pressed={settings.hideHeaderClock} onClick={() => update({ hideHeaderClock: !settings.hideHeaderClock })} />
+              </div>
+              <div className="settings-inline">
+                <span>Header separator</span>
+                <button type="button" className={`os-toggle${settings.headerLine ? " on" : ""}`} aria-pressed={settings.headerLine} onClick={() => update({ headerLine: !settings.headerLine })} />
+              </div>
+              <p className="os-kicker">Turn my screen off after</p>
+              <button type="button" className="os-version-trigger" onClick={() => setScreenOffOpen(!screenOffOpen)}>
+                {screenOffLabel(settings.screenOffSecs)} ▼
+              </button>
+              {screenOffOpen && (
+                <div className="os-version-list">
+                  {SCREEN_OFF_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.secs}
+                      type="button"
+                      className="os-row"
+                      onClick={() => {
+                        update({ screenOffSecs: opt.secs });
+                        setScreenOffOpen(false);
+                      }}
+                    >
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <ScaleRow label="Text scale" min={80} max={200} value={settings.textScale} onChange={(n) => update({ textScale: n })} />
+              <ScaleRow label="UI / padding scale" min={75} max={150} value={settings.uiScale} onChange={(n) => update({ uiScale: n })} />
+              <ScaleRow label="Header height" min={88} max={140} value={settings.headerH} onChange={(n) => update({ headerH: n })} />
+              <ScaleRow label="Hit-target size" min={48} max={96} value={settings.hitTarget} onChange={(n) => update({ hitTarget: n })} />
+            </div>
+          )}
         </div>
       </div>
 
@@ -593,6 +651,45 @@ export function SettingsOverlay() {
         />
       )}
       {busy && <p className="settings-note os-busy">{powerStatus || "Working…"}</p>}
+    </div>
+  );
+}
+
+function ScaleRow({
+  label,
+  min,
+  max,
+  value,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  const clamp = (n: number) => Math.max(min, Math.min(max, Math.round(n)));
+  return (
+    <div className="settings-scale">
+      <div className="settings-inline">
+        <span>{label}</span>
+        <input
+          className="settings-num"
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => onChange(clamp(Number(e.target.value) || min))}
+        />
+      </div>
+      <input
+        className="slider"
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(clamp(Number(e.target.value)))}
+      />
     </div>
   );
 }

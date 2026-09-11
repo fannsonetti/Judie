@@ -1,8 +1,8 @@
 /** Home-screen type scale and header geometry for the 1920×1200 kiosk. */
 
-export const HOME_CLOCK_PX = 44;
+export const HOME_CLOCK_PX = 52;
 export const PREVIOUS_CLOCK_PX = 22;
-export const HOME_HEADER_H = 88;
+export const HOME_HEADER_H = 108;
 export const HOME_FRAME = { w: 1920, h: 1200 };
 
 export const TYPE = {
@@ -90,7 +90,6 @@ export function homeHeaderBoxes(
 
 export function assertReadableHierarchy() {
   return (
-    TYPE.clock === PREVIOUS_CLOCK_PX * 2 &&
     TYPE.clock > TYPE.hero &&
     TYPE.hero > TYPE.value &&
     TYPE.value > TYPE.title &&

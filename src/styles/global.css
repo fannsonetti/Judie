@@ -17,11 +17,13 @@
   --radius-md: 22px;
   --radius-lg: 28px;
   --radius-xl: 32px;
-  --status-h: 88px;
-  --page-pad: clamp(16px, 2.2vw, 36px);
-  --grid-gap: clamp(12px, 1.2vw, 20px);
+  --status-h: 108px;
+  --page-pad: clamp(12px, 2.2vw, 28px);
+  --grid-gap: clamp(8px, 1.2vw, 16px);
   --safe-bottom: 20px;
-  --type-clock: 44px;
+  --type-clock: 52px;
+  --text-scale: 1;
+  --ui-scale: 1;
   --type-hero: 32px;
   --type-value: 28px;
   --type-title: 16px;
@@ -116,6 +118,24 @@ input:focus-visible {
   overflow: hidden;
 }
 
+.app-shell.with-rail {
+  flex-direction: row;
+}
+
+.app-content {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.status-bar.with-line {
+  box-shadow: inset 0 -1px 0 #ffffff;
+}
+
 .status-bar {
   height: var(--status-h);
   flex-shrink: 0;
@@ -126,6 +146,7 @@ input:focus-visible {
   z-index: 20;
   touch-action: pan-y;
   cursor: default;
+  position: relative;
 }
 
 .status-left {
@@ -406,8 +427,9 @@ input:focus-visible {
 .expanded-overlay {
   position: absolute;
   inset: 0;
+  top: var(--status-h);
   z-index: 40;
-  background: rgba(8, 9, 12, 0.55);
+  background: #000;
   display: flex;
   align-items: stretch;
   justify-content: stretch;
@@ -415,14 +437,34 @@ input:focus-visible {
 
 .expanded-app {
   flex: 1;
-  margin: var(--status-h) var(--page-pad) var(--page-pad);
-  border-radius: var(--radius-xl);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  margin: 0;
+  border-radius: 0;
+  background: var(--bg);
+  border: none;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   position: relative;
+}
+
+.expanded-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  z-index: 6;
+}
+
+.expanded-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  width: 48px;
+  height: 4px;
+  margin-left: -24px;
+  background: #3a3a3a;
 }
 
 .expanded-close {
@@ -849,7 +891,7 @@ input:focus-visible {
 .wx {
   height: 100%;
   min-height: 0;
-  padding: 14px 16px;
+  padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -866,7 +908,7 @@ input:focus-visible {
 }
 
 .wx-host.size-1x1 .wx {
-  padding: 12px 13px;
+  padding: 8px 10px;
   gap: 8px;
 }
 
@@ -908,7 +950,7 @@ input:focus-visible {
 }
 
 .wx-host.size-1x2 .wx {
-  padding: 12px 14px;
+  padding: 8px 10px;
   gap: 8px;
 }
 
@@ -2149,4 +2191,83 @@ html.linux-app .widget-shell.edit-jiggle {
 html.linux-app .judie-orb.listening {
   animation: none;
 }
+
+.wx.analog {
+  align-items: center;
+  justify-content: center;
+}
+.analog-face {
+  width: min(86%, 86%);
+  aspect-ratio: 1;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  position: relative;
+  background: #000;
+}
+.analog-hand {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  transform-origin: 50% 100%;
+  background: #fff;
+}
+.analog-hand.hour { width: 4px; height: 28%; margin-left: -2px; }
+.analog-hand.minute { width: 3px; height: 38%; margin-left: -1.5px; }
+.analog-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #fff;
+}
+.wx.digital-clock {
+  align-items: center;
+  justify-content: center;
+}
+.wx.digital-clock strong {
+  font-size: var(--type-clock);
+  font-variant-numeric: tabular-nums;
+}
+.wx.digital-clock.size-1x1 strong { font-size: var(--type-hero); }
+.pong-preview, .pong-court {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  min-height: 120px;
+}
+.pong-net {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  margin-left: -1px;
+  background: #3a3a3a;
+}
+.pong-paddle {
+  position: absolute;
+  width: 8px;
+  height: 36px;
+  margin-top: -18px;
+  background: #fff;
+}
+.pong-paddle.left { left: 8px; }
+.pong-paddle.right { right: 8px; }
+.pong-ball {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  background: #fff;
+}
+.pong-app { display: flex; flex-direction: column; height: 100%; gap: 8px; }
+.pong-score { display: flex; justify-content: space-between; font-size: 32px; }
+.pong-modes { display: flex; gap: 8px; flex-wrap: wrap; }
+.pong-court { flex: 1; }
+.pong-court .pong-paddle { height: 96px; margin-top: -48px; width: 12px; }
+
 

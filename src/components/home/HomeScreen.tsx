@@ -16,7 +16,10 @@ import { Toasts } from "./Toasts";
 import { DebugPanel } from "./DebugPanel";
 import { JudieRuntime } from "../../runtime/JudieRuntime";
 import { WifiMenu } from "../chrome/WifiMenu";
+import { SideRail } from "../chrome/SideRail";
 import { AnsiKeyboard } from "../chrome/AnsiKeyboard";
+import { useSettingsStore } from "../../store/settingsStore";
+import { useChromeStore } from "../../store/chromeStore";
 
 const TRIPLE_MS = 480;
 
@@ -69,7 +72,7 @@ export function HomeScreen() {
   const ignoreHoldTarget = (target: HTMLElement) =>
     Boolean(
       target.closest(
-        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .expanded-overlay, .confirm-backdrop, .wifi-menu, .osk"
+        "input, button, textarea, select, .toggle, .slider, .wx-slider, .palette-backdrop, .palette-panel, .settings-backdrop, .settings-sheet, .edit-bar, .wg-backdrop, .wg-panel, .widget-remove, .expanded-overlay, .confirm-backdrop, .wifi-menu, .osk, .side-rail, .sleep-layer, .vol-menu"
       )
     );
 
@@ -182,17 +185,58 @@ export function HomeScreen() {
     return () => window.removeEventListener("contextmenu", onContext);
   }, []);
 
+  const volOpen = useChromeStore((s) => s.volMenuOpen);
+  const blockyFont = useSettingsStore((s) => s.blockyFont);
+  const textScale = useSettingsStore((s) => s.textScale);
+  const uiScale = useSettingsStore((s) => s.uiScale);
+  const headerH = useSettingsStore((s) => s.headerH);
+  const screenOffSecs = useSettingsStore((s) => s.screenOffSecs);
+  const [asleep, setAsleep] = useState(false);
+  const lastInput = useRef(performance.now());
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--status-h", `${headerH}px`);
+    root.style.setProperty("--text-scale", String(textScale / 100));
+    root.style.setProperty("--ui-scale", String(uiScale / 100));
+    root.style.setProperty("--type-clock", `${52 * (textScale / 100)}px`);
+    root.classList.toggle("blocky-font", blockyFont);
+  }, [headerH, textScale, uiScale, blockyFont]);
+
+  useEffect(() => {
+    const bump = () => {
+      lastInput.current = performance.now();
+      if (asleep) return;
+    };
+    window.addEventListener("pointerdown", bump, true);
+    window.addEventListener("keydown", bump, true);
+    const id = window.setInterval(() => {
+      if (!screenOffSecs || asleep) return;
+      if (performance.now() - lastInput.current >= screenOffSecs * 1000) {
+        setAsleep(true);
+      }
+    }, 1000);
+    return () => {
+      window.removeEventListener("pointerdown", bump, true);
+      window.removeEventListener("keydown", bump, true);
+      window.clearInterval(id);
+    };
+  }, [screenOffSecs, asleep]);
+
   const pageWidthPct = `${100 / pageCount}%`;
   const link = useNetworkLink();
+  const sidebar = useSettingsStore((s) => s.sidebar);
 
   return (
     <div
-      className="app-shell"
+      className={`app-shell${sidebar ? " with-rail" : ""}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={() => endDrag()}
     >
+      {sidebar && <SideRail />}
+      <div className="app-content">
       <JudieRuntime />
       <StatusBar link={link} />
       <div
@@ -239,6 +283,23 @@ export function HomeScreen() {
       <RemoveConfirm />
       <Toasts />
       <DebugPanel />
+      {volOpen && (
+        <div
+          className="vol-menu-backdrop"
+          onClick={() => useChromeStore.getState().setVolMenuOpen(false)}
+        />
+      )}
+      </div>
+      {asleep && (
+        <div
+          className="sleep-layer"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            lastInput.current = performance.now();
+            setAsleep(false);
+          }}
+        />
+      )}
     </div>
   );
 }

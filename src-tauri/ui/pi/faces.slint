@@ -61,6 +61,15 @@ export component WidgetFace inherits Rectangle {
     in property <string> terminal-input: "";
     in property <[TerminalLine]> terminal-lines: [];
     in property <bool> terminal-kb-active: false;
+    in property <string> clock-hm: "12:00";
+    in property <string> clock-hms: "12:00:00";
+    in property <float> hour-deg: 0;
+    in property <float> minute-deg: 0;
+    in property <float> second-deg: 0;
+    in property <int> pong-ly: 42;
+    in property <int> pong-ry: 42;
+    in property <int> pong-bx: 50;
+    in property <int> pong-by: 50;
 
     callback toggle-master();
     callback brightness-changed(int);
@@ -423,13 +432,13 @@ export component WidgetFace inherits Rectangle {
                 text: "TERMINAL";
                 color: #8a8a8a;
                 font-size: Dy.type-secondary * root.face-scale;
-                font-family: Dy.mono;
+                font-family: Dy.code;
             }
             if root.size == "1x1": Text {
                 text: root.t-term.length == 0 ? "Linux shell" : root.t-term[root.t-term.length - 1].text;
                 color: #ffffff;
                 font-size: Dy.type-title * root.face-scale;
-                font-family: Dy.mono;
+                font-family: Dy.code;
                 overflow: elide;
                 vertical-stretch: 1;
             }
@@ -443,7 +452,7 @@ export component WidgetFace inherits Rectangle {
                         text: line.text;
                         color: line.prompt ? #8a8a8a : #ffffff;
                         font-size: Dy.type-secondary * root.face-scale;
-                        font-family: Dy.mono;
+                        font-family: Dy.code;
                         overflow: elide;
                         wrap: no-wrap;
                     }
@@ -482,6 +491,91 @@ export component WidgetFace inherits Rectangle {
                 Text { text: t.label; color: #ffffff; font-size: Dy.type-title * root.face-scale; }
                 Rectangle { horizontal-stretch: 1; }
                 Text { text: t.remain; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; }
+            }
+        }
+
+        if !root.use-layout && root.kind == "clock": Rectangle {
+                analog := Rectangle {
+                width: min(parent.width, parent.height) * 0.86;
+                height: self.width;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                border-radius: self.width;
+                border-width: max(1.5px, 2px * root.face-scale);
+                border-color: #ffffff;
+                background: #000000;
+                property <float> hx: 50 + sin(root.hour-deg * 1deg) * 22;
+                property <float> hy: 50 - cos(root.hour-deg * 1deg) * 22;
+                property <float> mx: 50 + sin(root.minute-deg * 1deg) * 32;
+                property <float> my: 50 - cos(root.minute-deg * 1deg) * 32;
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: 100;
+                    viewbox-height: 100;
+                    stroke: #ffffff;
+                    stroke-width: 3.2px;
+                    commands: "M 50 50 L \{analog.hx} \{analog.hy}";
+                }
+                Path {
+                    width: 100%;
+                    height: 100%;
+                    viewbox-x: 0;
+                    viewbox-y: 0;
+                    viewbox-width: 100;
+                    viewbox-height: 100;
+                    stroke: #ffffff;
+                    stroke-width: 2.2px;
+                    commands: "M 50 50 L \{analog.mx} \{analog.my}";
+                }
+                Rectangle {
+                    width: 8px * root.face-scale;
+                    height: 8px * root.face-scale;
+                    x: (analog.width - self.width) / 2;
+                    y: (analog.height - self.height) / 2;
+                    border-radius: self.width;
+                    background: #ffffff;
+                }
+            }
+        }
+
+        if !root.use-layout && root.kind == "digitalClock": VerticalLayout {
+            alignment: center;
+            Text {
+                text: root.size == "1x2" ? root.clock-hms : root.clock-hm;
+                color: #ffffff;
+                font-size: (root.size == "2x2" ? Dy.type-clock : Dy.type-hero) * root.face-scale;
+                font-weight: 700;
+                font-family: Dy.mono;
+                horizontal-alignment: center;
+            }
+        }
+
+        if !root.use-layout && root.kind == "pong": Rectangle {
+            background: #000000;
+            Rectangle { x: parent.width / 2 - 1px; y: 8px; width: 2px; height: parent.height - 16px; background: #3a3a3a; }
+            Rectangle {
+                x: 8px;
+                y: parent.height * root.pong-ly / 100.0 - 18px * root.face-scale;
+                width: 6px * root.face-scale;
+                height: 36px * root.face-scale;
+                background: #ffffff;
+            }
+            Rectangle {
+                x: parent.width - 14px * root.face-scale;
+                y: parent.height * root.pong-ry / 100.0 - 18px * root.face-scale;
+                width: 6px * root.face-scale;
+                height: 36px * root.face-scale;
+                background: #ffffff;
+            }
+            Rectangle {
+                x: parent.width * root.pong-bx / 100.0 - 4px * root.face-scale;
+                y: parent.height * root.pong-by / 100.0 - 4px * root.face-scale;
+                width: 8px * root.face-scale;
+                height: 8px * root.face-scale;
+                background: #ffffff;
             }
         }
 

@@ -26,17 +26,17 @@ export function gallerySizeCaption(size: WidgetSize) {
   return `${info.name}  ${info.width}×${info.height}`;
 }
 
-export function gallerySizeAt(index: number): WidgetSize {
-  return GALLERY_SIZE_ORDER[Math.max(0, Math.min(GALLERY_SIZE_ORDER.length - 1, index))];
+export function gallerySizeAt(index: number, sizes: WidgetSize[] = GALLERY_SIZE_ORDER): WidgetSize {
+  return sizes[Math.max(0, Math.min(sizes.length - 1, index))];
 }
 
-export function galleryIndexForSize(size: WidgetSize) {
-  const i = GALLERY_SIZE_ORDER.indexOf(size);
+export function galleryIndexForSize(size: WidgetSize, sizes: WidgetSize[] = GALLERY_SIZE_ORDER) {
+  const i = sizes.indexOf(size);
   return i < 0 ? 0 : i;
 }
 
-export function gallerySwipeIndex(from: number, dx: number, threshold = 48) {
-  if (dx < -threshold) return Math.min(2, from + 1);
+export function gallerySwipeIndex(from: number, dx: number, threshold = 48, last = 2) {
+  if (dx < -threshold) return Math.min(last, from + 1);
   if (dx > threshold) return Math.max(0, from - 1);
   return from;
 }

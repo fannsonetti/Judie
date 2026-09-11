@@ -6,6 +6,15 @@ export function formatClock(d: Date, hour12 = false) {
   });
 }
 
+export function formatClockHms(d: Date) {
+  return d.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+}
+
 export function formatDateLong(d: Date) {
   return d.toLocaleDateString("en-GB", {
     weekday: "long",

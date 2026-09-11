@@ -4,6 +4,9 @@ export type WidgetType =
   | "media"
   | "calendar"
   | "climate"
+  | "clock"
+  | "digitalClock"
+  | "pong"
   | "purifier"
   | "quickControls"
   | "server"
@@ -48,8 +51,11 @@ export const WIDGET_SUPPORTED_SIZES: Record<WidgetType, WidgetSize[]> = {
   activity: ["1x1", "1x2", "2x2"],
   calendar: ["1x1", "1x2", "2x2"],
   climate: ["1x1", "1x2", "2x2"],
+  clock: ["1x1", "2x2"],
+  digitalClock: ["1x1", "1x2", "2x2"],
   lights: ["1x1", "1x2", "2x2"],
   media: ["1x1", "1x2", "2x2"],
+  pong: ["1x1", "2x2"],
   purifier: ["1x1", "1x2", "2x2"],
   quickControls: ["1x1", "1x2", "2x2"],
   server: ["1x1", "1x2", "2x2"],
@@ -65,6 +71,9 @@ export const WIDGET_LABELS: Record<WidgetType, string> = {
   media: "Media",
   calendar: "Calendar",
   climate: "Climate",
+  clock: "Clock",
+  digitalClock: "Digital Clock",
+  pong: "Pong",
   purifier: "Air Purifier",
   quickControls: "Quick Controls",
   server: "Server Status",
@@ -75,12 +84,25 @@ export const WIDGET_LABELS: Record<WidgetType, string> = {
 };
 
 export const GRID_COLS = 6;
+export const GRID_COLS_SIDE = 4;
 export const GRID_ROWS = 4;
 export const MAX_PAGES = 6;
+
+export function gridColumnCount(sidebar: boolean) {
+  return sidebar ? GRID_COLS_SIDE : GRID_COLS;
+}
 
 export interface PlacedWidget extends WidgetInstance {
   col: number;
   row: number;
 }
 
-export type ExpandableWidgetType = "weather" | "lights" | "media" | "purifier" | "calendar";
+export type ExpandableWidgetType =
+  | "weather"
+  | "lights"
+  | "media"
+  | "purifier"
+  | "calendar"
+  | "climate"
+  | "pong"
+  | "terminal";
