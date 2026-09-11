@@ -43,8 +43,7 @@ export component AnsiKeyboard inherits Rectangle {
             }
             TouchArea {
                 clicked => { root.close(); }
-                width: Dy.hit-target * 1.4;
-                min-width: 88px;
+                width: max(88px, Dy.hit-target * 1.4);
                 Rectangle {
                     border-width: 1.5px;
                     border-color: Dy.border-hi;

@@ -1078,7 +1078,7 @@ export component MainWindow inherits Window {
         x: root.rail-w;
         y: root.settings-page ? Dy.header-h : (root.settings-pull - 1.0) * parent.height;
         width: parent.width - root.rail-w;
-        height: root.settings-page ? (parent.height - Dy.header-h) : 100%;
+        height: root.settings-page ? (parent.height - Dy.header-h) : parent.height;
         background: #000000;
         clip: true;
         TouchArea {

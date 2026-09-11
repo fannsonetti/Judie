@@ -1299,7 +1299,7 @@ test("keyboard is 600px and modifiers are hold-only", () => {
   assert(slint.includes("x: root.rail-w") && slint.includes("parent.width - root.rail-w"), "keyboard sits in the content column");
   assert(cards.includes("min-height: Dy.hit-target"), "keys use the hit-target scale");
   assert(cards.includes("width: 40px") && cards.includes("height: 40px"), "Pi key icon is 40px");
-  assert(kb.includes("text: \"Hide\"") && kb.includes("min-width: 88px"), "Hide is a large hit target");
+  assert(kb.includes("text: \"Hide\"") && kb.includes("max(88px, Dy.hit-target * 1.4)"), "Hide is a large hit target");
   assert(cards.includes("out property <bool> down"), "keys expose pressed state");
   assert(kb.includes("property <bool> shift: shift-l.down"), "shift is hold");
   assert(kb.includes("property <bool> ctrl: ctrl-l.down"), "ctrl is hold");
