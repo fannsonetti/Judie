@@ -270,7 +270,7 @@ export function HomeScreen() {
         </div>
 
         {pageCount > 1 && <PageIndicator page={currentPage} count={pageCount} />}
-        {editMode && <EditModeControls />}
+        {editMode && <EditModeControls showButtons={!sidebar} />}
       </div>
 
       <ExpandedOverlay />

@@ -54,7 +54,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: sudo, iw, wpasupplicant, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6
+Depends: sudo, iw, wpasupplicant, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6, alsa-utils
 Maintainer: Judie <judie@local>
 Description: Judie room control (native Pi kiosk)
  Native Slint UI for Raspberry Pi — no WebKit process. Boots via systemd + bare Xorg.

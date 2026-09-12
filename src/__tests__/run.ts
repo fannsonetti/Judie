@@ -984,7 +984,7 @@ test("accessibility settings and sidebar persist on both stacks", () => {
   assert(settings.includes('"device"'), "react device tab");
   assert(config.includes("screenOffSecs") && config.includes("hitTarget"), "config a11y fields");
   assert(slint.includes("PONG") && slint.includes("pong-mode"), "pong expand");
-  assert(readFileSync("src-tauri/ui/pi/faces.slint", "utf8").includes('root.kind == "clock"'), "analog face");
+  assert(readFileSync("src-tauri/ui/pi/faces.slint", "utf8").includes("root.clock-hm"), "clock face is digital");
 });
 
 test("widget drag uses a dedicated layer, does not jump, and stays on the grid", () => {
@@ -1035,13 +1035,13 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   const grid = readFileSync("src/components/home/WidgetGrid.tsx", "utf8");
   const css = readFileSync("src/styles/global.css", "utf8");
   const container = readFileSync("src/components/home/WidgetContainer.tsx", "utf8");
-  const editAt = slint.indexOf("if root.edit-mode:");
+  const editAt = slint.indexOf("if root.edit-mode && !root.sidebar");
   const layerAt = slint.indexOf("if root.drag-id != \"\": TileShell");
   assert(slint.includes("ghost: root.drag-id == w.id"), "home tiles ghost while lifted");
   assert(slint.includes("layer: true"), "slint drag portal");
   assert(slint.includes("drag-cancel"), "canceled drags restore");
   assert(slint.includes("drag-ox"), "layer keeps the press origin");
-  assert(layerAt > editAt && layerAt > 0, "drag layer paints above edit controls");
+  assert(layerAt > editAt && layerAt > 0, "drag layer paints above overlay edit controls");
   assert(!/z-index:\s*\d+/.test(slint), "slint must not stack tiles with z-index");
   assert(grid.includes("widget-drag-layer"), "react drag portal");
   assert(grid.indexOf("widget-drag-layer") > grid.indexOf("placed.map"), "portal is after slots");
@@ -1057,7 +1057,7 @@ test("widget drag uses a dedicated layer, does not jump, and stays on the grid",
   assert(rust.includes("ui.set_drop_col") && rust.includes("ui.set_drop_row"), "glide uses the collided cell");
   assert(slint.includes("in-out property <int> drop-col"), "drop-col is writable from rust");
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
-  assert(pkg.version === "0.3.3", "package version is 0.3.3");
+  assert(pkg.version === "0.3.4", "package version is 0.3.4");
 });
 
 test("edit-mode widget delete control is a square white X", () => {
@@ -1075,7 +1075,7 @@ test("edit-mode widget delete control is a square white X", () => {
   const btn = slint.slice(btnAt, btnAt + 1800);
   assert(btn.includes("width: 40px") && btn.includes("height: 40px"), "square 40px control");
   assert(btn.includes("background: #ffffff"), "pure white fill");
-  assert(btn.includes("color: #000000") && btn.includes("text: \"×\""), "centered black X");
+  assert(btn.includes("stroke: #000000") && btn.includes("M 10 10 L 30 30"), "centered black X");
   assert(btn.includes("border-radius: 0px"), "square corners");
   assert(btn.includes("border-width: 0px"), "filled, not outline");
   assert(!btn.includes("border-radius: 15px") && !btn.includes("border-radius: 50%"), "must not be a circle");
@@ -1148,9 +1148,9 @@ test("edit-mode widget delete control is a square white X", () => {
   assert(left.x + left.size > leftShellLeft + leftShellWidth, "badge occupies the gutter toward the next widget");
   assert(overlayAt > tilesAt, "adjacent widgets cannot paint over the X");
 
-  assert(pkg.version === "0.3.3", "npm version");
-  assert(cargo.includes('version = "0.3.3"'), "crate version");
-  assert(tauri.version === "0.3.3", "tauri version");
+  assert(pkg.version === "0.3.4", "npm version");
+  assert(cargo.includes('version = "0.3.4"'), "crate version");
+  assert(tauri.version === "0.3.4", "tauri version");
 });
 
 test("widget editor size carousel is compact and has three sizes", () => {
@@ -1224,9 +1224,9 @@ test("widget editor size carousel is compact and has three sizes", () => {
   assert(gallery.includes("aria-label={gallerySizeCaption(s)}"), "dot accessible names");
   assert(gallery.includes('role="dialog"'), "keyboard dialog");
 
-  assert(pkg.version === "0.3.3", "npm version");
-  assert(cargo.includes('version = "0.3.3"'), "crate version");
-  assert(tauri.version === "0.3.3", "tauri version");
+  assert(pkg.version === "0.3.4", "npm version");
+  assert(cargo.includes('version = "0.3.4"'), "crate version");
+  assert(tauri.version === "0.3.4", "tauri version");
 });
 
 function textHeightSafe(px: number) {
@@ -1271,7 +1271,7 @@ test("settings compact power, routines, general, and close gesture live on the s
   assert(!slint.includes("x: (parent.width - 48px) / 2"), "misplaced handle is gone");
   assert(slint.includes("clip: true"), "settings sheet clips stray chrome");
   const start = slint.indexOf("if root.settings-page || root.settings-pull > 0.001");
-  const end = slint.indexOf("if root.net-menu-open: Rectangle");
+  const end = slint.indexOf("if root.confirm-kind == \"restart\"");
   const sheet = slint.slice(start, end);
   assert(sheet.includes("y: parent.height - 28px"), "close edge is on the settings sheet");
   assert(slint.includes("interactive: !root.settings-tracking"), "page scroll stays when the close edge is unused");
@@ -1394,7 +1394,15 @@ test("pi polish: rail, device, sleep, timers, borders, and screen-off", () => {
   const pongTimerAt = rust.indexOf("let pong_timer");
   const runAt = rust.lastIndexOf("ui.run()");
   assert(pongTimerAt > 0 && runAt > pongTimerAt, "pong timer stays in scope through ui.run");
-  assert(!rust.includes("vcgencmd"), "HDMI transmitter stays up for tap-to-wake");
+  assert(rust.includes("vcgencmd") && rust.includes("display_power"), "sleep cuts HDMI backlight");
+  assert(rust.includes("PADDLE_HALF") && rust.includes("const PADDLE_HALF: f32 = 6.0"), "paddle hitbox matches the graphic");
+  assert(!rust.includes(".abs() < 14.0"), "old oversized paddle hitbox is gone");
+  assert(rust.includes("fn beep_loop") && rust.includes("fn play_beep"), "pong audio uses a persistent aplay thread");
+  const playAt = rust.indexOf("fn play_beep");
+  const playFn = rust.slice(playAt, playAt + 400);
+  assert(!playFn.includes("Command::new(\"aplay\")"), "16ms pong path does not spawn aplay");
+  assert(postinst.includes("alsa-utils") || readFileSync("scripts/package-armhf-deb.sh", "utf8").includes("alsa-utils"), "deb depends on aplay");
+  assert(rust.includes("get_drag_id") && rust.includes("get_expanded() == \"pong\""), "skip full push_ui while pong or drag");
   assert(rust.includes("set_backlight"), "backlight sysfs dim");
   assert(rust.includes("if SCREEN_ASLEEP"), "asleep skips push_ui");
   assert(rust.includes("settings_tab.clamp(0, 4)"), "five settings tabs");
@@ -1405,11 +1413,25 @@ test("pi polish: rail, device, sleep, timers, borders, and screen-off", () => {
   const netAt = slint.indexOf("net-btn := TouchArea");
   const volAt = slint.indexOf("vol-btn := TouchArea");
   assert(netAt > 0 && volAt > netAt, "wifi is left of volume");
-  assert(slint.includes("x: parent.width - Dy.hit-target * 2 - 16px"), "wifi uses the inner header slot");
-  assert(slint.slice(volAt, volAt + 400).includes("x: parent.width - Dy.hit-target - 8px"), "volume is the rightmost header control");
+  assert(slint.includes("x: parent.width - 108px"), "wifi sits next to volume");
+  assert(slint.slice(volAt, volAt + 400).includes("x: parent.width - 56px"), "volume is the rightmost header control");
   assert(slint.slice(volAt, volAt + 900).includes("arm-sheet-open(0"), "far-right volume starts the settings pull");
   assert(cards.includes("in property <float> zoom: 1.0"), "header glyphs scale");
-  assert(slint.includes("zoom: Dy.header-h / 108px"), "header icons follow header height");
+  assert(slint.includes("zoom: Dy.header-h / 108px * 1.75"), "header icons are larger");
+  const mediaAt = slint.indexOf("if root.expanded == \"media\"");
+  const netMenuAt = slint.indexOf("if root.net-menu-open: Rectangle");
+  const volMenuAt = slint.indexOf("if root.vol-menu-open: Rectangle");
+  const kbAt = slint.indexOf("if root.kb-open: AnsiKeyboard");
+  assert(mediaAt > 0 && netMenuAt > mediaAt, "wifi menu paints above expanded apps");
+  assert(volMenuAt > netMenuAt && kbAt > volMenuAt, "volume menu is under the icon and under the keyboard");
+  assert(slint.includes("if root.edit-mode && !root.sidebar"), "edit bar leaves the grid when the rail is on");
+  assert(slint.includes("if root.edit-mode: HorizontalLayout"), "add/done sit in the rail");
+  const dragLayerAt = slint.indexOf("if root.drag-id != \"\": TileShell");
+  const removeAt = slint.indexOf("for w in root.slots: WidgetRemoveBtn");
+  const layerSlice = slint.slice(dragLayerAt, removeAt);
+  assert(dragLayerAt > 0 && removeAt > dragLayerAt, "drag ghost is below the remove X");
+  assert(!layerSlice.includes("WidgetFace"), "drag portal is a lightweight ghost");
+  assert(!readFileSync("src-tauri/ui/pi/faces.slint", "utf8").includes("analog :="), "clock dropped analog Path hands");
   const hideClock = slint.indexOf("if !root.hide-header-clock: VerticalLayout");
   assert(hideClock > 0, "clock and date share one hide");
   assert(slint.slice(hideClock, hideClock + 700).includes("root.date-text"), "hiding the clock also hides the date");

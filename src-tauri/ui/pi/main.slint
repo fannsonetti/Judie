@@ -364,7 +364,7 @@ export component MainWindow inherits Window {
     property <int> settings-kind: 0;
     property <int> sheet-id: 0;
     property <float> settings-eased: 0;
-    property <string> drag-id: "";
+    in-out property <string> drag-id: "";
     property <string> drag-kind: "activity";
     in-out property <string> drag-size: "1x1";
     property <bool> drag-use-layout: false;
@@ -589,8 +589,8 @@ export component MainWindow inherits Window {
                 }
             }
             net-btn := TouchArea {
-                x: parent.width - Dy.hit-target * 2 - 16px;
-                width: Dy.hit-target;
+                x: parent.width - 108px;
+                width: 48px;
                 height: 100%;
                 clicked => {
                     if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open {
@@ -601,14 +601,14 @@ export component MainWindow inherits Window {
                 NetGlyph {
                     x: (parent.width - self.width) / 2;
                     y: (parent.height - self.height) / 2;
-                    zoom: Dy.header-h / 108px;
+                    zoom: Dy.header-h / 108px * 1.75;
                     kind: root.net-kind;
                     bars: root.net-bars;
                 }
             }
             vol-btn := TouchArea {
-                x: parent.width - Dy.hit-target - 8px;
-                width: Dy.hit-target;
+                x: parent.width - 56px;
+                width: 48px;
                 height: 100%;
                 clicked => {
                     if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open {
@@ -640,12 +640,12 @@ export component MainWindow inherits Window {
                 VolumeGlyph {
                     x: (parent.width - self.width) / 2;
                     y: (parent.height - self.height) / 2;
-                    zoom: Dy.header-h / 108px;
+                    zoom: Dy.header-h / 108px * 1.75;
                 }
             }
             settings-edge := TouchArea {
                 x: parent.width * 2 / 3;
-                width: parent.width / 3 - Dy.hit-target * 2 - 16px;
+                width: parent.width / 3 - 108px;
                 height: 100%;
                 pointer-event(ev) => {
                     if ev.kind == PointerEventKind.down {
@@ -850,6 +850,7 @@ export component MainWindow inherits Window {
                         terminal-kb-active: root.kb-open && root.kb-field == "terminal";
                         clock-hm: root.clock-hm;
                         clock-hms: root.clock-hms;
+                        date-text: root.date-text;
                         hour-deg: root.hour-deg;
                         minute-deg: root.minute-deg;
                         second-deg: root.second-deg;
@@ -904,7 +905,7 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                if root.edit-mode: Rectangle {
+                if root.edit-mode && !root.sidebar: Rectangle {
                     y: parent.height - 120px;
                     height: 120px;
                     width: parent.width;
@@ -928,75 +929,19 @@ export component MainWindow inherits Window {
                     pending: root.pending-remove == root.drag-id;
                     layer: true;
                     ghost: false;
-                    show-border: root.drag-border;
-                    WidgetFace {
-                        kind: root.drag-kind;
-                        size: root.drag-size;
-                        sample: false;
-                        source: "live";
-                        widget-id: root.drag-id;
-                        weather-loc: root.weather-loc;
-                        weather-temp: root.weather-temp;
-                        weather-cond: root.weather-cond;
-                        weather-range: root.weather-range;
-                        weather-feel: root.weather-feel;
-                        weather-note: root.weather-note;
-                        hours: root.hours;
-                        master-on: root.master-on;
-                        brightness: root.brightness;
-                        scene: root.scene;
-                        master-color: root.master-color;
-                        lights: root.lights;
-                        playing: root.playing;
-                        track-title: root.track-title;
-                        track-artist: root.track-artist;
-                        volume: root.volume;
-                        media-progress: root.media-progress;
-                        indoor: root.indoor;
-                        outdoor: root.outdoor;
-                        humidity: root.humidity;
-                        comfort: root.comfort;
-                        events: root.events;
-                        month-name: root.month-name;
-                        cal-cells: root.cal-cells;
-                        purifier-on: root.purifier-on;
-                        purifier-mode: root.purifier-mode;
-                        purifier-aq: root.purifier-aq;
-                        purifier-filter: root.purifier-filter;
-                        cpu: root.cpu;
-                        memory: root.memory;
-                        mem-detail: root.mem-detail;
-                        temp-text: root.temp-text;
-                        services: root.services;
-                        activity: root.activity;
-                        timers: root.timers;
-                        slop-nodes: root.slop-nodes;
-                        dnd: root.dnd;
-                        use-layout: root.drag-use-layout;
-                        terminal-input: root.terminal-input;
-                        terminal-lines: root.terminal-lines;
-                        terminal-kb-active: false;
-                        clock-hm: root.clock-hm;
-                        clock-hms: root.clock-hms;
-                        hour-deg: root.hour-deg;
-                        minute-deg: root.minute-deg;
-                        second-deg: root.second-deg;
-                        pong-ly: root.pong-ly;
-                        pong-ry: root.pong-ry;
-                        pong-bx: root.pong-bx;
-                        pong-by: root.pong-by;
-                        toggle-master => { root.toggle-master(); }
-                        brightness-changed(v) => { root.brightness-changed(v); }
-                        set-color(c) => { root.set-color(c); }
-                        toggle-light(id) => { root.toggle-light(id); }
-                        toggle-play => { root.toggle-play(); }
-                        next-track => { root.next-track(); }
-                        prev-track => { root.prev-track(); }
-                        volume-changed(v) => { root.volume-changed(v); }
-                        quick(id) => { root.quick(id); }
-                        set-purifier-mode(m) => { root.set-purifier-mode(m); }
-                        open-terminal-input => { }
-                        submit-terminal => { }
+                    show-border: true;
+                    Rectangle {
+                        background: #111111;
+                        Text {
+                            width: 100%;
+                            height: 100%;
+                            text: root.drag-kind;
+                            color: #8a8a8a;
+                            font-size: Dy.type-value;
+                            font-family: Dy.mono;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
                     }
                 }
 
@@ -1589,96 +1534,6 @@ export component MainWindow inherits Window {
                         root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
                     }
                 }
-            }
-        }
-    }
-
-    if root.net-menu-open: Rectangle {
-        x: root.rail-w;
-        width: parent.width - root.rail-w;
-        background: #00000000;
-        TouchArea { clicked => { root.close-net-menu(); } }
-        Rectangle {
-            x: parent.width - 360px;
-            y: Dy.header-h - 8px;
-            width: 340px;
-            height: root.wifi-detail == "" ? min(parent.height / 2, 24px + max(1, root.wifi-nets.length) * 44px) : 220px;
-            background: #000000;
-            border-width: 1.5px;
-            border-color: #2a2a2a;
-            TouchArea { clicked => { } }
-            VerticalLayout {
-                padding: 10px;
-                spacing: 4px;
-                if root.net-kind == "ethernet": Text {
-                    text: "Ethernet";
-                    color: #ffffff;
-                    font-size: 14px;
-                    font-family: Dy.mono;
-                }
-                if root.wifi-detail == "": Flickable {
-                    vertical-stretch: 1;
-                    viewport-height: max(1, root.wifi-nets.length) * 44px;
-                    VerticalLayout {
-                        spacing: 2px;
-                        for net in root.wifi-nets: TouchArea {
-                            clicked => { root.pick-wifi(net.ssid); }
-                            height: 42px;
-                            HorizontalLayout {
-                                spacing: 8px;
-                                NetGlyph { kind: "wifi"; bars: net.bars; }
-                                VerticalLayout {
-                                    alignment: center;
-                                    Text { text: net.ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
-                                    Text { text: net.connected ? "Connected" : (net.saved ? "Saved" : "Available"); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; }
-                                }
-                            }
-                        }
-                    }
-                }
-                if root.wifi-detail != "": VerticalLayout {
-                    spacing: 6px;
-                    TouchArea {
-                        clicked => { root.wifi-detail = ""; }
-                        Text { text: "←  Networks"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; }
-                    }
-                    Text { text: root.wifi-pick; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
-                    Text { text: root.wifi-pick == root.wifi-ssid ? "Connected" : "Available"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                    if root.wifi-pick == root.wifi-ssid: Pill { label: "Disconnect"; clicked => { root.disconnect-wifi(); } }
-                    if root.wifi-pick != root.wifi-ssid: VerticalLayout {
-                        spacing: 6px;
-                        HorizontalLayout {
-                            Text { text: "Auto-connect"; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.wifi-auto; toggled => { root.toggle-wifi-auto(); } }
-                        }
-                        Pill { label: "Connect"; on: true; clicked => { root.connect-wifi(); } }
-                    }
-                    Text { text: root.wifi-status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
-                }
-            }
-        }
-    }
-
-    if root.vol-menu-open: Rectangle {
-        x: root.rail-w;
-        width: parent.width - root.rail-w;
-        background: #00000000;
-        TouchArea { clicked => { root.close-vol-menu(); } }
-        Rectangle {
-            x: parent.width - Dy.hit-target * 2 - 280px;
-            y: Dy.header-h - 8px;
-            width: 260px;
-            height: 88px;
-            background: #000000;
-            border-width: 1.5px;
-            border-color: #2a2a2a;
-            TouchArea { clicked => { } }
-            VerticalLayout {
-                padding: 12px;
-                spacing: 8px;
-                Text { text: "Volume  " + root.volume + "%"; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
             }
         }
     }
@@ -2659,6 +2514,114 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
+            }
+            if root.edit-mode: HorizontalLayout {
+                height: 72px;
+                spacing: 8px;
+                Pill {
+                    label: "ADD WIDGET";
+                    on: true;
+                    horizontal-stretch: 1;
+                    clicked => {
+                        root.gallery-index = root.gallery-size == "2x2" ? 2 : (root.gallery-size == "1x2" ? 1 : 0);
+                        root.open-gallery();
+                    }
+                }
+                Pill {
+                    label: "DONE";
+                    horizontal-stretch: 1;
+                    clicked => { root.exit-edit(); }
+                }
+            }
+        }
+    }
+
+    if root.net-menu-open: Rectangle {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
+        background: #00000000;
+        TouchArea { clicked => { root.close-net-menu(); } }
+        Rectangle {
+            x: parent.width - 360px;
+            y: Dy.header-h - 8px;
+            width: 340px;
+            height: root.wifi-detail == "" ? min(parent.height / 2, 24px + max(1, root.wifi-nets.length) * 44px) : 220px;
+            background: #000000;
+            border-width: 1.5px;
+            border-color: #2a2a2a;
+            TouchArea { clicked => { } }
+            VerticalLayout {
+                padding: 10px;
+                spacing: 4px;
+                if root.net-kind == "ethernet": Text {
+                    text: "Ethernet";
+                    color: #ffffff;
+                    font-size: 14px;
+                    font-family: Dy.mono;
+                }
+                if root.wifi-detail == "": Flickable {
+                    vertical-stretch: 1;
+                    viewport-height: max(1, root.wifi-nets.length) * 44px;
+                    VerticalLayout {
+                        spacing: 2px;
+                        for net in root.wifi-nets: TouchArea {
+                            clicked => { root.pick-wifi(net.ssid); }
+                            height: 42px;
+                            HorizontalLayout {
+                                spacing: 8px;
+                                NetGlyph { kind: "wifi"; bars: net.bars; }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text { text: net.ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                                    Text { text: net.connected ? "Connected" : (net.saved ? "Saved" : "Available"); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; }
+                                }
+                            }
+                        }
+                    }
+                }
+                if root.wifi-detail != "": VerticalLayout {
+                    spacing: 6px;
+                    TouchArea {
+                        clicked => { root.wifi-detail = ""; }
+                        Text { text: "←  Networks"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; }
+                    }
+                    Text { text: root.wifi-pick; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                    Text { text: root.wifi-pick == root.wifi-ssid ? "Connected" : "Available"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                    if root.wifi-pick == root.wifi-ssid: Pill { label: "Disconnect"; clicked => { root.disconnect-wifi(); } }
+                    if root.wifi-pick != root.wifi-ssid: VerticalLayout {
+                        spacing: 6px;
+                        HorizontalLayout {
+                            Text { text: "Auto-connect"; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Toggle { on: root.wifi-auto; toggled => { root.toggle-wifi-auto(); } }
+                        }
+                        Pill { label: "Connect"; on: true; clicked => { root.connect-wifi(); } }
+                    }
+                    Text { text: root.wifi-status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+                }
+            }
+        }
+    }
+
+    if root.vol-menu-open: Rectangle {
+        x: root.rail-w;
+        width: parent.width - root.rail-w;
+        background: #00000000;
+        TouchArea { clicked => { root.close-vol-menu(); } }
+        Rectangle {
+            x: parent.width - 268px;
+            y: Dy.header-h - 8px;
+            width: 260px;
+            height: 88px;
+            background: #000000;
+            border-width: 1.5px;
+            border-color: #2a2a2a;
+            TouchArea { clicked => { } }
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                Text { text: "Volume  " + root.volume + "%"; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
             }
         }
     }

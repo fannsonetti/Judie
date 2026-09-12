@@ -25,7 +25,6 @@ export function StatusBar({ link }: { link: NetworkLink }) {
   const hideClock = useSettingsStore((s) => s.hideHeaderClock);
   const headerLine = useSettingsStore((s) => s.headerLine);
   const headerH = useSettingsStore((s) => s.headerH);
-  const hitTarget = useSettingsStore((s) => s.hitTarget);
   const volume = useSettingsStore((s) => s.volume);
   const update = useSettingsStore((s) => s.update);
   const volOpen = useChromeStore((s) => s.volMenuOpen);
@@ -169,7 +168,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
           type="button"
           className="status-net"
           aria-label="Network"
-          style={{ width: hitTarget, minWidth: hitTarget }}
+          style={{ width: 48, minWidth: 48 }}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -177,13 +176,13 @@ export function StatusBar({ link }: { link: NetworkLink }) {
             useChromeStore.getState().setNetMenuOpen(!useChromeStore.getState().netMenuOpen);
           }}
         >
-          <NetGlyph kind={link.kind} bars={link.bars} zoom={headerH / 108} />
+          <NetGlyph kind={link.kind} bars={link.bars} zoom={(headerH / 108) * 1.75} />
         </button>
         <button
           type="button"
           className="status-vol"
           aria-label="Volume"
-          style={{ width: hitTarget, minWidth: hitTarget }}
+          style={{ width: 48, minWidth: 48 }}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -191,7 +190,7 @@ export function StatusBar({ link }: { link: NetworkLink }) {
             useChromeStore.getState().setVolMenuOpen(!useChromeStore.getState().volMenuOpen);
           }}
         >
-          <VolumeGlyph zoom={headerH / 108} />
+          <VolumeGlyph zoom={(headerH / 108) * 1.75} />
         </button>
       </div>
       {volOpen && (

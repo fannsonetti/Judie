@@ -198,7 +198,7 @@ input:focus-visible {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 14px;
+  gap: 4px;
   font-size: var(--type-status);
   color: var(--text-muted);
 }
@@ -2231,12 +2231,19 @@ html.linux-app .judie-orb.listening {
 .wx.digital-clock {
   align-items: center;
   justify-content: center;
+  flex-direction: column;
+  gap: 8px;
 }
 .wx.digital-clock strong {
   font-size: var(--type-clock);
   font-variant-numeric: tabular-nums;
 }
 .wx.digital-clock.size-1x1 strong { font-size: var(--type-hero); }
+.wx.clock .clock-date {
+  color: var(--text-muted);
+  font-size: var(--type-status);
+  font-family: ui-monospace, monospace;
+}
 .pong-preview, .pong-court {
   position: relative;
   width: 100%;

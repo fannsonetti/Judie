@@ -18,6 +18,9 @@ const TABS: { id: string; label: string; glyph: string; kind?: ExpandableWidgetT
 export function SideRail() {
   const expandedType = useLayoutStore((s) => s.expandedType);
   const settingsOpen = useAssistantStore((s) => s.settingsOpen);
+  const editMode = useLayoutStore((s) => s.editMode);
+  const exitEditMode = useLayoutStore((s) => s.exitEditMode);
+  const setGalleryOpen = useLayoutStore((s) => s.setGalleryOpen);
 
   const active = settingsOpen ? "settings" : expandedType ?? "home";
 
@@ -64,6 +67,16 @@ export function SideRail() {
           );
         })}
       </nav>
+      {editMode ? (
+        <div className="side-rail-edit">
+          <button type="button" className="primary" onClick={() => setGalleryOpen(true)}>
+            ADD WIDGET
+          </button>
+          <button type="button" onClick={exitEditMode}>
+            DONE
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

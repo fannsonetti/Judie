@@ -17,7 +17,10 @@ slint::include_modules!();
 
 use pi_room::{Expanded, Overlay};
 use slint::{Model, ModelRc, SharedString, TimerMode, VecModel};
-use std::sync::Mutex;
+use std::io::Write;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::mpsc::{self, Sender};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use chrono::Timelike;
 
@@ -210,35 +213,66 @@ impl PongGame {
 
 static PONG: Mutex<PongGame> = Mutex::new(PongGame::new());
 static LAST_INPUT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
-static SCREEN_ASLEEP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static SCREEN_ASLEEP: AtomicBool = AtomicBool::new(false);
+static BEEP_VOL: AtomicU8 = AtomicU8::new(62);
+static BEEP_TX: OnceLock<Sender<(u32, u32, u8)>> = OnceLock::new();
+
+/// Half the drawn paddle plus half the ball, in 0–100 court units (~96px paddle).
+const PADDLE_HALF: f32 = 6.0;
 
 fn note_input() {
     *LAST_INPUT.lock().unwrap() = Some(std::time::Instant::now());
 }
 
-fn play_beep(freq: u32, ms: u32) {
-    std::thread::spawn(move || {
-        use std::io::Write;
-        let rate = 22050u32;
-        let n = rate * ms / 1000;
-        let mut pcm = Vec::with_capacity((n as usize) * 2);
+fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
+    let rate = 22050u32;
+    let mut child: Option<std::process::Child> = None;
+    let mut stdin: Option<std::process::ChildStdin> = None;
+    while let Ok((freq, ms, vol)) = rx.recv() {
+        if stdin.is_none() {
+            match std::process::Command::new("aplay")
+                .args(["-q", "-t", "raw", "-r", "22050", "-c", "1", "-f", "S16_LE", "-"])
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+            {
+                Ok(mut c) => {
+                    stdin = c.stdin.take();
+                    child = Some(c);
+                }
+                Err(_) => continue,
+            }
+        }
+        let n = (rate * ms.max(1) / 1000).max(1);
+        let amp = 18000.0 * (vol.min(100) as f32 / 100.0);
+        let mut pcm = Vec::with_capacity(n as usize * 2);
         for i in 0..n {
-            let s = ((i as f32 * freq as f32 * 2.0 * std::f32::consts::PI / rate as f32).sin() * 9000.0) as i16;
+            let s = ((i as f32 * freq as f32 * 2.0 * std::f32::consts::PI / rate as f32).sin() * amp) as i16;
             pcm.extend_from_slice(&s.to_le_bytes());
         }
-        let _ = std::process::Command::new("aplay")
-            .args(["-q", "-t", "raw", "-r", "22050", "-c", "1", "-f", "S16_LE", "-"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .and_then(|mut child| {
-                if let Some(stdin) = child.stdin.as_mut() {
-                    let _ = stdin.write_all(&pcm);
-                }
-                child.wait()
-            });
+        let ok = stdin
+            .as_mut()
+            .map(|s| s.write_all(&pcm).is_ok())
+            .unwrap_or(false);
+        if !ok {
+            stdin = None;
+            if let Some(mut c) = child.take() {
+                let _ = c.kill();
+            }
+        }
+    }
+}
+
+fn play_beep(freq: u32, ms: u32) {
+    let tx = BEEP_TX.get_or_init(|| {
+        let (tx, rx) = mpsc::channel();
+        let _ = std::thread::Builder::new()
+            .name("judie-beep".into())
+            .spawn(move || beep_loop(rx));
+        tx
     });
+    let _ = tx.send((freq, ms, BEEP_VOL.load(Ordering::Relaxed)));
 }
 
 fn set_backlight(on: bool) {
@@ -256,16 +290,43 @@ fn set_backlight(on: bool) {
     }
 }
 
+fn set_hdmi_power(on: bool) {
+    let arg = if on { "1" } else { "0" };
+    let _ = std::process::Command::new("vcgencmd")
+        .args(["display_power", arg])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+}
+
+fn restore_hdmi_mode() {
+    let info = parse_xrandr();
+    if info.mode != "—" {
+        let _ = apply_xrandr_mode(&info.output, &info.mode, Some(&info.rate));
+        return;
+    }
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_millis(400));
+        let info = parse_xrandr();
+        if info.mode != "—" {
+            let _ = apply_xrandr_mode(&info.output, &info.mode, Some(&info.rate));
+        }
+    });
+}
+
 fn set_display_power(on: bool) {
     if on {
+        set_hdmi_power(true);
         let _ = std::process::Command::new("xset").args(["dpms", "force", "on"]).status();
         set_backlight(true);
-        SCREEN_ASLEEP.store(false, std::sync::atomic::Ordering::Relaxed);
+        restore_hdmi_mode();
+        SCREEN_ASLEEP.store(false, Ordering::Relaxed);
     } else {
         let _ = std::process::Command::new("xset").args(["+dpms"]).status();
         let _ = std::process::Command::new("xset").args(["dpms", "force", "off"]).status();
         set_backlight(false);
-        SCREEN_ASLEEP.store(true, std::sync::atomic::Ordering::Relaxed);
+        set_hdmi_power(false);
+        SCREEN_ASLEEP.store(true, Ordering::Relaxed);
     }
 }
 
@@ -402,39 +463,39 @@ fn pong_step() {
     if g.by <= 3.0 {
         g.by = 3.0;
         g.vy = g.vy.abs();
-        play_beep(520, 35);
+        play_beep(520, 90);
     }
     if g.by >= 97.0 {
         g.by = 97.0;
         g.vy = -g.vy.abs();
-        play_beep(520, 35);
+        play_beep(520, 90);
     }
     if g.bx <= 7.0 {
-        if (g.by - g.ly).abs() < 14.0 {
+        if (g.by - g.ly).abs() < PADDLE_HALF {
             g.bx = 7.0;
             g.vx = g.vx.abs();
             g.vy += (g.by - g.ly) * 0.04;
-            play_beep(880, 40);
+            play_beep(880, 100);
         } else {
             g.rs += 1;
             g.bx = 50.0;
             g.by = 50.0;
             g.vx = 1.1;
-            play_beep(180, 140);
+            play_beep(180, 120);
         }
     }
     if g.bx >= 93.0 {
-        if (g.by - g.ry).abs() < 14.0 {
+        if (g.by - g.ry).abs() < PADDLE_HALF {
             g.bx = 93.0;
             g.vx = -g.vx.abs();
             g.vy += (g.by - g.ry) * 0.04;
-            play_beep(880, 40);
+            play_beep(880, 100);
         } else {
             g.ls += 1;
             g.bx = 50.0;
             g.by = 50.0;
             g.vx = -1.1;
-            play_beep(180, 140);
+            play_beep(180, 120);
         }
     }
     if g.mode < 3 {
@@ -476,7 +537,7 @@ fn dispatch_terminal(ui: &MainWindow) {
 }
 
 fn push_ui(ui: &MainWindow) {
-    if SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed) {
+    if SCREEN_ASLEEP.load(Ordering::Relaxed) {
         ui.set_screen_sleep(true);
         return;
     }
@@ -531,6 +592,7 @@ fn push_ui(ui: &MainWindow) {
         ui.set_track_title(track.title.clone().into());
         ui.set_track_artist(track.artist.clone().into());
         let vol = i32::from(room.volume);
+        BEEP_VOL.store(room.volume, Ordering::Relaxed);
         if ui.get_volume() != vol {
             ui.set_volume(vol);
         }
@@ -545,7 +607,7 @@ fn push_ui(ui: &MainWindow) {
         ui.set_header_h_px(room.header_h);
         ui.set_hit_target_px(room.hit_target);
         ui.set_grid_cols(room.cols());
-        ui.set_screen_sleep(SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed));
+        ui.set_screen_sleep(SCREEN_ASLEEP.load(Ordering::Relaxed));
         ui.set_media_progress(room.progress);
         ui.set_indoor(format!("{:.1}°", room.indoor).into());
         ui.set_outdoor(format!("{}°", room.outdoor).into());
@@ -1251,8 +1313,10 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_volume_changed(move |v| {
+        let vol = v.clamp(0, 100) as u8;
+        BEEP_VOL.store(vol, Ordering::Relaxed);
         pi_room::with(|room| {
-            room.volume = v.clamp(0, 100) as u8;
+            room.volume = vol;
             room.save();
         });
         r();
@@ -1405,7 +1469,7 @@ fn bind(ui: &MainWindow) {
             g.ls = 0;
             g.rs = 0;
         }
-        play_beep(660, 80);
+        play_beep(660, 100);
         note_input();
         r();
     });
@@ -2496,7 +2560,7 @@ fn main() {
     let tick_timer = slint::Timer::default();
     tick_timer.start(TimerMode::Repeated, Duration::from_secs(1), move || {
         if let Some(ui) = weak.upgrade() {
-            let asleep = SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed);
+            let asleep = SCREEN_ASLEEP.load(Ordering::Relaxed);
             if !asleep {
                 pi_room::with(|room| room.tick_media());
             }
@@ -2512,7 +2576,9 @@ fn main() {
                     ui.set_screen_sleep(true);
                 }
             }
-            if !SCREEN_ASLEEP.load(std::sync::atomic::Ordering::Relaxed) {
+            let dragging = !ui.get_drag_id().is_empty();
+            let pong_open = ui.get_expanded() == "pong";
+            if !SCREEN_ASLEEP.load(Ordering::Relaxed) && !dragging && !pong_open {
                 push_ui(&ui);
             }
         }
