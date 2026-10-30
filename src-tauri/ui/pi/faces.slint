@@ -283,7 +283,8 @@ export component WidgetFace inherits Rectangle {
                 spacing: root.sp;
                 Pill { label: "Auto"; zoom: root.s; horizontal-stretch: 1; on: root.t-pmode == "Auto"; clicked => { if !root.sample { root.set-purifier-mode("Auto"); } } }
                 Pill { label: "Sleep"; zoom: root.s; horizontal-stretch: 1; on: root.t-pmode == "Sleep"; clicked => { if !root.sample { root.set-purifier-mode("Sleep"); } } }
-                Pill { label: "Boost"; zoom: root.s; horizontal-stretch: 1; on: root.t-pmode == "Manual"; clicked => { if !root.sample { root.set-purifier-mode("Manual"); } } }
+                Pill { label: "Medium"; zoom: root.s; horizontal-stretch: 1; on: root.t-pmode == "Medium"; clicked => { if !root.sample { root.set-purifier-mode("Medium"); } } }
+                Pill { label: "Turbo"; zoom: root.s; horizontal-stretch: 1; on: root.t-pmode == "Turbo"; clicked => { if !root.sample { root.set-purifier-mode("Turbo"); } } }
             }
         }
 

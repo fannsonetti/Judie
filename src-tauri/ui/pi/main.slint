@@ -2154,7 +2154,8 @@ export component MainWindow inherits Window {
                     spacing: 4px;
                     Pill { label: "Auto"; horizontal-stretch: 1; on: root.purifier-mode == "Auto"; clicked => { root.set-purifier-mode("Auto"); } }
                     Pill { label: "Sleep"; horizontal-stretch: 1; on: root.purifier-mode == "Sleep"; clicked => { root.set-purifier-mode("Sleep"); } }
-                    Pill { label: "Boost"; horizontal-stretch: 1; on: root.purifier-mode == "Manual"; clicked => { root.set-purifier-mode("Manual"); } }
+                    Pill { label: "Medium"; horizontal-stretch: 1; on: root.purifier-mode == "Medium"; clicked => { root.set-purifier-mode("Medium"); } }
+                    Pill { label: "Turbo"; horizontal-stretch: 1; on: root.purifier-mode == "Turbo"; clicked => { root.set-purifier-mode("Turbo"); } }
                 }
                 Rectangle { vertical-stretch: 1; }
             }

@@ -1553,8 +1553,9 @@ impl Room {
 
     pub fn cycle_purifier_mode(&mut self) {
         self.purifier_mode = match self.purifier_mode.as_str() {
-            "Auto" => "Manual".into(),
-            "Manual" => "Sleep".into(),
+            "Auto" => "Sleep".into(),
+            "Sleep" => "Medium".into(),
+            "Medium" => "Turbo".into(),
             _ => "Auto".into(),
         };
     }
@@ -1562,7 +1563,8 @@ impl Room {
     pub fn set_purifier_mode(&mut self, mode: &str) {
         self.purifier_mode = match mode.to_lowercase().as_str() {
             "sleep" => "Sleep".into(),
-            "manual" | "boost" => "Manual".into(),
+            "medium" | "manual" => "Medium".into(),
+            "turbo" | "boost" => "Turbo".into(),
             _ => "Auto".into(),
         };
     }

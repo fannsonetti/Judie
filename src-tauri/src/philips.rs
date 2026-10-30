@@ -136,7 +136,8 @@ fn parse_status(raw: &str) -> Option<Status> {
         mode: match num(r, MODE) {
             0 => "Auto",
             17 => "Sleep",
-            _ => "Manual",
+            18 => "Turbo",
+            _ => "Medium",
         },
         aq: match num(r, "D03120") {
             0..=3 => "Good",
@@ -187,9 +188,9 @@ pub fn set_power(ip: &str, on: bool) -> bool {
     control(ip, serde_json::json!({ "D03102": on as i64 }))
 }
 
-/// "Auto" | "Sleep" | "Manual" (the UI's Boost → turbo).
+/// "Auto" | "Sleep" | "Medium" | "Turbo".
 pub fn set_mode(ip: &str, mode: &str) -> bool {
-    let m = match mode { "Sleep" => 17, "Manual" => 18, _ => 0 };
+    let m = match mode { "Sleep" => 17, "Turbo" => 18, "Medium" => 19, _ => 0 };
     control(ip, serde_json::json!({ "D03102": 1, "D0310C": m }))
 }
 
