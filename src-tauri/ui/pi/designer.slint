@@ -25,7 +25,7 @@ export component DesignerStage inherits Rectangle {
 
     width: root.tile-w;
     height: root.tile-h;
-    background: #000000;
+    background: Dy.bg;
     clip: false;
 
     TileShell {
@@ -46,7 +46,7 @@ export component DesignerStage inherits Rectangle {
         y: root.pad;
         width: parent.width - root.pad * 2;
         height: parent.height - root.pad * 2;
-        background: #00000000;
+        background: transparent;
         clip: true;
 
         for n in root.nodes: TouchArea {
@@ -83,8 +83,8 @@ export component DesignerStage inherits Rectangle {
             }
             Rectangle {
                 border-width: root.selected == n.id ? 1.5px : 1px;
-                border-color: root.selected == n.id ? #ffffff : #3a3a3a;
-                background: #00000000;
+                border-color: root.selected == n.id ? Dy.text : Dy.line;
+                background: transparent;
             }
         }
 
@@ -123,7 +123,7 @@ export component DesignerStage inherits Rectangle {
             Rectangle {
                 width: 100%;
                 height: 100%;
-                background: #ffffff;
+                background: Dy.text;
             }
         }
     }

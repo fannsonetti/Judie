@@ -1,6 +1,6 @@
 import { ScrollView, Slider, Button } from "std-widgets.slint";
-import "./fonts/PixeloidSans.ttf";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, VolumeGlyph, ScreenOffChoice, RailTab } from "cards.slint";
+import "./fonts/PressStart2P.ttf";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, PixIcon, ScreenOffChoice, RailTab } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 import { WidgetPreview } from "preview.slint";
@@ -11,7 +11,7 @@ export component MainWindow inherits Window {
     title: "Judie";
     preferred-width: 1920px;
     preferred-height: 1200px;
-    background: #000000;
+    background: Dy.bg;
     no-frame: true;
 
     in-out property <string> clock: "--:--";
@@ -98,6 +98,9 @@ export component MainWindow inherits Window {
 
     in-out property <bool> settings-open: false;
     in-out property <bool> reduced-motion: false;
+    in-out property <int> theme: 0;
+    property <bool> booting: true;
+    property <int> boot-step: 0;
     in-out property <bool> palette-open: false;
     in-out property <bool> gallery-open: false;
     in-out property <bool> creator-open: false;
@@ -238,6 +241,8 @@ export component MainWindow inherits Window {
     callback set-screen-off(int);
     callback set-display-rate(string);
     callback set-display-scale(int);
+    callback set-theme(int);
+    callback toggle-reduced-motion();
     callback set-gallery-border(bool);
     callback set-text-scale(int);
     callback set-ui-scale(int);
@@ -518,14 +523,16 @@ export component MainWindow inherits Window {
     changed ui-scale => { Dy.ui-scale = root.ui-scale / 100.0; }
     changed header-h-px => { Dy.header-h = root.header-h-px * 1px; }
     changed hit-target-px => { Dy.hit-target = root.hit-target-px * 1px; }
+    // Family name inside fonts/PressStart2P.ttf (imported above).
     changed blocky-font => { Dy.mono = root.blocky-font ? "Press Start 2P" : "DejaVu Sans Mono"; }
+    changed theme => { Dy.theme = root.theme; }
 
     HorizontalLayout {
         padding: 0;
         spacing: 0;
         if root.sidebar: Rectangle {
             width: root.rail-w;
-            background: #000000;
+            background: Dy.bg;
         }
         VerticalLayout {
         padding: 0;
@@ -533,24 +540,29 @@ export component MainWindow inherits Window {
 
         Rectangle {
             height: Dy.header-h;
-            background: #000000;
+            background: Dy.bg;
             HorizontalLayout {
                 x: root.pad;
                 y: 0;
                 height: 100%;
                 width: parent.width / 3 - root.pad * 2;
-                spacing: 10px;
+                spacing: 12px;
+                alignment: start;
+                VerticalLayout {
+                    alignment: center;
+                    PiMark { width: 40px * Dy.header-h / 108px; }
+                }
                 Text {
-                    text: "v" + root.version-text;
-                    color: #ffffff;
-                    opacity: 0.1;
-                    font-size: Dy.type-status;
+                    text: root.room-name;
+                    color: Dy.text;
+                    font-size: Dy.type-title;
                     font-family: Dy.mono;
                     vertical-alignment: center;
+                    overflow: elide;
                 }
                 if root.dnd: Text {
                     text: "DND";
-                    color: #ffffff;
+                    color: Dy.text;
                     font-size: Dy.type-status;
                     font-family: Dy.mono;
                     vertical-alignment: center;
@@ -570,7 +582,7 @@ export component MainWindow inherits Window {
                         alignment: center;
                         Text {
                             text: root.clock;
-                            color: #ffffff;
+                            color: Dy.accent1;
                             font-size: Dy.type-clock;
                             font-weight: 700;
                             font-family: Dy.mono;
@@ -579,7 +591,7 @@ export component MainWindow inherits Window {
                         }
                         Text {
                             text: root.date-text;
-                            color: #8a8a8a;
+                            color: Dy.dim;
                             font-size: Dy.type-status;
                             font-family: Dy.mono;
                             horizontal-alignment: center;
@@ -637,10 +649,11 @@ export component MainWindow inherits Window {
                         }
                     }
                 }
-                VolumeGlyph {
+                PixIcon {
                     x: (parent.width - self.width) / 2;
                     y: (parent.height - self.height) / 2;
-                    zoom: Dy.header-h / 108px * 1.75;
+                    name: "vol";
+                    scale: Dy.header-h >= 108px ? 4 : 3;
                 }
             }
             settings-edge := TouchArea {
@@ -672,8 +685,8 @@ export component MainWindow inherits Window {
         }
 
         if root.header-line: Rectangle {
-            height: 1px;
-            background: #ffffff;
+            height: Dy.stroke;
+            background: Dy.line;
         }
 
         home-touch := TouchArea {
@@ -881,27 +894,27 @@ export component MainWindow inherits Window {
                     spacing: 8px;
                     Rectangle {
                         width: 8px; height: 8px; border-radius: 0px;
-                        background: root.page == 0 ? #e6e6e6 : #555555;
+                        background: root.page == 0 ? Dy.text : Dy.line;
                     }
                     Rectangle {
                         width: 8px; height: 8px; border-radius: 0px;
-                        background: root.page == 1 ? #e6e6e6 : #555555;
+                        background: root.page == 1 ? Dy.text : Dy.line;
                     }
                     if root.page-count > 2: Rectangle {
                         width: 8px; height: 8px; border-radius: 0px;
-                        background: root.page == 2 ? #e6e6e6 : #555555;
+                        background: root.page == 2 ? Dy.text : Dy.line;
                     }
                     if root.page-count > 3: Rectangle {
                         width: 8px; height: 8px; border-radius: 0px;
-                        background: root.page == 3 ? #e6e6e6 : #555555;
+                        background: root.page == 3 ? Dy.text : Dy.line;
                     }
                     if root.page-count > 4: Rectangle {
                         width: 8px; height: 8px; border-radius: 0px;
-                        background: root.page == 4 ? #e6e6e6 : #555555;
+                        background: root.page == 4 ? Dy.text : Dy.line;
                     }
                     if root.page-count > 5: Rectangle {
                         width: 8px; height: 8px; border-radius: 0px;
-                        background: root.page == 5 ? #e6e6e6 : #555555;
+                        background: root.page == 5 ? Dy.text : Dy.line;
                     }
                 }
 
@@ -909,7 +922,7 @@ export component MainWindow inherits Window {
                     y: parent.height - 120px;
                     height: 120px;
                     width: parent.width;
-                    background: #000000cc;
+                    background: Dy.bg.with-alpha(0.8);
                     HorizontalLayout {
                         padding: 10px; spacing: 10px; alignment: center;
                         Pill { label: "ADD WIDGET"; on: true; clicked => {
@@ -931,12 +944,12 @@ export component MainWindow inherits Window {
                     ghost: false;
                     show-border: true;
                     Rectangle {
-                        background: #111111;
+                        background: Dy.panel;
                         Text {
                             width: 100%;
                             height: 100%;
                             text: root.drag-kind;
-                            color: #8a8a8a;
+                            color: Dy.dim;
                             font-size: Dy.type-value;
                             font-family: Dy.mono;
                             horizontal-alignment: center;
@@ -960,16 +973,16 @@ export component MainWindow inherits Window {
     if root.pending-remove != "": Rectangle {
         x: root.rail-w;
         width: parent.width - root.rail-w;
-        background: #000000cc;
+        background: Dy.bg.with-alpha(0.8);
         TouchArea { clicked => { root.cancel-remove(); } }
         Rectangle {
             x: (parent.width - min(520px, parent.width * 0.72)) / 2; y: parent.height * 0.32; width: min(520px, parent.width * 0.72); height: 320px;
-            border-radius: 0px; background: #000000;
-            border-width: 1px; border-color: #3d3d3d;
+            border-radius: 0px; background: Dy.bg;
+            border-width: Dy.stroke; border-color: Dy.line;
             VerticalLayout {
                 padding: 20px; spacing: 12px;
-                Text { text: "REMOVE WIDGET?"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
-                Text { text: root.pending-label == "" ? "This tile will leave the home screen." : root.pending-label; color: #7a7a7a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+                Text { text: "REMOVE WIDGET?"; color: Dy.text; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+                Text { text: root.pending-label == "" ? "This tile will leave the home screen." : root.pending-label; color: Dy.dim; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
                 HorizontalLayout {
                     spacing: 10px;
                     Pill { label: "CANCEL"; clicked => { root.cancel-remove(); } }
@@ -1002,16 +1015,14 @@ export component MainWindow inherits Window {
         }
     }
 
+    // Stepped, never eased (pixel-ui.md rule 6): about 12 fps at Performance,
+    // 30 fps at Quality. Reduced motion cuts straight to the end.
     Timer {
-        interval: 16ms;
+        interval: root.display-scale == 50 ? 83ms : 33ms;
         running: root.settings-animating;
         triggered => {
-            root.settings-anim-t = min(1.0, root.settings-anim-t + 16.0 / root.settings-anim-ms);
-            if root.reduced-motion {
-                root.settings-eased = root.settings-anim-t;
-            } else {
-                root.settings-eased = 1.0 - (1.0 - root.settings-anim-t) * (1.0 - root.settings-anim-t) * (1.0 - root.settings-anim-t);
-            }
+            root.settings-anim-t = root.reduced-motion ? 1.0 : min(1.0, root.settings-anim-t + (root.display-scale == 50 ? 83.0 : 33.0) / root.settings-anim-ms);
+            root.settings-eased = root.settings-anim-t;
             root.settings-pull = root.settings-from + (root.settings-goal - root.settings-from) * root.settings-eased;
             if root.settings-anim-t >= 1 {
                 root.settings-commit();
@@ -1024,7 +1035,7 @@ export component MainWindow inherits Window {
         y: root.settings-page ? Dy.header-h : (root.settings-pull - 1.0) * parent.height;
         width: parent.width - root.rail-w;
         height: root.settings-page ? (parent.height - Dy.header-h) : parent.height;
-        background: #000000;
+        background: Dy.bg;
         clip: true;
         TouchArea {
             width: 100%;
@@ -1041,23 +1052,23 @@ export component MainWindow inherits Window {
                 height: 36px;
                 TouchArea {
                     clicked => { root.set-tab(0); }
-                    Text { text: "General"; color: root.settings-tab == 0 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "General"; color: root.settings-tab == 0 ? Dy.text : Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 TouchArea {
                     clicked => { root.set-tab(1); }
-                    Text { text: "Network"; color: root.settings-tab == 1 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "Network"; color: root.settings-tab == 1 ? Dy.text : Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 TouchArea {
                     clicked => { root.set-tab(2); }
-                    Text { text: "Power"; color: root.settings-tab == 2 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "Power"; color: root.settings-tab == 2 ? Dy.text : Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 TouchArea {
                     clicked => { root.set-tab(3); }
-                    Text { text: "Device"; color: root.settings-tab == 3 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "Device"; color: root.settings-tab == 3 ? Dy.text : Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 TouchArea {
                     clicked => { root.set-tab(4); }
-                    Text { text: "Accessibility"; color: root.settings-tab == 4 ? #ffffff : #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "Accessibility"; color: root.settings-tab == 4 ? Dy.text : Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                 }
                 Rectangle { horizontal-stretch: 1; }
             }
@@ -1076,26 +1087,26 @@ export component MainWindow inherits Window {
                             spacing: 18px;
                             padding-bottom: 80px;
                             FieldTap { label: "Username"; value: root.room-name; active: root.kb-field == "room-name"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("room-name"); } }
-                            Text { text: "Location"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            Text { text: "Location"; color: Dy.dim; font-size: 18px; font-family: Dy.mono; }
                             FieldTap { label: "Location name"; value: root.weather-loc; active: root.kb-field == "location"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("location"); } }
                             HorizontalLayout {
                                 spacing: 20px;
                                 FieldTap { label: "Latitude"; value: root.latitude; active: root.kb-field == "latitude"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("latitude"); } }
                                 FieldTap { label: "Longitude"; value: root.longitude; active: root.kb-field == "longitude"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("longitude"); } }
                             }
-                            Text { text: "Units"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            Text { text: "Units"; color: Dy.dim; font-size: 18px; font-family: Dy.mono; }
                             VerticalLayout {
                                 spacing: 10px;
                                 Rectangle {
                                     height: 58px;
-                                    border-width: 1.5px;
-                                    border-color: root.temp-unit == "c" ? #ffffff : #2a2a2a;
+                                    border-width: Dy.stroke;
+                                    border-color: root.temp-unit == "c" ? Dy.text : Dy.line;
                                     TouchArea { clicked => { root.set-units-preset("c-km"); } }
                                     Text {
                                         x: 16px;
                                         height: 100%;
                                         text: "Celsius and kilometres";
-                                        color: root.temp-unit == "c" ? #ffffff : #8a8a8a;
+                                        color: root.temp-unit == "c" ? Dy.text : Dy.dim;
                                         font-size: 20px;
                                         font-family: Dy.mono;
                                         vertical-alignment: center;
@@ -1103,14 +1114,14 @@ export component MainWindow inherits Window {
                                 }
                                 Rectangle {
                                     height: 58px;
-                                    border-width: 1.5px;
-                                    border-color: root.temp-unit == "f" ? #ffffff : #2a2a2a;
+                                    border-width: Dy.stroke;
+                                    border-color: root.temp-unit == "f" ? Dy.text : Dy.line;
                                     TouchArea { clicked => { root.set-units-preset("f-mi"); } }
                                     Text {
                                         x: 16px;
                                         height: 100%;
                                         text: "Fahrenheit and miles";
-                                        color: root.temp-unit == "f" ? #ffffff : #8a8a8a;
+                                        color: root.temp-unit == "f" ? Dy.text : Dy.dim;
                                         font-size: 20px;
                                         font-family: Dy.mono;
                                         vertical-alignment: center;
@@ -1118,36 +1129,36 @@ export component MainWindow inherits Window {
                                 }
                                 Rectangle {
                                     height: 58px;
-                                    border-width: 1.5px;
-                                    border-color: root.temp-unit == "k" ? #ffffff : #2a2a2a;
+                                    border-width: Dy.stroke;
+                                    border-color: root.temp-unit == "k" ? Dy.text : Dy.line;
                                     TouchArea { clicked => { root.set-units-preset("k-fur"); } }
                                     Text {
                                         x: 16px;
                                         height: 100%;
                                         text: "Kelvin and furlongs";
-                                        color: root.temp-unit == "k" ? #ffffff : #8a8a8a;
+                                        color: root.temp-unit == "k" ? Dy.text : Dy.dim;
                                         font-size: 20px;
                                         font-family: Dy.mono;
                                         vertical-alignment: center;
                                     }
                                 }
                             }
-                            Text { text: "Voice"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            Text { text: "Voice"; color: Dy.dim; font-size: 18px; font-family: Dy.mono; }
                             HorizontalLayout {
                                 spacing: 20px;
                                 height: 56px;
-                                Text { text: "Microphone"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: "Microphone"; color: Dy.text; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
                                 Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } }
                                 Rectangle { horizontal-stretch: 1; }
                             }
                             HorizontalLayout {
                                 spacing: 20px;
                                 height: 56px;
-                                Text { text: "Voice Response"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: "Voice Response"; color: Dy.text; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
                                 Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } }
                                 Rectangle { horizontal-stretch: 1; }
                             }
-                            Text { text: "Routines"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+                            Text { text: "Routines"; color: Dy.dim; font-size: 18px; font-family: Dy.mono; }
                             Pill { label: "Add"; on: true; clicked => { root.add-routine(); } }
                             for r in root.routines: RoutineCard {
                                 item: r;
@@ -1170,39 +1181,39 @@ export component MainWindow inherits Window {
                             width: root.general-col;
                             spacing: 10px;
                             padding-bottom: 80px;
-                            Text { text: root.net-headline; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
-                            Text { text: "Type"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-kind; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "Interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-iface; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "SSID"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.wifi-ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
-                            Text { text: "State"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.wifi-state; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "Signal"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-signal; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "Security"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-security; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "IPv4"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.wifi-ip; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "IPv6"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-ipv6; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
-                            Text { text: "Gateway"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-gateway; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "DNS"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-dns; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
-                            Text { text: "MAC"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-mac; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "Link speed"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
-                            Text { text: root.net-speed; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
-                            Text { text: "Preferred interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-headline; color: Dy.text; font-size: 16px; font-family: Dy.mono; }
+                            Text { text: "Type"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-kind; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Interface"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-iface; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "SSID"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.wifi-ssid; color: Dy.text; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                            Text { text: "State"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.wifi-state; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Signal"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-signal; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Security"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-security; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "IPv4"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.wifi-ip; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "IPv6"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-ipv6; color: Dy.text; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+                            Text { text: "Gateway"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-gateway; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "DNS"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-dns; color: Dy.text; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+                            Text { text: "MAC"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-mac; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Link speed"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                            Text { text: root.net-speed; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
+                            Text { text: "Preferred interface"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
                             HorizontalLayout {
                                 spacing: 8px;
                                 Pill { label: "Ethernet"; on: root.preferred-net == "ethernet"; clicked => { root.set-preferred-net("ethernet"); } }
                                 Pill { label: "Wi-Fi"; on: root.preferred-net == "wifi"; clicked => { root.set-preferred-net("wifi"); } }
                             }
                             HorizontalLayout {
-                                Text { text: "DHCP"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: "DHCP"; color: Dy.text; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
                                 Toggle { on: root.dhcp-on; toggled => { root.toggle-dhcp(); } }
                             }
@@ -1213,21 +1224,21 @@ export component MainWindow inherits Window {
                             }
                             HorizontalLayout {
                                 spacing: 8px;
-                                Text { text: "Nearby Wi-Fi"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: "Nearby Wi-Fi"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
                                 Pill { label: root.wifi-busy ? "Scanning…" : "Refresh"; on: true; clicked => { if !root.wifi-busy { root.scan-wifi(); } } }
                             }
                             Text {
                                 text: root.wifi-scan-state == "" ? root.wifi-status : root.wifi-scan-state;
-                                color: #8a8a8a;
+                                color: Dy.dim;
                                 font-size: 12px;
                                 font-family: Dy.mono;
                                 wrap: word-wrap;
                             }
                             for net in root.wifi-nets: Rectangle {
                                 height: 52px;
-                                border-width: 1.5px;
-                                border-color: net.connected ? #ffffff : #2a2a2a;
+                                border-width: Dy.stroke;
+                                border-color: net.connected ? Dy.text : Dy.line;
                                 HorizontalLayout {
                                     padding-left: 10px;
                                     padding-right: 10px;
@@ -1236,8 +1247,8 @@ export component MainWindow inherits Window {
                                     VerticalLayout {
                                         alignment: center;
                                         horizontal-stretch: 1;
-                                        Text { text: net.ssid + (net.connected ? "  · connected" : ""); color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
-                                        Text { text: net.security + (net.saved ? "  · saved" : ""); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; overflow: elide; }
+                                        Text { text: net.ssid + (net.connected ? "  · connected" : ""); color: Dy.text; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                                        Text { text: net.security + (net.saved ? "  · saved" : ""); color: Dy.dim; font-size: 11px; font-family: Dy.mono; overflow: elide; }
                                     }
                                     if !net.connected: Pill {
                                         label: "Join";
@@ -1259,15 +1270,15 @@ export component MainWindow inherits Window {
                             }
                             HorizontalLayout {
                                 spacing: 8px;
-                                Text { text: "Diagnostics"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: "Diagnostics"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
                                 Pill { label: "Run checks"; on: true; clicked => { root.run-diag(); } }
                             }
                             for d in root.diags: HorizontalLayout {
                                 height: 28px;
-                                Text { text: d.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: d.label; color: Dy.text; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
                                 Rectangle { horizontal-stretch: 1; }
-                                Text { text: d.state + (d.detail == "" ? "" : "  " + d.detail); color: #8a8a8a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: d.state + (d.detail == "" ? "" : "  " + d.detail); color: Dy.dim; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
                             }
                         }
                     }
@@ -1303,38 +1314,38 @@ export component MainWindow inherits Window {
                         }
                         if root.power-status != "": Text {
                             text: root.power-status;
-                            color: #ffffff;
+                            color: Dy.text;
                             font-size: 14px;
                             font-family: Dy.mono;
                             wrap: word-wrap;
                         }
-                        Rectangle { height: 1.5px; background: #2a2a2a; }
-                        Text { text: "Software"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        Rectangle { height: 1.5px; background: Dy.line; }
+                        Text { text: "Software"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
                         HorizontalLayout {
-                            Text { text: "Installed version"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "Installed version"; color: Dy.dim; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
-                            Text { text: "v" + root.version-text; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "v" + root.version-text; color: Dy.text; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
                         }
                         if root.update-label != "": Text {
                             text: root.update-label;
-                            color: #ffffff;
+                            color: Dy.text;
                             font-size: 14px;
                             font-family: Dy.mono;
                             wrap: word-wrap;
                         }
                         if root.refresh-status != "": Text {
                             text: root.refresh-status;
-                            color: #8a8a8a;
+                            color: Dy.dim;
                             font-size: 13px;
                             font-family: Dy.mono;
                             wrap: word-wrap;
                         }
-                        Text { text: "Switch version"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+                        Text { text: "Switch version"; color: Dy.text; font-size: 16px; font-family: Dy.mono; }
                         Rectangle {
                             height: 56px;
-                            border-width: 1.5px;
-                            border-color: (root.updating || root.power-busy) ? #2a2a2a : #ffffff;
-                            background: #000000;
+                            border-width: Dy.stroke;
+                            border-color: (root.updating || root.power-busy) ? Dy.line : Dy.text;
+                            background: Dy.bg;
                             TouchArea {
                                 clicked => {
                                     if !root.updating && !root.power-busy {
@@ -1347,7 +1358,7 @@ export component MainWindow inherits Window {
                                 padding-right: 16px;
                                 Text {
                                     text: (root.selected-release == "" ? ("v" + root.version-text) : root.selected-release) + "  ▼";
-                                    color: (root.updating || root.power-busy) ? #6a6a6a : #ffffff;
+                                    color: (root.updating || root.power-busy) ? Dy.dim : Dy.text;
                                     font-size: 16px;
                                     font-family: Dy.mono;
                                     vertical-alignment: center;
@@ -1364,24 +1375,24 @@ export component MainWindow inherits Window {
                                     clicked => { if !rel.current && !root.updating && !root.power-busy { root.pick-version(rel.tag); } }
                                     height: 40px;
                                     HorizontalLayout {
-                                        Text { text: rel.tag; color: rel.current ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; }
+                                        Text { text: rel.tag; color: rel.current ? Dy.text : Dy.dim; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; }
                                         Rectangle { horizontal-stretch: 1; }
-                                        if rel.current: Text { text: "current"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                                        if rel.current: Text { text: "current"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
                                     }
                                 }
                             }
                         }
                         Rectangle {
                             height: 56px;
-                            border-width: 1.5px;
-                            border-color: (root.updating || root.power-busy) ? #2a2a2a : #ffffff;
-                            background: #000000;
+                            border-width: Dy.stroke;
+                            border-color: (root.updating || root.power-busy) ? Dy.line : Dy.text;
+                            background: Dy.bg;
                             TouchArea {
                                 clicked => { if !root.updating && !root.power-busy { root.check-updates(); } }
                             }
                             Text {
                                 text: "Check for updates";
-                                color: (root.updating || root.power-busy) ? #6a6a6a : #ffffff;
+                                color: (root.updating || root.power-busy) ? Dy.dim : Dy.text;
                                 font-size: 16px;
                                 font-weight: 700;
                                 font-family: Dy.mono;
@@ -1391,7 +1402,7 @@ export component MainWindow inherits Window {
                         }
                         Text {
                             text: root.release-status;
-                            color: #8a8a8a;
+                            color: Dy.dim;
                             font-size: 12px;
                             font-family: Dy.mono;
                             wrap: word-wrap;
@@ -1401,101 +1412,114 @@ export component MainWindow inherits Window {
                         alignment: start;
                         spacing: 10px;
                         padding-bottom: 80px;
-                        Text { text: "Screen"; color: #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; }
-                        Text { text: "Turn my screen off after"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; }
+                        Text { text: "Screen"; color: Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: "Turn my screen off after"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; }
                         TouchArea {
                             clicked => { root.screen-off-open = !root.screen-off-open; }
                             height: 48px;
                             Rectangle {
-                                border-width: 1.5px;
-                                border-color: #ffffff;
+                                border-width: Dy.stroke;
+                                border-color: Dy.text;
                                 HorizontalLayout {
                                     padding-left: 12px;
                                     padding-right: 12px;
-                                    Text { text: root.screen-off-label + "  ▼"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                                    Text { text: root.screen-off-label + "  ▼"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
                                 }
                             }
                         }
                         if root.screen-off-open: VerticalLayout {
                             spacing: 2px;
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(60); } Text { text: "1 minute"; color: root.screen-off-secs == 60 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(120); } Text { text: "2 minutes"; color: root.screen-off-secs == 120 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(180); } Text { text: "3 minutes"; color: root.screen-off-secs == 180 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(300); } Text { text: "5 minutes"; color: root.screen-off-secs == 300 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(600); } Text { text: "10 minutes"; color: root.screen-off-secs == 600 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(900); } Text { text: "15 minutes"; color: root.screen-off-secs == 900 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(1200); } Text { text: "20 minutes"; color: root.screen-off-secs == 1200 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(1500); } Text { text: "25 minutes"; color: root.screen-off-secs == 1500 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(1800); } Text { text: "30 minutes"; color: root.screen-off-secs == 1800 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(2700); } Text { text: "45 minutes"; color: root.screen-off-secs == 2700 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(3600); } Text { text: "1 hour"; color: root.screen-off-secs == 3600 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(7200); } Text { text: "2 hours"; color: root.screen-off-secs == 7200 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(10800); } Text { text: "3 hours"; color: root.screen-off-secs == 10800 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(14400); } Text { text: "4 hours"; color: root.screen-off-secs == 14400 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(18000); } Text { text: "5 hours"; color: root.screen-off-secs == 18000 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 36px; clicked => { root.set-screen-off(0); } Text { text: "Never"; color: root.screen-off-secs == 0 ? #ffffff : #8a8a8a; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(60); } Text { text: "1 minute"; color: root.screen-off-secs == 60 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(120); } Text { text: "2 minutes"; color: root.screen-off-secs == 120 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(180); } Text { text: "3 minutes"; color: root.screen-off-secs == 180 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(300); } Text { text: "5 minutes"; color: root.screen-off-secs == 300 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(600); } Text { text: "10 minutes"; color: root.screen-off-secs == 600 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(900); } Text { text: "15 minutes"; color: root.screen-off-secs == 900 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(1200); } Text { text: "20 minutes"; color: root.screen-off-secs == 1200 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(1500); } Text { text: "25 minutes"; color: root.screen-off-secs == 1500 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(1800); } Text { text: "30 minutes"; color: root.screen-off-secs == 1800 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(2700); } Text { text: "45 minutes"; color: root.screen-off-secs == 2700 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(3600); } Text { text: "1 hour"; color: root.screen-off-secs == 3600 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(7200); } Text { text: "2 hours"; color: root.screen-off-secs == 7200 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(10800); } Text { text: "3 hours"; color: root.screen-off-secs == 10800 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(14400); } Text { text: "4 hours"; color: root.screen-off-secs == 14400 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(18000); } Text { text: "5 hours"; color: root.screen-off-secs == 18000 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
+                            TouchArea { height: 36px; clicked => { root.set-screen-off(0); } Text { text: "Never"; color: root.screen-off-secs == 0 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
                         }
-                        Text { text: "Display"; color: #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; }
-                        Text { text: root.display-output + "  " + root.display-mode + "  @  " + root.display-rate + " Hz"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
-                        Text { text: "Refresh rate"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; }
+                        Text { text: "Display"; color: Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: root.display-output + "  " + root.display-mode + "  @  " + root.display-rate + " Hz"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
+                        Text { text: "Refresh rate"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 8px;
                             Pill { label: "60"; on: root.display-rate == "60.00" || root.display-rate == "60"; clicked => { root.set-display-rate("60"); } }
                             Pill { label: "50"; on: root.display-rate == "50.00" || root.display-rate == "50"; clicked => { root.set-display-rate("50"); } }
                             Pill { label: "30"; on: root.display-rate == "30.00" || root.display-rate == "30"; clicked => { root.set-display-rate("30"); } }
                         }
-                        Text { text: "Pixel size"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; }
+                        Text { text: "Quality"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 8px;
-                            Pill { label: "Full"; on: root.display-scale == 100; clicked => { root.set-display-scale(100); } }
                             Pill { label: "Performance"; on: root.display-scale == 50; clicked => { root.set-display-scale(50); } }
+                            Pill { label: "Quality"; on: root.display-scale == 100; clicked => { root.set-display-scale(100); } }
                         }
-                        Text { text: root.display-scale == 50 ? "Half pixels. Judie restarts so the layout still fills the screen." : "Native panel size."; color: #8a8a8a; font-size: Dy.type-dense; font-family: Dy.mono; wrap: word-wrap; }
+                        Text { text: root.display-scale == 50 ? "Half resolution · 12 fps stepped motion. Judie restarts to apply." : "Native resolution · 30 fps stepped motion. Judie restarts to apply."; color: Dy.dim; font-size: Dy.type-dense; font-family: Dy.mono; wrap: word-wrap; }
+                        Text { text: "Theme"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Pill { label: "Dusk"; on: root.theme == 0; clicked => { root.set-theme(0); } }
+                            Pill { label: "Amber CRT"; on: root.theme == 1; clicked => { root.set-theme(1); } }
+                            Pill { label: "Pocket"; on: root.theme == 2; clicked => { root.set-theme(2); } }
+                            Pill { label: "Paper"; on: root.theme == 3; clicked => { root.set-theme(3); } }
+                        }
+                        HorizontalLayout {
+                            Text { text: "Reduced motion"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Toggle { on: root.reduced-motion; toggled => { root.toggle-reduced-motion(); } }
+                        }
                     }
                     if root.settings-tab == 4: VerticalLayout {
                         alignment: start;
                         spacing: 10px;
                         padding-bottom: 80px;
-                        Text { text: "Display"; color: #6a6a6a; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: "Display"; color: Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
-                            Text { text: "Sidebar"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "Sidebar"; color: Dy.text; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
                             Toggle { on: root.sidebar; toggled => { root.toggle-sidebar(); } }
                         }
                         HorizontalLayout {
-                            Text { text: "Blocky font"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "Blocky font"; color: Dy.text; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
                             Toggle { on: root.blocky-font; toggled => { root.toggle-blocky-font(); } }
                         }
                         HorizontalLayout {
-                            Text { text: "Hide header clock"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "Hide header clock"; color: Dy.text; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
                             Toggle { on: root.hide-header-clock; toggled => { root.toggle-hide-header-clock(); } }
                         }
                         HorizontalLayout {
-                            Text { text: "Header separator"; color: #ffffff; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "Header separator"; color: Dy.text; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
                             Toggle { on: root.header-line; toggled => { root.toggle-header-line(); } }
                         }
-                        Text { text: "Text scale"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: "Text scale"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 80; maximum: 200; value: root.text-scale; changed(v) => { root.set-text-scale(round(v)); } }
                             FieldTap { width: 88px; tap-height: 52px; label: "80–200"; value: "\{root.text-scale}"; active: root.kb-field == "text-scale"; tapped => { root.open-keyboard("text-scale"); } }
                         }
-                        Text { text: "UI / padding scale"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: "UI / padding scale"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 75; maximum: 150; value: root.ui-scale; changed(v) => { root.set-ui-scale(round(v)); } }
                             FieldTap { width: 88px; tap-height: 52px; label: "75–150"; value: "\{root.ui-scale}"; active: root.kb-field == "ui-scale"; tapped => { root.open-keyboard("ui-scale"); } }
                         }
-                        Text { text: "Header height"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: "Header height"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 88; maximum: 140; value: root.header-h-px; changed(v) => { root.set-header-h(round(v)); } }
                             FieldTap { width: 88px; tap-height: 52px; label: "88–140"; value: "\{root.header-h-px}"; active: root.kb-field == "header-h"; tapped => { root.open-keyboard("header-h"); } }
                         }
-                        Text { text: "Hit-target size"; color: #ffffff; font-size: Dy.type-control; font-family: Dy.mono; }
+                        Text { text: "Hit-target size"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
                         HorizontalLayout {
                             spacing: 10px;
                             Slider { minimum: 48; maximum: 96; value: root.hit-target-px; changed(v) => { root.set-hit-target(round(v)); } }
@@ -1552,15 +1576,15 @@ export component MainWindow inherits Window {
     if root.confirm-kind == "uninstall2": Rectangle {
         x: root.rail-w;
         width: parent.width - root.rail-w;
-        background: #000000cc;
+        background: Dy.bg.with-alpha(0.8);
         TouchArea { clicked => { root.cancel-confirm(); } }
         Rectangle {
             x: parent.width * 0.22; y: parent.height * 0.28; width: parent.width * 0.56; height: 300px;
-            background: #000000; border-width: 1.5px; border-color: #2a2a2a;
+            background: Dy.bg; border-width: Dy.stroke; border-color: Dy.line;
             TouchArea { clicked => { } }
             VerticalLayout {
                 padding: 28px; spacing: 16px;
-                Text { text: root.math-prompt; color: #ffffff; font-size: 28px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                Text { text: root.math-prompt; color: Dy.text; font-size: 28px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
                 FieldTap { label: "Answer"; value: root.math-typed; active: root.kb-field == "math"; tapped => { root.open-keyboard("math"); } }
                 HorizontalLayout {
                     spacing: 12px;
@@ -1575,16 +1599,16 @@ export component MainWindow inherits Window {
     if root.confirm-kind == "uninstall3": Rectangle {
         x: root.rail-w;
         width: parent.width - root.rail-w;
-        background: #000000cc;
+        background: Dy.bg.with-alpha(0.8);
         TouchArea { clicked => { root.cancel-confirm(); } }
         Rectangle {
             x: parent.width * 0.18; y: parent.height * 0.24; width: parent.width * 0.64; height: 320px;
-            background: #000000; border-width: 1.5px; border-color: #2a2a2a;
+            background: Dy.bg; border-width: Dy.stroke; border-color: Dy.line;
             TouchArea { clicked => { } }
             VerticalLayout {
                 padding: 28px; spacing: 16px;
-                Text { text: "Type this exactly"; color: #6a6a6a; font-size: 13px; font-family: Dy.mono; }
-                Text { text: root.verify-code; color: #ffffff; font-size: 22px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+                Text { text: "Type this exactly"; color: Dy.dim; font-size: 13px; font-family: Dy.mono; }
+                Text { text: root.verify-code; color: Dy.text; font-size: 22px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
                 FieldTap { label: "Verification"; value: root.verify-typed; active: root.kb-field == "verify"; tapped => { root.open-keyboard("verify"); } }
                 HorizontalLayout {
                     spacing: 12px;
@@ -1599,7 +1623,7 @@ export component MainWindow inherits Window {
     if root.gallery-open: Rectangle {
         x: root.rail-w;
         width: parent.width - root.rail-w;
-        background: #000000cc;
+        background: Dy.bg.with-alpha(0.8);
         TouchArea { clicked => { root.close-gallery(); } }
         Rectangle {
             x: (parent.width - min(760px, parent.width - 40px)) / 2;
@@ -1607,9 +1631,9 @@ export component MainWindow inherits Window {
             width: 760px;
             height: 540px;
             border-radius: 0px;
-            background: #000000;
-            border-width: 1px;
-            border-color: #3d3d3d;
+            background: Dy.bg;
+            border-width: Dy.stroke;
+            border-color: Dy.line;
             TouchArea { clicked => { } }
             gallery-keys := FocusScope {
                 x: 0px;
@@ -1651,17 +1675,17 @@ export component MainWindow inherits Window {
                 VerticalLayout {
                     width: 240px;
                     spacing: 8px;
-                    Text { text: "ADD WIDGET"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: "ADD WIDGET"; color: Dy.text; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
                     FieldTap { label: "Search"; value: root.gallery-query; active: root.kb-field == "gallery-query"; tapped => { root.open-keyboard("gallery-query"); } }
                     TouchArea {
                         height: 32px;
                         clicked => { root.open-creator(); }
-                        Text { text: "Creator"; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                        Text { text: "Creator"; color: Dy.text; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
                     }
                     TouchArea {
                         height: 32px;
                         clicked => { root.gallery-import(); }
-                        Text { text: "Import"; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                        Text { text: "Import"; color: Dy.text; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
                     }
                     Flickable {
                         vertical-stretch: 1;
@@ -1677,10 +1701,10 @@ export component MainWindow inherits Window {
                                 Rectangle {
                                     height: 32px;
                                     border-radius: 0px;
-                                    border-width: 1px;
-                                    border-color: (item.custom ? item.id == root.gallery-custom-id : root.gallery-kind == item.kind) ? #ffffff : #2a2a2a;
-                                    background: #000000;
-                                    Text { text: item.label; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+                                    border-width: Dy.stroke;
+                                    border-color: (item.custom ? item.id == root.gallery-custom-id : root.gallery-kind == item.kind) ? Dy.text : Dy.line;
+                                    background: Dy.bg;
+                                    Text { text: item.label; color: Dy.text; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
                                 }
                             }
                         }
@@ -1692,7 +1716,7 @@ export component MainWindow inherits Window {
                     alignment: center;
                     Text {
                         text: root.gallery-desc == "" ? root.gallery-kind : root.gallery-desc;
-                        color: #e6e6e6;
+                        color: Dy.text;
                         font-size: 16px;
                         font-weight: 700;
                         font-family: Dy.mono;
@@ -1701,9 +1725,9 @@ export component MainWindow inherits Window {
                         width: 240px;
                         height: 240px;
                         clip: true;
-                        background: #000000;
-                        border-width: 1px;
-                        border-color: #2a2a2a;
+                        background: Dy.bg;
+                        border-width: Dy.stroke;
+                        border-color: Dy.line;
                         TouchArea {
                             pointer-event(ev) => {
                                 if ev.kind == PointerEventKind.down {
@@ -1791,31 +1815,31 @@ export component MainWindow inherits Window {
                             width: 28px;
                             height: 28px;
                             clicked => { root.gallery-index = 0; root.gallery-set-index(0); }
-                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 0 ? #ffffff : #8a8a8a; }
+                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 0 ? Dy.text : Dy.dim; }
                         }
                         TouchArea {
                             width: 28px;
                             height: 28px;
                             clicked => { root.gallery-index = 1; root.gallery-set-index(1); }
-                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 1 ? #ffffff : #8a8a8a; }
+                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 1 ? Dy.text : Dy.dim; }
                         }
                         if root.gallery-kind != "clock" && root.gallery-kind != "pong": TouchArea {
                             width: 28px;
                             height: 28px;
                             clicked => { root.gallery-index = 2; root.gallery-set-index(2); }
-                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 2 ? #ffffff : #8a8a8a; }
+                            Rectangle { x: 10px; y: 10px; width: 8px; height: 8px; border-radius: 0px; background: root.gallery-index == 2 ? Dy.text : Dy.dim; }
                         }
                     }
                     Text {
                         text: root.gallery-size-caption;
-                        color: #8a8a8a;
+                        color: Dy.dim;
                         font-size: 12px;
                         font-family: Dy.mono;
                         horizontal-alignment: center;
                     }
                     HorizontalLayout {
                         spacing: 10px;
-                        Text { text: "Border"; color: #ffffff; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
+                        Text { text: "Border"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
                         Rectangle { horizontal-stretch: 1; }
                         Toggle { on: root.gallery-border; toggled => { root.set-gallery-border(!root.gallery-border); } }
                     }
@@ -1833,7 +1857,7 @@ export component MainWindow inherits Window {
     if root.creator-open: Rectangle {
         x: root.rail-w;
         width: parent.width - root.rail-w;
-        background: #000000cc;
+        background: Dy.bg.with-alpha(0.8);
         TouchArea { clicked => { root.close-creator(); } }
         Rectangle {
             x: parent.width * 0.04;
@@ -1841,28 +1865,28 @@ export component MainWindow inherits Window {
             width: parent.width * 0.92;
             height: parent.height - 48px;
             border-radius: 0px;
-            background: #000000;
-            border-width: 1.5px;
-            border-color: #2a2a2a;
+            background: Dy.bg;
+            border-width: Dy.stroke;
+            border-color: Dy.line;
             TouchArea { clicked => { } }
             VerticalLayout {
                 padding: 20px;
                 spacing: 14px;
                 HorizontalLayout {
-                    Text { text: "Widget"; color: #ffffff; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: "Widget"; color: Dy.text; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
                     Rectangle { horizontal-stretch: 1; }
                     Pill { label: "Save"; on: true; clicked => { root.save-creator(); } }
                     Pill { label: "Close"; clicked => { root.close-creator(); } }
                 }
                 FieldTap { label: "Name"; value: root.creator-name; active: root.kb-field == "creator-name"; tapped => { root.open-keyboard("creator-name"); } }
-                Text { text: "Size"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                Text { text: "Size"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
                 HorizontalLayout {
                     spacing: 8px;
                     Pill { label: "Small"; on: root.creator-size == "1x1"; clicked => { root.set-creator-size("1x1"); } }
                     Pill { label: "Medium"; on: root.creator-size == "1x2"; clicked => { root.set-creator-size("1x2"); } }
                     Pill { label: "Large"; on: root.creator-size == "2x2"; clicked => { root.set-creator-size("2x2"); } }
                 }
-                Text { text: "Starting layout"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                Text { text: "Starting layout"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
                 HorizontalLayout {
                     spacing: 8px;
                     Pill { label: "Blank"; on: root.creator-template == "blank"; clicked => { root.set-creator-template("blank"); } }
@@ -1876,18 +1900,18 @@ export component MainWindow inherits Window {
                     VerticalLayout {
                         width: 160px;
                         spacing: 6px;
-                        Text { text: "Parts"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                        Text { text: "Parts"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
                         for k in root.part-kinds: TouchArea {
                             clicked => { root.add-creator-kind(k.id); }
                             height: 36px;
-                            Text { text: k.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: k.label; color: Dy.text; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
                         }
                     }
                     Rectangle {
                         horizontal-stretch: 1;
-                        background: #000000;
-                        border-width: 1.5px;
-                        border-color: #2a2a2a;
+                        background: Dy.bg;
+                        border-width: Dy.stroke;
+                        border-color: Dy.line;
                         DesignerStage {
                             x: max(0px, (parent.width - self.width) / 2);
                             y: max(0px, (parent.height - self.height) / 2);
@@ -1903,8 +1927,8 @@ export component MainWindow inherits Window {
                     VerticalLayout {
                         width: 240px;
                         spacing: 10px;
-                        Text { text: "Selected"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
-                        Text { text: root.creator-selected == "" ? "Tap a part" : root.creator-selected-kind; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                        Text { text: "Selected"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
+                        Text { text: root.creator-selected == "" ? "Tap a part" : root.creator-selected-kind; color: Dy.text; font-size: 14px; font-family: Dy.mono; overflow: elide; }
                         FieldTap { label: "Text"; value: root.creator-node-text; active: root.kb-field == "creator-node"; tapped => { root.open-keyboard("creator-node"); } }
                         Pill { label: "Remove part"; clicked => { root.delete-creator-node(); } }
                     }
@@ -1918,27 +1942,27 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         Rectangle {
             width: 100%; height: 100%;
-            border-radius: 0px; background: #000000;
-            border-width: 1px; border-color: #3d3d3d;
+            border-radius: 0px; background: Dy.bg;
+            border-width: Dy.stroke; border-color: Dy.line;
             VerticalLayout {
                 padding: 12px; spacing: 8px;
                 HorizontalLayout {
-                    Text { text: root.weather-loc; color: #e6e6e6; font-size: 22px; font-weight: 700; }
+                    Text { text: root.weather-loc; color: Dy.text; font-size: 22px; font-weight: 700; }
                     Rectangle { horizontal-stretch: 1; }
                 }
-                Text { text: root.weather-temp + "  " + root.weather-cond; color: #e6e6e6; font-size: 42px; font-weight: 700; }
-                Text { text: root.weather-range + "  ·  " + root.weather-feel; color: #7a7a7a; font-size: 16px; }
-                Text { text: root.weather-note; color: #e6e6e6; font-size: 16px; }
+                Text { text: root.weather-temp + "  " + root.weather-cond; color: Dy.text; font-size: 42px; font-weight: 700; }
+                Text { text: root.weather-range + "  ·  " + root.weather-feel; color: Dy.dim; font-size: 16px; }
+                Text { text: root.weather-note; color: Dy.text; font-size: 16px; }
                 HorizontalLayout {
                     spacing: 16px;
                     for h in root.hours: VerticalLayout {
                         spacing: 4px;
-                        Text { text: h.hour; color: #555555; font-size: 12px; horizontal-alignment: center; }
-                        Text { text: h.temp; color: #e6e6e6; font-size: 18px; font-weight: 700; horizontal-alignment: center; }
-                        Text { text: h.precip; color: #7a7a7a; font-size: 12px; horizontal-alignment: center; }
+                        Text { text: h.hour; color: Dy.line; font-size: 12px; horizontal-alignment: center; }
+                        Text { text: h.temp; color: Dy.text; font-size: 18px; font-weight: 700; horizontal-alignment: center; }
+                        Text { text: h.precip; color: Dy.dim; font-size: 12px; horizontal-alignment: center; }
                     }
                 }
             }
@@ -1950,15 +1974,15 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         Rectangle {
             width: 100%; height: 100%;
-            border-radius: 0px; background: #000000;
-            border-width: 1px; border-color: #3d3d3d;
+            border-radius: 0px; background: Dy.bg;
+            border-width: Dy.stroke; border-color: Dy.line;
             VerticalLayout {
                 padding: 12px; spacing: 10px;
                 HorizontalLayout {
-                    Text { text: "LIGHTS"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: "LIGHTS"; color: Dy.text; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
                     Rectangle { horizontal-stretch: 1; }
                     Toggle { on: root.master-on; toggled => { root.toggle-master(); } }
                 }
@@ -1970,7 +1994,7 @@ export component MainWindow inherits Window {
                     Pill { label: "Bright"; on: root.scene == "Bright"; clicked => { root.set-scene("Bright"); } }
                     Pill { label: "Gaming"; on: root.scene == "Gaming"; clicked => { root.set-scene("Gaming"); } }
                 }
-                Text { text: root.brightness + "%"; color: #e6e6e6; font-size: 28px; font-weight: 700; }
+                Text { text: root.brightness + "%"; color: Dy.text; font-size: 28px; font-weight: 700; }
                 Slider { minimum: 0; maximum: 100; value: root.brightness; changed(v) => { root.brightness-changed(round(v)); } }
                 HorizontalLayout {
                     spacing: 8px;
@@ -1984,8 +2008,8 @@ export component MainWindow inherits Window {
                     Swatch { swatch: #ffffff; on: root.master-color == "#FFFFFF"; clicked => { root.set-color("#FFFFFF"); } }
                 }
                 for light in root.lights: HorizontalLayout {
-                    Text { text: light.name; color: #e6e6e6; font-size: 16px; vertical-alignment: center; }
-                    Text { text: light.brightness; color: #7a7a7a; font-size: 14px; vertical-alignment: center; }
+                    Text { text: light.name; color: Dy.text; font-size: 16px; vertical-alignment: center; }
+                    Text { text: light.brightness; color: Dy.dim; font-size: 14px; vertical-alignment: center; }
                     Rectangle { horizontal-stretch: 1; }
                     Pill { label: light.on ? "On" : "Off"; on: light.on; clicked => { root.toggle-light(light.id); } }
                 }
@@ -1998,20 +2022,20 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         Rectangle {
             width: 100%; height: 100%;
-            border-radius: 0px; background: #000000;
-            border-width: 1px; border-color: #3d3d3d;
+            border-radius: 0px; background: Dy.bg;
+            border-width: Dy.stroke; border-color: Dy.line;
             VerticalLayout {
                 padding: 12px; spacing: 10px;
                 HorizontalLayout {
-                    Text { text: "NOW PLAYING"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: "NOW PLAYING"; color: Dy.text; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
                     Rectangle { horizontal-stretch: 1; }
                 }
-                Text { text: root.track-title; color: #e6e6e6; font-size: 32px; font-weight: 700; }
-                Text { text: root.track-artist; color: #7a7a7a; font-size: 16px; }
-                Bar { level: root.media-progress; fill: #e6e6e6; }
+                Text { text: root.track-title; color: Dy.text; font-size: 32px; font-weight: 700; }
+                Text { text: root.track-artist; color: Dy.dim; font-size: 16px; }
+                Bar { level: root.media-progress; fill: Dy.text; }
                 HorizontalLayout {
                     spacing: 12px;
                     alignment: center;
@@ -2019,7 +2043,7 @@ export component MainWindow inherits Window {
                     IconBtn { glyph: root.playing ? "❚❚" : "▶"; primary: true; clicked => { root.toggle-play(); } }
                     IconBtn { glyph: "⟩"; clicked => { root.next-track(); } }
                 }
-                Text { text: "Volume " + root.volume + "%"; color: #7a7a7a; font-size: 13px; }
+                Text { text: "Volume " + root.volume + "%"; color: Dy.dim; font-size: 13px; }
                 Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
             }
         }
@@ -2030,23 +2054,23 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         Rectangle {
             width: 100%; height: 100%;
-            border-radius: 0px; background: #000000;
-            border-width: 1px; border-color: #3d3d3d;
+            border-radius: 0px; background: Dy.bg;
+            border-width: Dy.stroke; border-color: Dy.line;
             VerticalLayout {
                 padding: 12px; spacing: 8px;
                 HorizontalLayout {
-                    Text { text: root.month-name; color: #e6e6e6; font-size: 22px; font-weight: 700; }
+                    Text { text: root.month-name; color: Dy.text; font-size: 22px; font-weight: 700; }
                     Rectangle { horizontal-stretch: 1; }
                 }
                 for ev in root.events: HorizontalLayout {
                     spacing: 12px;
-                    Text { text: ev.time; color: #7a7a7a; font-size: 14px; min-width: 64px; }
+                    Text { text: ev.time; color: Dy.dim; font-size: 14px; min-width: 64px; }
                     VerticalLayout {
-                        Text { text: ev.title; color: #e6e6e6; font-size: 16px; font-weight: 600; }
-                        Text { text: ev.detail; color: #7a7a7a; font-size: 12px; }
+                        Text { text: ev.title; color: Dy.text; font-size: 16px; font-weight: 600; }
+                        Text { text: ev.detail; color: Dy.dim; font-size: 12px; }
                     }
                 }
             }
@@ -2058,28 +2082,28 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         Rectangle {
             width: 100%; height: 100%;
-            border-radius: 0px; background: #000000;
-            border-width: 1px; border-color: #3d3d3d;
+            border-radius: 0px; background: Dy.bg;
+            border-width: Dy.stroke; border-color: Dy.line;
             VerticalLayout {
                 padding: 12px; spacing: 10px;
                 HorizontalLayout {
-                    Text { text: "AIR PURIFIER"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: "AIR PURIFIER"; color: Dy.text; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
                     Rectangle { horizontal-stretch: 1; }
                     Toggle { on: root.purifier-on; toggled => { root.toggle-purifier(); } }
                 }
-                Text { text: root.purifier-aq; color: #ffffff; font-size: 36px; font-weight: 700; }
-                Text { text: "PM2.5  7 µg/m³   ·   Allergens  4/12"; color: #e6e6e6; font-size: 16px; }
+                Text { text: root.purifier-aq; color: Dy.text; font-size: 36px; font-weight: 700; }
+                Text { text: "PM2.5  7 µg/m³   ·   Allergens  4/12"; color: Dy.text; font-size: 16px; }
                 HorizontalLayout {
                     spacing: 8px;
                     Pill { label: "Auto"; on: root.purifier-mode == "Auto"; clicked => { root.set-purifier-mode("Auto"); } }
                     Pill { label: "Sleep"; on: root.purifier-mode == "Sleep"; clicked => { root.set-purifier-mode("Sleep"); } }
                     Pill { label: "Boost"; on: root.purifier-mode == "Manual"; clicked => { root.set-purifier-mode("Manual"); } }
                 }
-                Text { text: "Filter " + root.purifier-filter + "%"; color: #7a7a7a; font-size: 14px; }
-                Bar { level: root.purifier-filter / 100; fill: #ffffff; }
+                Text { text: "Filter " + root.purifier-filter + "%"; color: Dy.dim; font-size: 14px; }
+                Bar { level: root.purifier-filter / 100; fill: Dy.text; }
             }
         }
     }
@@ -2089,16 +2113,16 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         Rectangle {
             width: 100%; height: 100%;
-            border-radius: 0px; background: #000000;
-            border-width: 1px; border-color: #3d3d3d;
+            border-radius: 0px; background: Dy.bg;
+            border-width: Dy.stroke; border-color: Dy.line;
             VerticalLayout {
                 padding: 12px; spacing: 10px;
                 HorizontalLayout {
-                    Text { text: "SHELL"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
-                    Text { text: root.terminal-cwd; color: #7a7a7a; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
+                    Text { text: "SHELL"; color: Dy.text; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+                    Text { text: root.terminal-cwd; color: Dy.dim; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
                     Rectangle { horizontal-stretch: 1; }
                 }
                 Flickable {
@@ -2109,14 +2133,14 @@ export component MainWindow inherits Window {
                         alignment: start;
                         if root.terminal-lines.length == 0: Text {
                             text: "Run normal Linux commands here — ls, df -h, systemctl status…";
-                            color: #7a7a7a;
+                            color: Dy.dim;
                             font-size: 14px;
                             font-family: Dy.mono;
                             wrap: word-wrap;
                         }
                         for line in root.terminal-lines: Text {
                             text: line.text;
-                            color: line.prompt ? #8a8a8a : #e6e6e6;
+                            color: line.prompt ? Dy.dim : Dy.text;
                             font-size: 15px;
                             font-family: Dy.mono;
                             wrap: word-wrap;
@@ -2145,16 +2169,16 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         VerticalLayout {
             padding: 12px;
             spacing: 10px;
-            Text { text: "CLIMATE"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
-            Text { text: root.indoor; color: #ffffff; font-size: 64px; font-weight: 700; font-family: Dy.mono; }
-            Text { text: "Indoor now"; color: #8a8a8a; font-size: 16px; font-family: Dy.mono; }
-            Text { text: "Humidity  " + root.humidity; color: #ffffff; font-size: 28px; font-family: Dy.mono; }
-            Text { text: "Outdoor  " + root.outdoor; color: #ffffff; font-size: 28px; font-family: Dy.mono; }
-            Text { text: root.comfort; color: #8a8a8a; font-size: 16px; font-family: Dy.mono; }
+            Text { text: "CLIMATE"; color: Dy.text; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+            Text { text: root.indoor; color: Dy.text; font-size: 64px; font-weight: 700; font-family: Dy.mono; }
+            Text { text: "Indoor now"; color: Dy.dim; font-size: 16px; font-family: Dy.mono; }
+            Text { text: "Humidity  " + root.humidity; color: Dy.text; font-size: 28px; font-family: Dy.mono; }
+            Text { text: "Outdoor  " + root.outdoor; color: Dy.text; font-size: 28px; font-family: Dy.mono; }
+            Text { text: root.comfort; color: Dy.dim; font-size: 16px; font-family: Dy.mono; }
         }
     }
 
@@ -2163,16 +2187,16 @@ export component MainWindow inherits Window {
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
-        background: #000000;
+        background: Dy.bg;
         VerticalLayout {
             padding: 12px;
             spacing: 8px;
             HorizontalLayout {
-                Text { text: root.pong-ls; color: #ffffff; font-size: 32px; font-weight: 700; font-family: Dy.mono; }
+                Text { text: root.pong-ls; color: Dy.text; font-size: 32px; font-weight: 700; font-family: Dy.mono; }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: "PONG"; color: #8a8a8a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+                Text { text: "PONG"; color: Dy.dim; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
                 Rectangle { horizontal-stretch: 1; }
-                Text { text: root.pong-rs; color: #ffffff; font-size: 32px; font-weight: 700; font-family: Dy.mono; }
+                Text { text: root.pong-rs; color: Dy.text; font-size: 32px; font-weight: 700; font-family: Dy.mono; }
             }
             HorizontalLayout {
                 spacing: 8px;
@@ -2220,29 +2244,29 @@ export component MainWindow inherits Window {
                 Rectangle {
                     width: 100%;
                     height: 100%;
-                    background: #000000;
+                    background: Dy.bg;
                     clip: true;
-                    Rectangle { x: parent.width / 2 - 1px; width: 2px; height: 100%; background: #2a2a2a; }
+                    Rectangle { x: parent.width / 2 - 1px; width: 2px; height: 100%; background: Dy.line; }
                     Rectangle {
                         x: 12px;
                         y: parent.height * root.pong-ly / 100.0 - 48px;
                         width: 12px;
                         height: 96px;
-                        background: #ffffff;
+                        background: Dy.text;
                     }
                     Rectangle {
                         x: parent.width - 24px;
                         y: parent.height * root.pong-ry / 100.0 - 48px;
                         width: 12px;
                         height: 96px;
-                        background: #ffffff;
+                        background: Dy.text;
                     }
                     Rectangle {
                         x: parent.width * root.pong-bx / 100.0 - 10px;
                         y: parent.height * root.pong-by / 100.0 - 10px;
                         width: 20px;
                         height: 20px;
-                        background: #ffffff;
+                        background: Dy.text;
                     }
                 }
             }
@@ -2268,42 +2292,42 @@ export component MainWindow inherits Window {
             height: 4px;
             HorizontalLayout {
                 alignment: center;
-                Rectangle { width: 48px; height: 4px; background: #3a3a3a; }
+                Rectangle { width: 48px; height: 4px; background: Dy.line; }
             }
         }
     }
 
     if root.updating: Rectangle {
-        background: #00000099;
+        background: Dy.bg.with-alpha(0.6);
         TouchArea { clicked => { } }
         Rectangle {
             x: parent.width * 0.22;
             y: parent.height * 0.30;
             width: parent.width * 0.56;
             height: 240px;
-            background: #000000;
-            border-width: 1.5px;
-            border-color: #ffffff;
+            background: Dy.bg;
+            border-width: Dy.stroke;
+            border-color: Dy.text;
             TouchArea { clicked => { } }
             VerticalLayout {
                 padding: 28px;
                 spacing: 16px;
                 Text {
                     text: "Installing Judie";
-                    color: #ffffff;
+                    color: Dy.text;
                     font-size: 20px;
                     font-weight: 700;
                     font-family: Dy.mono;
                 }
                 Text {
                     text: root.release-status;
-                    color: #ffffff;
+                    color: Dy.text;
                     font-size: 16px;
                     font-family: Dy.mono;
                 }
                 Text {
                     text: "Downloading, validating, installing, verifying, then reboot. This screen stays up. Settings, widgets, and routines are kept.";
-                    color: #8a8a8a;
+                    color: Dy.dim;
                     font-size: 13px;
                     font-family: Dy.mono;
                     wrap: word-wrap;
@@ -2314,30 +2338,30 @@ export component MainWindow inherits Window {
     }
 
     if root.power-busy: Rectangle {
-        background: #00000099;
+        background: Dy.bg.with-alpha(0.6);
         TouchArea { clicked => { } }
         Rectangle {
             x: parent.width * 0.22;
             y: parent.height * 0.32;
             width: parent.width * 0.56;
             height: 200px;
-            background: #000000;
-            border-width: 1.5px;
-            border-color: #ffffff;
+            background: Dy.bg;
+            border-width: Dy.stroke;
+            border-color: Dy.text;
             TouchArea { clicked => { } }
             VerticalLayout {
                 padding: 28px;
                 spacing: 16px;
                 Text {
                     text: "Device";
-                    color: #ffffff;
+                    color: Dy.text;
                     font-size: 20px;
                     font-weight: 700;
                     font-family: Dy.mono;
                 }
                 Text {
                     text: root.power-status;
-                    color: #ffffff;
+                    color: Dy.text;
                     font-size: 16px;
                     font-family: Dy.mono;
                     wrap: word-wrap;
@@ -2345,7 +2369,7 @@ export component MainWindow inherits Window {
                 }
                 Text {
                     text: "This screen stays up. A blank terminal never appears.";
-                    color: #8a8a8a;
+                    color: Dy.dim;
                     font-size: 13px;
                     font-family: Dy.mono;
                     wrap: word-wrap;
@@ -2358,12 +2382,12 @@ export component MainWindow inherits Window {
         x: 0px;
         width: root.rail-w;
         height: 100%;
-        background: #000000;
+        background: Dy.bg;
         Rectangle {
             x: parent.width - 1.5px;
             width: 1.5px;
             height: 100%;
-            background: #ffffff;
+            background: Dy.text;
         }
         VerticalLayout {
             padding-left: 16px;
@@ -2378,14 +2402,14 @@ export component MainWindow inherits Window {
                 PiMark { }
                 Text {
                     text: "PANEL";
-                    color: #ffffff;
+                    color: Dy.text;
                     font-size: Dy.type-hero;
                     font-weight: 700;
                     font-family: Dy.mono;
                     vertical-alignment: center;
                 }
             }
-            Rectangle { height: 1px; background: #ffffff; opacity: 0.35; }
+            Rectangle { height: 1px; background: Dy.text; opacity: 0.35; }
             Rectangle { height: 18px; }
             Flickable {
                 vertical-stretch: 1;
@@ -2396,12 +2420,12 @@ export component MainWindow inherits Window {
                         clicked => { root.collapse(); root.close-overlay(); }
                         height: 72px;
                         Rectangle {
-                            background: (root.expanded == "" && !root.settings-page) ? #ffffff : #000000;
+                            background: (root.expanded == "" && !root.settings-page) ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px;
                                 spacing: 12px;
-                                Text { text: "⌂"; color: (root.expanded == "" && !root.settings-page) ? #000000 : #c8c8c8; font-size: Dy.type-value; vertical-alignment: center; }
-                                Text { text: "HOME"; color: (root.expanded == "" && !root.settings-page) ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "⌂"; color: (root.expanded == "" && !root.settings-page) ? Dy.bg : Dy.dim; font-size: Dy.type-value; vertical-alignment: center; }
+                                Text { text: "HOME"; color: (root.expanded == "" && !root.settings-page) ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2409,11 +2433,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("lights"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "lights" ? #ffffff : #000000;
+                            background: root.expanded == "lights" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "💡"; color: root.expanded == "lights" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
-                                Text { text: "LIGHTS"; color: root.expanded == "lights" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "💡"; color: root.expanded == "lights" ? Dy.bg : Dy.dim; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "LIGHTS"; color: root.expanded == "lights" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2421,11 +2445,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("climate"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "climate" ? #ffffff : #000000;
+                            background: root.expanded == "climate" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "°"; color: root.expanded == "climate" ? #000000 : #c8c8c8; font-size: Dy.type-value; vertical-alignment: center; }
-                                Text { text: "CLIMATE"; color: root.expanded == "climate" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "°"; color: root.expanded == "climate" ? Dy.bg : Dy.dim; font-size: Dy.type-value; vertical-alignment: center; }
+                                Text { text: "CLIMATE"; color: root.expanded == "climate" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2433,11 +2457,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("calendar"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "calendar" ? #ffffff : #000000;
+                            background: root.expanded == "calendar" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "▦"; color: root.expanded == "calendar" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
-                                Text { text: "CALENDAR"; color: root.expanded == "calendar" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "▦"; color: root.expanded == "calendar" ? Dy.bg : Dy.dim; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "CALENDAR"; color: root.expanded == "calendar" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2445,11 +2469,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("weather"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "weather" ? #ffffff : #000000;
+                            background: root.expanded == "weather" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "*"; color: root.expanded == "weather" ? #000000 : #c8c8c8; font-size: Dy.type-value; vertical-alignment: center; }
-                                Text { text: "WEATHER"; color: root.expanded == "weather" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "*"; color: root.expanded == "weather" ? Dy.bg : Dy.dim; font-size: Dy.type-value; vertical-alignment: center; }
+                                Text { text: "WEATHER"; color: root.expanded == "weather" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2457,11 +2481,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("media"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "media" ? #ffffff : #000000;
+                            background: root.expanded == "media" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "▶"; color: root.expanded == "media" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
-                                Text { text: "MEDIA"; color: root.expanded == "media" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "▶"; color: root.expanded == "media" ? Dy.bg : Dy.dim; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "MEDIA"; color: root.expanded == "media" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2469,11 +2493,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("purifier"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "purifier" ? #ffffff : #000000;
+                            background: root.expanded == "purifier" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "◎"; color: root.expanded == "purifier" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
-                                Text { text: "PURIFIER"; color: root.expanded == "purifier" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "◎"; color: root.expanded == "purifier" ? Dy.bg : Dy.dim; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "PURIFIER"; color: root.expanded == "purifier" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2481,11 +2505,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("terminal"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "terminal" ? #ffffff : #000000;
+                            background: root.expanded == "terminal" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: ">_"; color: root.expanded == "terminal" ? #000000 : #c8c8c8; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
-                                Text { text: "TERMINAL"; color: root.expanded == "terminal" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: ">_"; color: root.expanded == "terminal" ? Dy.bg : Dy.dim; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
+                                Text { text: "TERMINAL"; color: root.expanded == "terminal" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2493,11 +2517,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("pong"); }
                         height: 72px;
                         Rectangle {
-                            background: root.expanded == "pong" ? #ffffff : #000000;
+                            background: root.expanded == "pong" ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "○"; color: root.expanded == "pong" ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
-                                Text { text: "PONG"; color: root.expanded == "pong" ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "○"; color: root.expanded == "pong" ? Dy.bg : Dy.dim; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "PONG"; color: root.expanded == "pong" ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2505,11 +2529,11 @@ export component MainWindow inherits Window {
                         clicked => { root.expand("settings"); }
                         height: 72px;
                         Rectangle {
-                            background: root.settings-page ? #ffffff : #000000;
+                            background: root.settings-page ? Dy.text : Dy.bg;
                             HorizontalLayout {
                                 padding-left: 12px; spacing: 12px;
-                                Text { text: "⚙"; color: root.settings-page ? #000000 : #c8c8c8; font-size: Dy.type-title; vertical-alignment: center; }
-                                Text { text: "SETTINGS"; color: root.settings-page ? #000000 : #c8c8c8; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
+                                Text { text: "⚙"; color: root.settings-page ? Dy.bg : Dy.dim; font-size: Dy.type-title; vertical-alignment: center; }
+                                Text { text: "SETTINGS"; color: root.settings-page ? Dy.bg : Dy.dim; font-size: Dy.type-value; font-family: Dy.mono; vertical-alignment: center; letter-spacing: 2px; }
                             }
                         }
                     }
@@ -2539,23 +2563,23 @@ export component MainWindow inherits Window {
     if root.net-menu-open: Rectangle {
         x: root.rail-w;
         width: parent.width - root.rail-w;
-        background: #00000000;
+        background: transparent;
         TouchArea { clicked => { root.close-net-menu(); } }
         Rectangle {
             x: parent.width - 360px;
             y: Dy.header-h - 8px;
             width: 340px;
             height: root.wifi-detail == "" ? min(parent.height / 2, 24px + max(1, root.wifi-nets.length) * 44px) : 220px;
-            background: #000000;
-            border-width: 1.5px;
-            border-color: #2a2a2a;
+            background: Dy.bg;
+            border-width: Dy.stroke;
+            border-color: Dy.line;
             TouchArea { clicked => { } }
             VerticalLayout {
                 padding: 10px;
                 spacing: 4px;
                 if root.net-kind == "ethernet": Text {
                     text: "Ethernet";
-                    color: #ffffff;
+                    color: Dy.text;
                     font-size: 14px;
                     font-family: Dy.mono;
                 }
@@ -2572,8 +2596,8 @@ export component MainWindow inherits Window {
                                 NetGlyph { kind: "wifi"; bars: net.bars; }
                                 VerticalLayout {
                                     alignment: center;
-                                    Text { text: net.ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
-                                    Text { text: net.connected ? "Connected" : (net.saved ? "Saved" : "Available"); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; }
+                                    Text { text: net.ssid; color: Dy.text; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+                                    Text { text: net.connected ? "Connected" : (net.saved ? "Saved" : "Available"); color: Dy.dim; font-size: 11px; font-family: Dy.mono; }
                                 }
                             }
                         }
@@ -2583,21 +2607,21 @@ export component MainWindow inherits Window {
                     spacing: 6px;
                     TouchArea {
                         clicked => { root.wifi-detail = ""; }
-                        Text { text: "←  Networks"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; }
+                        Text { text: "←  Networks"; color: Dy.dim; font-size: 13px; font-family: Dy.mono; }
                     }
-                    Text { text: root.wifi-pick; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
-                    Text { text: root.wifi-pick == root.wifi-ssid ? "Connected" : "Available"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+                    Text { text: root.wifi-pick; color: Dy.text; font-size: 16px; font-family: Dy.mono; }
+                    Text { text: root.wifi-pick == root.wifi-ssid ? "Connected" : "Available"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
                     if root.wifi-pick == root.wifi-ssid: Pill { label: "Disconnect"; clicked => { root.disconnect-wifi(); } }
                     if root.wifi-pick != root.wifi-ssid: VerticalLayout {
                         spacing: 6px;
                         HorizontalLayout {
-                            Text { text: "Auto-connect"; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                            Text { text: "Auto-connect"; color: Dy.text; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
                             Rectangle { horizontal-stretch: 1; }
                             Toggle { on: root.wifi-auto; toggled => { root.toggle-wifi-auto(); } }
                         }
                         Pill { label: "Connect"; on: true; clicked => { root.connect-wifi(); } }
                     }
-                    Text { text: root.wifi-status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+                    Text { text: root.wifi-status; color: Dy.dim; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
                 }
             }
         }
@@ -2606,21 +2630,21 @@ export component MainWindow inherits Window {
     if root.vol-menu-open: Rectangle {
         x: root.rail-w;
         width: parent.width - root.rail-w;
-        background: #00000000;
+        background: transparent;
         TouchArea { clicked => { root.close-vol-menu(); } }
         Rectangle {
             x: parent.width - 268px;
             y: Dy.header-h - 8px;
             width: 260px;
             height: 88px;
-            background: #000000;
-            border-width: 1.5px;
-            border-color: #2a2a2a;
+            background: Dy.bg;
+            border-width: Dy.stroke;
+            border-color: Dy.line;
             TouchArea { clicked => { } }
             VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
-                Text { text: "Volume  " + root.volume + "%"; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+                Text { text: "Volume  " + root.volume + "%"; color: Dy.text; font-size: 14px; font-family: Dy.mono; }
                 Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
             }
         }
@@ -2639,13 +2663,36 @@ export component MainWindow inherits Window {
     }
 
     if root.screen-sleep: Rectangle {
-        background: #000000;
+        background: Dy.bg;
         TouchArea {
             pointer-event(ev) => {
                 if ev.kind == PointerEventKind.down {
                     root.wake-screen();
                 }
             }
+        }
+    }
+
+    // Boot screen (pixel-ui.md): PiMark, wordmark, 8-segment bar stepping at ~8 fps.
+    Timer {
+        interval: 120ms;
+        running: root.booting;
+        triggered => {
+            root.boot-step += 1;
+            if root.boot-step >= 9 || root.reduced-motion {
+                root.booting = false;
+            }
+        }
+    }
+    if root.booting: Rectangle {
+        background: Dy.bg;
+        TouchArea { }
+        VerticalLayout {
+            alignment: center;
+            spacing: 24px;
+            HorizontalLayout { alignment: center; PiMark { width: 192px; } }
+            Text { text: "Judie"; color: Dy.text; font-size: 40px; font-family: "Press Start 2P"; horizontal-alignment: center; }
+            HorizontalLayout { alignment: center; Bar { width: 200px; zoom: 1.5; segments: 8; level: root.boot-step / 8; } }
         }
     }
 }

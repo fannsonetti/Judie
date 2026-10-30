@@ -70,9 +70,9 @@ export component WidgetPreview inherits Rectangle {
     width: round((root.canon-w / 1px) * root.zs) * 1px;
     height: round((root.canon-h / 1px) * root.zs) * 1px;
     clip: true;
-    background: #000000;
-    border-width: 1px;
-    border-color: #2a2a2a;
+    background: Dy.bg;
+    border-width: Dy.stroke;
+    border-color: Dy.line;
 
     WidgetFace {
         width: round((root.canon-w / 1px) * root.zs) * 1px;

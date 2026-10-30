@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Judie pixel UI</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500&family=Silkscreen&display=swap">
+<style>
+body{margin:0;background:#0b0a10;padding:24px 16px}
+.jd{max-width:960px;margin:0 auto;--bg:#15121f;--pn:#211c30;--ln:#3b3354;--tx:#f3ecda;--dm:#9d93b5;--a1:#ffb43a;--a2:#5fe3cf;--a3:#ff5f8d;font-family:'Pixelify Sans',monospace;color:var(--tx)}
+.jd .scr{background:var(--bg);aspect-ratio:16/10;padding:10px;display:flex;flex-direction:column;gap:8px;border:4px solid #000;outline:4px solid var(--ln)}
+.jd .t{background:var(--pn);border:3px solid var(--ln);padding:8px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.jd .h{font-family:'Silkscreen',monospace;font-size:11px;color:var(--dm)}
+.jd .bar{display:flex;gap:3px}.jd .bar i{flex:1;height:8px;background:var(--ln)}.jd .bar i.on{background:var(--a1)}
+.jd .cur{display:inline-block;width:9px;height:15px;background:var(--a2);vertical-align:-2px;animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+.jd .px{shape-rendering:crispEdges}
+.jd .seg{display:flex;border:3px solid var(--ln)}.jd .seg button{flex:1;border:0;border-radius:0;background:transparent;color:var(--dm);font-family:'Silkscreen',monospace;font-size:11px;padding:6px;cursor:pointer}.jd .seg button.on{background:var(--a1);color:var(--bg)}
+.jd .lbl{font-size:13px;color:#9d93b5;margin:18px 0 8px}
+</style>
+</head>
+<body>
+<div class="jd" id="jd">
+<div class="lbl">Boot</div>
+<div class="scr" style="align-items:center;justify-content:center;gap:16px">
+ <span class="pm" data-w="192"></span>
+ <div style="font-family:'Silkscreen',monospace;font-size:22px">Judie</div>
+ <div class="bar" style="width:200px"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div>
+</div>
+
+<div class="lbl">Home</div>
+<div class="scr">
+ <div style="display:flex;justify-content:space-between;align-items:center;font-family:'Silkscreen',monospace;font-size:13px">
+  <span style="display:flex;align-items:center;gap:10px"><span class="pm" data-w="40"></span>Living room</span><span style="color:var(--dm)">Thu 30 Oct</span><span style="display:flex;gap:10px;align-items:center"><span data-ic="wifi"></span><span data-ic="vol"></span></span>
+ </div>
+ <div style="flex:1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:1fr 1fr;gap:8px">
+  <div class="t" style="grid-column:span 2;justify-content:center">
+   <div style="font-family:'Silkscreen',monospace;font-size:46px;line-height:1;color:var(--a1)">21:47</div>
+   <div class="h">Next: gym in 40 min</div>
+  </div>
+  <div class="t"><div class="h">Weather</div><div style="display:flex;align-items:center;gap:8px"><span data-ic="sun" data-s="4"></span><span style="font-size:26px">9°</span></div><div class="h">Clear · L8 H11</div></div>
+  <div class="t"><div class="h">Lights</div><div style="display:flex;align-items:center;gap:8px"><span data-ic="bulb" data-s="4"></span><span style="font-size:20px">Cozy</span></div><div class="bar"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div></div>
+  <div class="t" style="grid-column:span 2"><div class="h">Ask Judie</div><div style="font-size:16px">&gt; what should i cook tonight<span class="cur"></span></div><div class="h" style="color:var(--a2)">Hold to talk · tap to type</div></div>
+  <div class="t"><div class="h">Now playing</div><div style="font-size:15px">Rain on window</div><div class="bar"><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i></div></div>
+  <div class="t"><div class="h">Timers</div><div style="font-size:15px">Tea <span style="color:var(--a3)">3:20</span></div><div style="font-size:15px">Laundry <span style="color:var(--dm)">18:00</span></div></div>
+ </div>
+</div>
+
+<div class="lbl">Assistant</div>
+<div class="scr">
+ <div style="display:flex;justify-content:space-between;align-items:center;font-family:'Silkscreen',monospace;font-size:13px"><span>&lt; Judie</span><span style="color:var(--a2)">Online</span></div>
+ <div style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:flex-end;font-size:16px;line-height:1.35">
+  <div style="align-self:flex-end;max-width:70%;background:var(--ln);padding:8px 10px">dim the lights and remind me to call mum at 8</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;padding-left:44px">
+   <span style="border:3px solid var(--a1);color:var(--a1);font-size:13px;padding:3px 8px">Lights 30% · done</span>
+   <span style="border:3px solid var(--a1);color:var(--a1);font-size:13px;padding:3px 8px">Reminder 20:00 · set</span>
+   <span style="border:3px solid var(--ln);color:var(--dm);font-size:13px;padding:3px 8px">Undo</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:flex-end"><span class="pm" data-w="36" style="flex:none"></span><div style="max-width:80%;background:var(--pn);border:3px solid var(--ln);padding:8px 10px">Done. Lights are at 30% and I'll ping you at 8. Want me to queue some quiet music too<span class="cur"></span></div></div>
+ </div>
+ <div style="display:flex;gap:8px"><div style="flex:1;border:3px solid var(--ln);padding:8px;color:var(--dm);font-size:15px">Type or hold to talk</div><div style="background:var(--a2);color:var(--bg);padding:8px 14px;font-family:'Silkscreen',monospace;font-size:13px;display:flex;align-items:center">Send</div></div>
+</div>
+
+<div class="lbl">Settings · display</div>
+<div class="scr" style="aspect-ratio:auto">
+ <div class="h">Quality</div>
+ <div class="seg" data-g="q"><button class="on">Performance</button><button>Quality</button></div>
+ <div class="h" id="qd" style="color:var(--tx);font-size:12px">Half resolution · 12 fps stepped motion · no transitions</div>
+ <div class="h" style="margin-top:6px">Theme</div>
+ <div class="seg" data-g="th"><button class="on" data-t="dusk">Dusk</button><button data-t="crt">Amber CRT</button><button data-t="gb">Pocket</button><button data-t="paper">Paper</button></div>
+ <div class="h" style="margin-top:6px">Reduced motion</div>
+ <div class="seg" data-g="rm"><button>On</button><button class="on">Off</button></div>
+</div>
+</div>
+<script>
+const PM=[[6,18,148,14],[6,18,14,40],[144,18,10,26],[52,18,22,92],[102,18,12,76]];
+document.querySelectorAll('#jd .pm').forEach(e=>{const w=+e.dataset.w,h=w*0.75;e.innerHTML=`<svg class="px" width="${w}" height="${h}" viewBox="0 0 160 120" fill="var(--tx)" aria-hidden="true">${PM.map(r=>`<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}"/>`).join('')}</svg>`});
+const IC={sun:["...#....","#..#..#.",".#####..","######.#","#.#####.",".#####..","#..#..#.","...#...."],bulb:["..####..",".######.",".######.",".######.","..####..","..#..#..","..####..","...##..."],wifi:[".######.","#......#","..####..",".#....#.","...##...","........","...##...","...##..."],vol:["...#....","..##..#.","####.#..","####.#.#","####.#.#","..##.#..","...#..#.","........"]};
+document.querySelectorAll('#jd [data-ic]').forEach(e=>{const m=IC[e.dataset.ic],s=+(e.dataset.s||2);let r='';m.forEach((row,y)=>[...row].forEach((ch,x)=>{if(ch==='#')r+=`<rect x="${x}" y="${y}" width="1" height="1"/>`}));e.innerHTML=`<svg class="px" width="${8*s}" height="${8*s}" viewBox="0 0 8 8" fill="${e.dataset.ic==='sun'||e.dataset.ic==='bulb'?'var(--a1)':'var(--tx)'}" aria-hidden="true">${r}</svg>`});
+const TH={dusk:['#15121f','#211c30','#3b3354','#f3ecda','#9d93b5','#ffb43a','#5fe3cf','#ff5f8d'],crt:['#0f0a02','#1c1305','#4a3208','#ffcf7a','#b07d2a','#ffb000','#ffd36b','#ff7a1a'],gb:['#0f380f','#1f4f1f','#306230','#c8e07a','#8bac0f','#e0f8a0','#9bbc0f','#e0f8a0'],paper:['#efe8d8','#fbf7ee','#2b2620','#1e1a16','#6b6257','#d9480f','#1c7c74','#c2255c']};
+const K=['--bg','--pn','--ln','--tx','--dm','--a1','--a2','--a3'];
+document.querySelectorAll('#jd .seg').forEach(g=>g.addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+if(g.dataset.g==='th'){const v=TH[b.dataset.t];K.forEach((k,i)=>document.getElementById('jd').style.setProperty(k,v[i]))}
+if(g.dataset.g==='q'){document.getElementById('qd').textContent=b.textContent==='Quality'?'Native resolution · 30 fps transitions · cross-fades between screens':'Half resolution · 12 fps stepped motion · no transitions'}
+if(g.dataset.g==='rm'){document.querySelectorAll('#jd .cur').forEach(c=>c.style.animation=b.textContent==='On'?'none':'')}}));
+</script>
+</body>
+</html>

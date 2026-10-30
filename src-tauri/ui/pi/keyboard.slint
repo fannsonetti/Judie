@@ -8,9 +8,9 @@ export component AnsiKeyboard inherits Rectangle {
     callback command(string);
     callback close();
 
-    background: #000000;
-    border-width: 1.5px;
-    border-color: Dy.border;
+    background: Dy.bg;
+    border-width: Dy.stroke;
+    border-color: Dy.line;
 
     property <bool> shift: shift-l.down || shift-r.down;
     property <bool> fn-layer: fn-key.down;
@@ -27,7 +27,7 @@ export component AnsiKeyboard inherits Rectangle {
             height: Dy.hit-target;
             Text {
                 text: root.field;
-                color: Dy.muted;
+                color: Dy.dim;
                 font-size: Dy.type-status;
                 font-family: Dy.mono;
                 vertical-alignment: center;
@@ -45,8 +45,8 @@ export component AnsiKeyboard inherits Rectangle {
                 clicked => { root.close(); }
                 width: max(88px, Dy.hit-target * 1.4);
                 Rectangle {
-                    border-width: 1.5px;
-                    border-color: Dy.border-hi;
+                    border-width: Dy.stroke;
+                    border-color: Dy.dim;
                     Text {
                         text: "Hide";
                         color: Dy.text;

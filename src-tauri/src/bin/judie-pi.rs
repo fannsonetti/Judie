@@ -1395,6 +1395,31 @@ fn bind(ui: &MainWindow) {
         restart_kiosk();
         r();
     });
+    // Theme and reduced motion are set here and at startup, never in push_ui.
+    let weak = ui.as_weak();
+    ui.on_set_theme(move |index| {
+        let theme = pi_room::with(|room| {
+            room.set_theme(index);
+            pi_room::theme_index(&room.theme)
+        });
+        if let Some(ui) = weak.upgrade() {
+            ui.set_theme(theme);
+        }
+        note_input();
+    });
+    let weak = ui.as_weak();
+    ui.on_toggle_reduced_motion(move || {
+        let on = pi_room::with(|room| {
+            let on = !room.reduced_motion.unwrap_or_else(prefers_reduced_motion);
+            room.reduced_motion = Some(on);
+            room.save();
+            on
+        });
+        if let Some(ui) = weak.upgrade() {
+            ui.set_reduced_motion(on);
+        }
+        note_input();
+    });
     let r = refresh.clone();
     ui.on_set_text_scale(move |v| {
         pi_room::with(|room| room.set_text_scale(v));
@@ -2529,7 +2554,10 @@ fn main() {
         }
     };
     apply_kiosk_geometry(&ui);
-    ui.set_reduced_motion(prefers_reduced_motion());
+    pi_room::with(|room| {
+        ui.set_reduced_motion(room.reduced_motion.unwrap_or_else(prefers_reduced_motion));
+        ui.set_theme(pi_room::theme_index(&room.theme));
+    });
     ui.set_version_text(releases::display_version().into());
     ui.set_selected_release(format!("v{}", releases::display_version()).into());
     bind(&ui);

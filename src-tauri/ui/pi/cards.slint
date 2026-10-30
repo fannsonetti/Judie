@@ -132,13 +132,20 @@ export struct DiagRow {
     detail: string,
 }
 
+// Theme tokens (docs/design/pixel-ui.md). Index: 0 Dusk, 1 Amber CRT, 2 Pocket, 3 Paper.
+// Only these eight colours go on screen; light swatches are the one exception.
 export global Dy {
-    out property <color> canvas: #000000;
-    out property <color> border: #2a2a2a;
-    out property <color> border-hi: #5a5a5a;
-    out property <color> text: #ffffff;
-    out property <color> muted: #8a8a8a;
-    out property <color> dim: #4a4a4a;
+    in-out property <int> theme: 0;
+    out property <color> bg: theme == 1 ? #0f0a02 : theme == 2 ? #0f380f : theme == 3 ? #efe8d8 : #15121f;
+    out property <color> panel: theme == 1 ? #1c1305 : theme == 2 ? #1f4f1f : theme == 3 ? #fbf7ee : #211c30;
+    out property <color> line: theme == 1 ? #4a3208 : theme == 2 ? #306230 : theme == 3 ? #2b2620 : #3b3354;
+    out property <color> text: theme == 1 ? #ffcf7a : theme == 2 ? #c8e07a : theme == 3 ? #1e1a16 : #f3ecda;
+    out property <color> dim: theme == 1 ? #b07d2a : theme == 2 ? #8bac0f : theme == 3 ? #6b6257 : #9d93b5;
+    out property <color> accent1: theme == 1 ? #ffb000 : theme == 2 ? #e0f8a0 : theme == 3 ? #d9480f : #ffb43a;
+    out property <color> accent2: theme == 1 ? #ffd36b : theme == 2 ? #9bbc0f : theme == 3 ? #1c7c74 : #5fe3cf;
+    out property <color> accent3: theme == 1 ? #ff7a1a : theme == 2 ? #e0f8a0 : theme == 3 ? #c2255c : #ff5f8d;
+    // Pixel border weight (spec rule 2).
+    out property <length> stroke: 3px;
     in-out property <string> mono: "DejaVu Sans Mono";
     out property <string> code: "DejaVu Sans Mono";
     in-out property <float> text-scale: 1.0;
@@ -161,9 +168,9 @@ export component Card inherits Rectangle {
     in property <string> kicker;
     in property <bool> expandable: false;
     callback tapped;
-    background: Dy.canvas;
-    border-width: 1px;
-    border-color: Dy.border;
+    background: Dy.panel;
+    border-width: Dy.stroke;
+    border-color: Dy.line;
     border-radius: 0px;
     clip: true;
 
@@ -184,15 +191,15 @@ export component Pill inherits Rectangle {
     in property <float> zoom: 1.0;
     callback clicked;
     border-radius: 0px;
-    border-width: max(1px, 1.5px * root.zoom);
-    border-color: root.on ? Dy.text : Dy.border;
-    background: Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: root.on ? Dy.accent1 : Dy.line;
+    background: root.on ? Dy.accent1 : Dy.bg;
     height: 44px * root.zoom;
     min-width: 72px * root.zoom;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.label;
-        color: root.on ? Dy.text : Dy.muted;
+        color: root.on ? Dy.bg : Dy.dim;
         font-size: Dy.type-control * root.zoom;
         font-weight: 600;
         font-family: Dy.mono;
@@ -209,9 +216,9 @@ export component Toggle inherits Rectangle {
     width: 56px * root.zoom;
     height: 28px * root.zoom;
     border-radius: 0px;
-    border-width: max(1px, 1.5px * root.zoom);
-    border-color: root.on ? Dy.text : Dy.border;
-    background: Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: root.on ? Dy.accent1 : Dy.line;
+    background: Dy.bg;
     TouchArea {
         clicked => {
             root.on = !root.on;
@@ -219,11 +226,11 @@ export component Toggle inherits Rectangle {
         }
     }
     Rectangle {
-        x: root.on ? parent.width - 22px * root.zoom : 4px * root.zoom;
-        y: 4px * root.zoom;
-        width: 18px * root.zoom;
-        height: 18px * root.zoom;
-        background: root.on ? Dy.text : Dy.muted;
+        x: root.on ? parent.width - 24px * root.zoom : 6px * root.zoom;
+        y: 6px * root.zoom;
+        width: 16px * root.zoom;
+        height: 16px * root.zoom;
+        background: root.on ? Dy.accent1 : Dy.dim;
     }
 }
 
@@ -237,7 +244,7 @@ export component Swatch inherits Rectangle {
     border-radius: 0px;
     background: root.swatch;
     border-width: max(1px, 2px * root.zoom);
-    border-color: root.on ? Dy.text : Dy.border;
+    border-color: root.on ? Dy.text : Dy.line;
     TouchArea { clicked => { root.clicked(); } }
 }
 
@@ -249,13 +256,13 @@ export component IconBtn inherits Rectangle {
     width: 48px * root.zoom;
     height: 48px * root.zoom;
     border-radius: 0px;
-    border-width: max(1px, 1.5px * root.zoom);
-    border-color: root.primary ? Dy.text : Dy.border;
-    background: root.primary ? Dy.text : Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: root.primary ? Dy.text : Dy.line;
+    background: root.primary ? Dy.text : Dy.bg;
     TouchArea { clicked => { root.clicked(); } }
     Text {
         text: root.glyph;
-        color: root.primary ? Dy.canvas : Dy.text;
+        color: root.primary ? Dy.bg : Dy.text;
         font-size: 18px * root.zoom;
         font-weight: 700;
         font-family: Dy.mono;
@@ -270,9 +277,9 @@ export component PowerAction inherits Rectangle {
     in property <bool> enabled: true;
     callback clicked;
     border-radius: 0px;
-    border-width: 1.5px;
-    border-color: Dy.border-hi;
-    background: Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: Dy.dim;
+    background: Dy.bg;
     height: 56px;
     horizontal-stretch: 1;
     opacity: root.enabled ? 1 : 0.35;
@@ -312,9 +319,9 @@ export component HitBtn inherits Rectangle {
     min-width: 140px;
     min-height: 72px;
     border-radius: 0px;
-    border-width: 1.5px;
-    border-color: Dy.border-hi;
-    background: Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: Dy.dim;
+    background: Dy.bg;
     TouchArea { clicked => { root.clicked(); } }
     VerticalLayout {
         padding: 12px;
@@ -322,7 +329,7 @@ export component HitBtn inherits Rectangle {
         alignment: center;
         if root.kicker != "": Text {
             text: root.kicker;
-            color: Dy.muted;
+            color: Dy.dim;
             font-size: 11px;
             font-family: Dy.mono;
             horizontal-alignment: center;
@@ -350,7 +357,7 @@ export component FieldTap inherits Rectangle {
     callback tapped;
     height: root.tap-height;
     border-width: 0px;
-    background: Dy.canvas;
+    background: Dy.bg;
     TouchArea {
         enabled: !root.locked;
         clicked => { root.tapped(); }
@@ -362,10 +369,10 @@ export component FieldTap inherits Rectangle {
             padding-right: 0px;
             alignment: center;
             horizontal-stretch: 1;
-            Text { text: root.label; color: Dy.muted; font-size: root.label-size; font-family: Dy.mono; }
+            Text { text: root.label; color: Dy.dim; font-size: root.label-size; font-family: Dy.mono; }
             Rectangle {
                 height: 1.5px;
-                background: root.active ? Dy.text : Dy.border;
+                background: root.active ? Dy.text : Dy.line;
             }
             Text {
                 text: root.value == "" ? "Tap to type" : root.value;
@@ -398,9 +405,9 @@ export component RoutineCard inherits Rectangle {
     callback duplicate;
     callback toggle-enabled;
     callback delete;
-    border-width: 1.5px;
-    border-color: Dy.border;
-    background: Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: Dy.line;
+    background: Dy.bg;
     VerticalLayout {
         padding: 10px;
         spacing: 8px;
@@ -409,7 +416,7 @@ export component RoutineCard inherits Rectangle {
             height: 44px;
             Text {
                 text: root.item.status;
-                color: Dy.muted;
+                color: Dy.dim;
                 font-size: 13px;
                 font-family: Dy.mono;
                 vertical-alignment: center;
@@ -488,9 +495,9 @@ export component KeyBtn inherits Rectangle {
     min-height: Dy.hit-target;
     horizontal-stretch: root.u;
     vertical-stretch: 1;
-    border-width: 1.5px;
-    border-color: (root.on || ta.pressed) ? Dy.text : Dy.border;
-    background: (root.on || ta.pressed) ? #141414 : Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: (root.on || ta.pressed) ? Dy.text : Dy.line;
+    background: (root.on || ta.pressed) ? Dy.panel : Dy.bg;
     ta := TouchArea { clicked => { root.clicked(); } }
     out property <bool> down: ta.pressed;
     if root.has-icon: Image {
@@ -514,25 +521,37 @@ export component KeyBtn inherits Rectangle {
         x: 4px;
         y: 3px;
         text: root.sub;
-        color: Dy.dim;
+        color: Dy.line;
         font-size: Dy.type-dense;
         font-family: Dy.mono;
     }
 }
 
+// Segmented level bar: whole segments only, filled = fill, empty = line.
+// With `interactive`, a tap or drag picks the level (0..100) via `changed`.
 export component Bar inherits Rectangle {
     in property <float> level;
-    in property <color> fill: #ffffff;
+    in property <color> fill: Dy.accent1;
     in property <float> zoom: 1.0;
-    height: max(1px, 3px * root.zoom);
-    border-radius: 0px;
-    background: #1a1a1a;
-    border-width: 0px;
-    Rectangle {
-        width: parent.width * clamp(root.level, 0, 1);
-        height: 100%;
-        border-radius: 0px;
-        background: root.fill;
+    in property <int> segments: 10;
+    in property <bool> interactive: false;
+    callback changed(int);
+    property <int> lit: round(clamp(root.level, 0, 1) * root.segments);
+    property <length> seg-gap: 3px;
+    property <length> seg-w: (root.width - root.seg-gap * (root.segments - 1)) / root.segments;
+    height: root.interactive ? 28px * root.zoom : 8px * root.zoom;
+    background: transparent;
+    for i in root.segments: Rectangle {
+        x: i * (root.seg-w + root.seg-gap);
+        width: root.seg-w;
+        background: i < root.lit ? root.fill : Dy.line;
+    }
+    if root.interactive: TouchArea {
+        function pick() {
+            root.changed(round(clamp(self.mouse-x / root.width, 0, 1) * root.segments) * 100 / root.segments);
+        }
+        pointer-event(ev) => { if ev.kind == PointerEventKind.down { self.pick(); } }
+        moved => { if self.pressed { self.pick(); } }
     }
 }
 
@@ -542,9 +561,9 @@ export component QuickTask inherits Rectangle {
     in property <bool> on: false;
     in property <float> zoom: 1.0;
     callback clicked;
-    border-width: max(1px, 1.5px * root.zoom);
-    border-color: root.on ? Dy.text : Dy.border;
-    background: Dy.canvas;
+    border-width: Dy.stroke;
+    border-color: root.on ? Dy.accent1 : Dy.line;
+    background: Dy.bg;
     clip: true;
     TouchArea { clicked => { root.clicked(); } }
     VerticalLayout {
@@ -581,24 +600,24 @@ export component NetGlyph inherits Rectangle {
 
     if root.kind == "ethernet": Rectangle {
         background: transparent;
-        Rectangle { x: 10px * root.zoom; y: 2px * root.zoom; width: 8px * root.zoom; height: 6px * root.zoom; background: #ffffff; }
-        Rectangle { x: 4px * root.zoom; y: 8px * root.zoom; width: 20px * root.zoom; height: 3px * root.zoom; background: #ffffff; }
-        Rectangle { x: 6px * root.zoom; y: 11px * root.zoom; width: 3px * root.zoom; height: 8px * root.zoom; background: #ffffff; }
-        Rectangle { x: 12.5px * root.zoom; y: 11px * root.zoom; width: 3px * root.zoom; height: 8px * root.zoom; background: #ffffff; }
-        Rectangle { x: 19px * root.zoom; y: 11px * root.zoom; width: 3px * root.zoom; height: 8px * root.zoom; background: #ffffff; }
+        Rectangle { x: 10px * root.zoom; y: 2px * root.zoom; width: 8px * root.zoom; height: 6px * root.zoom; background: Dy.text; }
+        Rectangle { x: 4px * root.zoom; y: 8px * root.zoom; width: 20px * root.zoom; height: 3px * root.zoom; background: Dy.text; }
+        Rectangle { x: 6px * root.zoom; y: 11px * root.zoom; width: 3px * root.zoom; height: 8px * root.zoom; background: Dy.text; }
+        Rectangle { x: 12.5px * root.zoom; y: 11px * root.zoom; width: 3px * root.zoom; height: 8px * root.zoom; background: Dy.text; }
+        Rectangle { x: 19px * root.zoom; y: 11px * root.zoom; width: 3px * root.zoom; height: 8px * root.zoom; background: Dy.text; }
     }
 
     if root.kind != "ethernet": Rectangle {
         background: transparent;
-        Rectangle { x: 2px * root.zoom; y: 16px * root.zoom; width: 5px * root.zoom; height: 4px * root.zoom; background: root.bars >= 1 ? #ffffff : #3a3a3a; }
-        Rectangle { x: 8px * root.zoom; y: 12px * root.zoom; width: 5px * root.zoom; height: 8px * root.zoom; background: root.bars >= 2 ? #ffffff : #3a3a3a; }
-        Rectangle { x: 14px * root.zoom; y: 7px * root.zoom; width: 5px * root.zoom; height: 13px * root.zoom; background: root.bars >= 3 ? #ffffff : #3a3a3a; }
-        Rectangle { x: 20px * root.zoom; y: 2px * root.zoom; width: 5px * root.zoom; height: 18px * root.zoom; background: root.bars >= 4 ? #ffffff : #3a3a3a; }
+        Rectangle { x: 2px * root.zoom; y: 16px * root.zoom; width: 5px * root.zoom; height: 4px * root.zoom; background: root.bars >= 1 ? Dy.text : Dy.line; }
+        Rectangle { x: 8px * root.zoom; y: 12px * root.zoom; width: 5px * root.zoom; height: 8px * root.zoom; background: root.bars >= 2 ? Dy.text : Dy.line; }
+        Rectangle { x: 14px * root.zoom; y: 7px * root.zoom; width: 5px * root.zoom; height: 13px * root.zoom; background: root.bars >= 3 ? Dy.text : Dy.line; }
+        Rectangle { x: 20px * root.zoom; y: 2px * root.zoom; width: 5px * root.zoom; height: 18px * root.zoom; background: root.bars >= 4 ? Dy.text : Dy.line; }
         if root.bars <= 0: Text {
             x: 14px * root.zoom;
             y: 8px * root.zoom;
             text: "×";
-            color: #ffffff;
+            color: Dy.text;
             font-size: 14px * root.zoom;
             font-weight: 700;
             font-family: Dy.mono;
@@ -615,16 +634,16 @@ export component ConfirmSheet inherits Rectangle {
     in property <length> box-height: 400px;
     callback accept;
     callback dismiss;
-    background: #000000cc;
+    background: Dy.bg.with-alpha(0.8);
     TouchArea { clicked => { root.dismiss(); } }
     Rectangle {
         x: parent.width * 0.18;
         y: parent.height * 0.18;
         width: parent.width * 0.64;
         height: root.box-height;
-        background: #000000;
-        border-width: 1.5px;
-        border-color: Dy.border-hi;
+        background: Dy.bg;
+        border-width: Dy.stroke;
+        border-color: Dy.dim;
         TouchArea { clicked => { } }
         VerticalLayout {
             padding: 28px;
@@ -638,7 +657,7 @@ export component ConfirmSheet inherits Rectangle {
             }
             Text {
                 text: root.body;
-                color: Dy.muted;
+                color: Dy.dim;
                 font-size: 14px;
                 font-family: Dy.mono;
                 wrap: word-wrap;
@@ -661,7 +680,7 @@ export component WidgetRemoveBtn inherits Rectangle {
     property <bool> fired: false;
     width: 40px;
     height: 40px;
-    background: #ffffff;
+    background: Dy.text;
     border-radius: 0px;
     border-width: 0px;
     clip: false;
@@ -704,7 +723,7 @@ export component WidgetRemoveBtn inherits Rectangle {
         viewbox-width: 40;
         viewbox-height: 40;
         fill: transparent;
-        stroke: #000000;
+        stroke: Dy.bg;
         stroke-width: 4px;
         commands: "M 10 10 L 30 30 M 30 10 L 10 30";
     }
@@ -764,10 +783,10 @@ export component TileShell inherits Rectangle {
         width: parent.width;
         height: parent.height;
         opacity: root.ghost ? 0 : 1;
-        background: Dy.canvas;
+        background: Dy.panel;
         border-radius: 0px;
-        border-width: root.show-border ? 1.5px : 0px;
-        border-color: root.pending ? #ffffff : Dy.border;
+        border-width: root.show-border ? Dy.stroke : 0px;
+        border-color: root.pending ? Dy.accent3 : Dy.line;
         clip: true;
         VerticalLayout {
             padding: Dy.pad;
@@ -783,14 +802,14 @@ export component TileShell inherits Rectangle {
         y: root.vis-y - 20px;
         width: 40px;
         height: 40px;
-        background: #ffffff;
+        background: Dy.text;
         border-radius: 0px;
         border-width: 0px;
         Text {
             width: 100%;
             height: 100%;
             text: "×";
-            color: #000000;
+            color: Dy.bg;
             font-size: 28px;
             font-weight: 700;
             font-family: Dy.mono;
@@ -806,28 +825,42 @@ export component TileShell inherits Rectangle {
     }
 }
 
-export component VolumeGlyph inherits Rectangle {
-    in property <float> zoom: 1.0;
-    width: 28px * root.zoom;
-    height: 22px * root.zoom;
+export struct Px { x: float, y: float }
+
+// 8x8 bitmap icon (spec rule 5). Scale by whole numbers only: 2 inline, 4 in tiles.
+export component PixIcon inherits Rectangle {
+    in property <string> name;
+    in property <int> scale: 2;
+    in property <color> fill: Dy.text;
+    width: 8px * root.scale;
+    height: 8px * root.scale;
     background: transparent;
-    Rectangle { x: 2px * root.zoom; y: 8px * root.zoom; width: 6px * root.zoom; height: 6px * root.zoom; background: #ffffff; }
-    Rectangle { x: 8px * root.zoom; y: 4px * root.zoom; width: 4px * root.zoom; height: 14px * root.zoom; background: #ffffff; }
-    Rectangle { x: 14px * root.zoom; y: 6px * root.zoom; width: 2px * root.zoom; height: 10px * root.zoom; background: #ffffff; }
-    Rectangle { x: 18px * root.zoom; y: 3px * root.zoom; width: 2px * root.zoom; height: 16px * root.zoom; background: #ffffff; }
-    Rectangle { x: 22px * root.zoom; y: 0px * root.zoom; width: 2px * root.zoom; height: 22px * root.zoom; background: #ffffff; }
+    property <[Px]> sun: [{x:3,y:0},{x:0,y:1},{x:3,y:1},{x:6,y:1},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:0,y:3},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3},{x:7,y:3},{x:0,y:4},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:5,y:4},{x:6,y:4},{x:1,y:5},{x:2,y:5},{x:3,y:5},{x:4,y:5},{x:5,y:5},{x:0,y:6},{x:3,y:6},{x:6,y:6},{x:3,y:7}];
+    property <[Px]> bulb: [{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:5,y:0},{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:4,y:1},{x:5,y:1},{x:6,y:1},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:6,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3},{x:6,y:3},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:5,y:4},{x:2,y:5},{x:5,y:5},{x:2,y:6},{x:3,y:6},{x:4,y:6},{x:5,y:6},{x:3,y:7},{x:4,y:7}];
+    property <[Px]> vol: [{x:3,y:0},{x:2,y:1},{x:3,y:1},{x:6,y:1},{x:0,y:2},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:5,y:2},{x:0,y:3},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:5,y:3},{x:7,y:3},{x:0,y:4},{x:1,y:4},{x:2,y:4},{x:3,y:4},{x:5,y:4},{x:7,y:4},{x:2,y:5},{x:3,y:5},{x:5,y:5},{x:3,y:6},{x:6,y:6}];
+    property <[Px]> px: root.name == "sun" ? root.sun : root.name == "bulb" ? root.bulb : root.vol;
+    for p in root.px: Rectangle {
+        x: p.x * root.scale * 1px;
+        y: p.y * root.scale * 1px;
+        width: root.scale * 1px;
+        height: root.scale * 1px;
+        background: root.fill;
+    }
 }
 
+// Judie's mark. The five rectangles are fixed (160x120 design box); keep the
+// lopsided legs exactly. Set `width` only; height follows at 3:4.
 export component PiMark inherits Rectangle {
+    in property <color> fill: Dy.text;
     width: 64px;
-    height: 48px;
+    height: self.width * 0.75;
     background: transparent;
-    property <float> s: 64.0 / 160.0;
-    Rectangle { x: 6px * root.s; y: 18px * root.s; width: 148px * root.s; height: 14px * root.s; background: #ffffff; }
-    Rectangle { x: 6px * root.s; y: 18px * root.s; width: 14px * root.s; height: 40px * root.s; background: #ffffff; }
-    Rectangle { x: 144px * root.s; y: 18px * root.s; width: 10px * root.s; height: 26px * root.s; background: #ffffff; }
-    Rectangle { x: 52px * root.s; y: 18px * root.s; width: 22px * root.s; height: 92px * root.s; background: #ffffff; }
-    Rectangle { x: 102px * root.s; y: 18px * root.s; width: 12px * root.s; height: 76px * root.s; background: #ffffff; }
+    property <float> s: self.width / 160px;
+    Rectangle { x: 6px * root.s; y: 18px * root.s; width: 148px * root.s; height: 14px * root.s; background: root.fill; }
+    Rectangle { x: 6px * root.s; y: 18px * root.s; width: 14px * root.s; height: 40px * root.s; background: root.fill; }
+    Rectangle { x: 144px * root.s; y: 18px * root.s; width: 10px * root.s; height: 26px * root.s; background: root.fill; }
+    Rectangle { x: 52px * root.s; y: 18px * root.s; width: 22px * root.s; height: 92px * root.s; background: root.fill; }
+    Rectangle { x: 102px * root.s; y: 18px * root.s; width: 12px * root.s; height: 76px * root.s; background: root.fill; }
 }
 
 export struct ScreenOffChoice {

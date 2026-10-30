@@ -6,7 +6,7 @@ export component DesignWindow inherits Window {
     title: "Judie widget designer";
     preferred-width: 1400px;
     preferred-height: 900px;
-    background: #000000;
+    background: Dy.bg;
     no-frame: false;
 
     in-out property <string> kind: "custom";
@@ -63,35 +63,35 @@ export component DesignWindow inherits Window {
         VerticalLayout {
             width: 180px;
             spacing: 8px;
-            Text { text: "Widget"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            Text { text: "Widget"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
             for k in root.face-kinds: TouchArea {
                 clicked => { root.set-kind(k.id); }
                 height: 28px;
                 Text {
                     text: k.label;
-                    color: root.kind == k.id ? #ffffff : #8a8a8a;
+                    color: root.kind == k.id ? Dy.text : Dy.dim;
                     font-size: 13px;
                     font-family: Dy.mono;
                     vertical-alignment: center;
                 }
             }
-            Text { text: "Size"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            Text { text: "Size"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
             Pill { label: "1×1"; on: root.size == "1x1"; clicked => { root.set-size("1x1"); } }
             Pill { label: "1×2"; on: root.size == "1x2"; clicked => { root.set-size("1x2"); } }
             Pill { label: "2×2"; on: root.size == "2x2"; clicked => { root.set-size("2x2"); } }
-            Text { text: "Parts"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            Text { text: "Parts"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
             for p in root.kinds: TouchArea {
                 clicked => { root.add-part(p.id); }
                 height: 28px;
-                Text { text: p.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+                Text { text: p.label; color: Dy.text; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
             }
         }
 
         Rectangle {
             horizontal-stretch: 1;
-            background: #0a0a0a;
-            border-width: 1.5px;
-            border-color: #2a2a2a;
+            background: Dy.panel;
+            border-width: Dy.stroke;
+            border-color: Dy.line;
             DesignerStage {
                 x: max(0px, (parent.width - self.width) / 2);
                 y: max(0px, (parent.height - self.height) / 2);
@@ -108,19 +108,19 @@ export component DesignWindow inherits Window {
         VerticalLayout {
             width: 260px;
             spacing: 10px;
-            Text { text: "Save"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            Text { text: "Save"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
             LineEdit { text <=> root.widget-name; edited => { root.name-changed(self.text); } }
             HorizontalLayout {
                 spacing: 8px;
                 Pill { label: "Save"; on: true; clicked => { root.save(); } }
                 Pill { label: "Reload"; clicked => { root.load(); } }
             }
-            Text { text: root.path-text; color: #6a6a6a; font-size: 11px; font-family: Dy.mono; wrap: word-wrap; }
-            Text { text: root.status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
-            Text { text: "Selected"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+            Text { text: root.path-text; color: Dy.dim; font-size: 11px; font-family: Dy.mono; wrap: word-wrap; }
+            Text { text: root.status; color: Dy.dim; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+            Text { text: "Selected"; color: Dy.dim; font-size: 12px; font-family: Dy.mono; }
             Text {
                 text: root.selected == "" ? "Click a part" : root.selected-kind;
-                color: #ffffff;
+                color: Dy.text;
                 font-size: 14px;
                 font-family: Dy.mono;
                 wrap: word-wrap;
@@ -129,7 +129,7 @@ export component DesignWindow inherits Window {
             Pill { label: "Remove part"; clicked => { root.delete-node(); } }
             Text {
                 text: "Stage is the Debian tile: 240/480, 12px pad, same WidgetFace percents. Drag to move, white square to resize.";
-                color: #6a6a6a;
+                color: Dy.dim;
                 font-size: 11px;
                 font-family: Dy.mono;
                 wrap: word-wrap;

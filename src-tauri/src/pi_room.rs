@@ -195,6 +195,10 @@ struct Persist {
     display_scale: Option<i32>,
     #[serde(default)]
     display_native: String,
+    #[serde(default)]
+    theme: String,
+    #[serde(default)]
+    reduced_motion: Option<bool>,
 }
 
 pub const GRID_COLS: i32 = 6;
@@ -296,6 +300,14 @@ pub const SCREEN_OFF_OPTIONS: &[(&str, i32)] = &[
     ("5 hours", 18000),
     ("Never", 0),
 ];
+
+/// Theme names as stored in layout.json; the index is `Dy.theme` in cards.slint.
+pub const THEMES: [&str; 4] = ["dusk", "amber", "pocket", "paper"];
+
+/// Unknown or missing names fall back to Dusk, the default.
+pub fn theme_index(name: &str) -> i32 {
+    THEMES.iter().position(|t| *t == name).unwrap_or(0) as i32
+}
 
 pub fn screen_off_label(secs: i32) -> &'static str {
     SCREEN_OFF_OPTIONS
@@ -547,6 +559,8 @@ fn save_persist(room: &Room) {
         hit_target: Some(room.hit_target),
         display_scale: Some(room.display_scale),
         display_native: room.display_native.clone(),
+        theme: room.theme.clone(),
+        reduced_motion: room.reduced_motion,
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
         let _ = std::fs::write(persist_path(), json);
@@ -1014,6 +1028,9 @@ pub struct Room {
     pub gallery_border: bool,
     pub display_scale: i32,
     pub display_native: String,
+    pub theme: String,
+    /// None until the user picks; startup then follows JUDIE_REDUCED_MOTION.
+    pub reduced_motion: Option<bool>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -1205,6 +1222,8 @@ impl Default for Room {
                 _ => 100,
             },
             display_native: persist.display_native,
+            theme: THEMES[theme_index(&persist.theme) as usize].to_string(),
+            reduced_motion: persist.reduced_motion,
         };
         let preset = migrate_units_preset(&persist.temp_unit, &persist.distance_unit);
         room.apply_units_preset(preset);
@@ -1289,6 +1308,11 @@ impl Room {
 
     pub fn set_display_scale(&mut self, scale: i32) {
         self.display_scale = if scale == 50 { 50 } else { 100 };
+        self.persist();
+    }
+
+    pub fn set_theme(&mut self, index: i32) {
+        self.theme = THEMES.get(index.max(0) as usize).unwrap_or(&THEMES[0]).to_string();
         self.persist();
     }
 
@@ -2608,6 +2632,23 @@ mod tests {
             None => unsafe { std::env::remove_var("JUDIE_DATA_DIR"); }
         }
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn theme_and_reduced_motion_persist() {
+        assert_eq!(theme_index("paper"), 3);
+        assert_eq!(theme_index("neon"), 0);
+        with_temp_room(|room| {
+            assert_eq!(room.theme, "dusk");
+            room.set_theme(9);
+            assert_eq!(room.theme, "dusk");
+            room.set_theme(3);
+            room.reduced_motion = Some(true);
+            room.save();
+            let p = load_persist();
+            assert_eq!(p.theme, "paper");
+            assert_eq!(p.reduced_motion, Some(true));
+        });
     }
 
     #[test]
