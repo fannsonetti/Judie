@@ -12,6 +12,8 @@ mod pi_ctl;
 mod widget_preview;
 #[path = "../releases.rs"]
 mod releases;
+#[path = "../philips.rs"]
+mod philips;
 
 slint::include_modules!();
 
@@ -673,6 +675,41 @@ fn dispatch_terminal(ui: &MainWindow) {
                 push_ui(&ui);
             }
         });
+    });
+}
+
+static PURIFIER_IP: Mutex<Option<String>> = Mutex::new(None);
+
+/// Find the Philips purifier on the LAN and mirror its pushed state into the
+/// room; the 1s tick puts the room on screen. Rediscovers if it goes quiet.
+fn start_purifier() {
+    std::thread::spawn(|| loop {
+        if let Some(ip) = philips::discover() {
+            *PURIFIER_IP.lock().unwrap() = Some(ip.clone());
+            philips::watch(&ip, |s| {
+                pi_room::with(|room| {
+                    room.purifier_on = s.on;
+                    room.purifier_mode = s.mode.into();
+                    room.purifier_aq = s.aq.into();
+                    room.purifier_filter = s.filter;
+                });
+            });
+            *PURIFIER_IP.lock().unwrap() = None;
+        }
+        std::thread::sleep(Duration::from_secs(30));
+    });
+}
+
+/// Send the room purifier state to the device, off the UI thread.
+fn sync_purifier(power_only: bool) {
+    let Some(ip) = PURIFIER_IP.lock().unwrap().clone() else { return };
+    let (on, mode) = pi_room::with(|room| (room.purifier_on, room.purifier_mode.clone()));
+    std::thread::spawn(move || {
+        if power_only || !on {
+            philips::set_power(&ip, on);
+        } else {
+            philips::set_mode(&ip, &mode);
+        }
     });
 }
 
@@ -1672,11 +1709,13 @@ fn bind(ui: &MainWindow) {
     let r = refresh.clone();
     ui.on_toggle_purifier(move || {
         pi_room::with(|room| room.toggle_purifier());
+        sync_purifier(true);
         r();
     });
     let r = refresh.clone();
     ui.on_cycle_purifier(move || {
         pi_room::with(|room| room.cycle_purifier_mode());
+        sync_purifier(false);
         r();
     });
     let r = refresh.clone();
@@ -1987,6 +2026,7 @@ fn bind(ui: &MainWindow) {
     let r = refresh.clone();
     ui.on_set_purifier_mode(move |m| {
         pi_room::with(|room| room.set_purifier_mode(m.as_str()));
+        sync_purifier(false);
         r();
     });
     let r = refresh.clone();
@@ -2760,6 +2800,7 @@ fn main() {
     push_ui(&ui);
     load_link(&ui);
     poll_latest(ui.as_weak());
+    start_purifier();
 
     ui.set_display_lowres(display_lowres());
     // After a switch to 960x600, revert unless Keep is tapped: the panel may

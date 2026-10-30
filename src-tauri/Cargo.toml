@@ -1,6 +1,6 @@
 [package]
 name = "judie"
-version = "0.3.10"
+version = "0.3.11"
 description = "Judie room control"
 authors = ["Judie"]
 edition = "2021"
@@ -41,7 +41,7 @@ tauri-ui = [
     "dep:tauri-plugin-updater",
     "dep:webkit2gtk",
 ]
-pi-native = ["dep:slint", "dep:chrono", "dep:slint-build"]
+pi-native = ["dep:slint", "dep:chrono", "dep:slint-build", "dep:aes", "dep:cbc", "dep:md-5", "dep:sha2"]
 
 [dependencies]
 tauri = { version = "2", optional = true, features = [] }
@@ -55,6 +55,10 @@ sysinfo = "0.33"
 ureq = { version = "2.12", features = ["json"] }
 slint = { version = "1.9", optional = true, default-features = false, features = ["compat-1-2", "std", "renderer-software", "backend-winit"] }
 chrono = { version = "0.4", optional = true, default-features = false, features = ["clock", "std"] }
+aes = { version = "0.8", optional = true }
+cbc = { version = "0.1", optional = true, features = ["alloc"] }
+md-5 = { version = "0.10", optional = true }
+sha2 = { version = "0.10", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 tauri-plugin-updater = { version = "2", optional = true }
