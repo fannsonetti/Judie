@@ -9,6 +9,9 @@ import { WidgetPreview } from "preview.slint";
 import { DesignerStage } from "designer.slint";
 export { DesignWindow } from "design.slint";
 
+// One filled square on the Tetris / Snake board.
+export struct ArcadeCell { col: int, row: int, c: int }
+
 export component MainWindow inherits Window {
     title: "Judie";
     preferred-width: 960px;
@@ -76,6 +79,19 @@ export component MainWindow inherits Window {
     in-out property <int> pong-rs: 0;
     in-out property <int> pong-mode: 0;
     in-out property <bool> pong-running: false;
+    // Arcade page: 0 Pong, 1 Tetris, 2 Snake.
+    in-out property <int> arcade-game: 0;
+    in-out property <[ArcadeCell]> arcade-cells: [];
+    in-out property <[ArcadeCell]> arcade-next: [];
+    in-out property <int> arcade-cols: 10;
+    in-out property <int> arcade-rows: 20;
+    in-out property <int> arcade-score: 0;
+    in-out property <int> arcade-lines: 0;
+    in-out property <bool> arcade-running: false;
+    in-out property <bool> arcade-over: false;
+    in-out property <bool> arcade-pairing: false;
+    in-out property <string> arcade-note: "";
+    in-out property <string> pad-status: "No pad";
     in-out property <string> rail-active: "home";
     in-out property <float> media-progress: 0.2;
 
@@ -257,6 +273,10 @@ export component MainWindow inherits Window {
     callback pong-move(int, float);
     callback pong-nudge(int, float);
     callback pong-start();
+    callback arcade-select(int);
+    // 0 left, 1 right, 2 up/rotate, 3 down, 4 A, 5 B/drop, 6 start
+    callback arcade-key(int);
+    callback arcade-pair();
     callback quick(string);
     callback toggle-purifier();
     callback cycle-purifier();
@@ -561,7 +581,7 @@ export component MainWindow inherits Window {
                 width: parent.width / 3 - root.pad * 2;
                 spacing: 10px;
                 alignment: start;
-                VerticalLayout {
+                if !root.sidebar: VerticalLayout {
                     alignment: center;
                     PiMark { width: 40px; }
                 }
@@ -2258,11 +2278,32 @@ export component MainWindow inherits Window {
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
         background: Dy.bg;
+        // Missed taps between the game buttons must not reach the home tiles underneath.
+        TouchArea { }
         VerticalLayout {
             padding: root.pad;
             padding-top: 0px;
             spacing: Dy.gap;
             HorizontalLayout {
+                spacing: 8px;
+                Seg {
+                    width: 300px;
+                    SegBtn { label: "Pong"; on: root.arcade-game == 0; clicked => { root.arcade-game = 0; root.arcade-select(0); } }
+                    SegBtn { label: "Tetris"; on: root.arcade-game == 1; clicked => { root.arcade-game = 1; root.arcade-select(1); } }
+                    SegBtn { label: "Snake"; on: root.arcade-game == 2; clicked => { root.arcade-game = 2; root.arcade-select(2); } }
+                }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: root.pad-status; color: Dy.dim; font-size: Dy.type-control; font-family: Dy.caps; vertical-alignment: center; }
+                Pill { label: root.arcade-pairing ? "Pairing" : "Pair pad"; min-width: 96px; clicked => { root.arcade-pair(); } }
+                Pill {
+                    label: (root.arcade-game == 0 ? root.pong-running : root.arcade-running) ? "Reset" : "Start";
+                    on: true;
+                    min-width: 96px;
+                    clicked => { if root.arcade-game == 0 { root.pong-start(); } else { root.arcade-key(6); } }
+                }
+            }
+            if root.arcade-note != "": Text { text: root.arcade-note; color: Dy.dim; font-size: Dy.type-control; font-family: Dy.caps; wrap: word-wrap; }
+            if root.arcade-game == 0: HorizontalLayout {
                 spacing: 4px;
                 Text { text: root.pong-ls; color: Dy.accent1; font-size: Dy.type-hero; font-family: Dy.caps; vertical-alignment: center; min-width: 40px; }
                 Seg {
@@ -2273,20 +2314,91 @@ export component MainWindow inherits Window {
                     SegBtn { label: "2P"; on: root.pong-mode == 3; clicked => { root.set-pong-mode(3); } }
                 }
                 Rectangle { horizontal-stretch: 1; }
-                Pill { label: root.pong-running ? "Reset" : "Start"; on: true; min-width: 96px; clicked => { root.pong-start(); } }
                 Text { text: root.pong-rs; color: Dy.accent1; font-size: Dy.type-hero; font-family: Dy.caps; vertical-alignment: center; horizontal-alignment: right; min-width: 40px; }
             }
-            pong-keys := FocusScope {
+            arcade-keys := FocusScope {
                 height: 0px;
+                init => { self.focus(); }
                 key-pressed(event) => {
-                    if event.text == "w" || event.text == "W" { root.pong-nudge(0, -0.05); return accept; }
-                    if event.text == "s" || event.text == "S" { root.pong-nudge(0, 0.05); return accept; }
-                    if event.text == Key.UpArrow { root.pong-nudge(1, -0.05); return accept; }
-                    if event.text == Key.DownArrow { root.pong-nudge(1, 0.05); return accept; }
+                    if root.arcade-game == 0 {
+                        if event.text == "w" || event.text == "W" { root.pong-nudge(0, -0.05); return accept; }
+                        if event.text == "s" || event.text == "S" { root.pong-nudge(0, 0.05); return accept; }
+                        if event.text == Key.UpArrow { root.pong-nudge(1, -0.05); return accept; }
+                        if event.text == Key.DownArrow { root.pong-nudge(1, 0.05); return accept; }
+                        return reject;
+                    }
+                    if event.text == Key.LeftArrow { root.arcade-key(0); return accept; }
+                    if event.text == Key.RightArrow { root.arcade-key(1); return accept; }
+                    if event.text == Key.UpArrow { root.arcade-key(2); return accept; }
+                    if event.text == Key.DownArrow { root.arcade-key(3); return accept; }
+                    if event.text == " " { root.arcade-key(5); return accept; }
+                    if event.text == Key.Return { root.arcade-key(6); return accept; }
                     return reject;
                 }
             }
-            Rectangle {
+            if root.arcade-game != 0: HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: Dy.gap;
+                board := Rectangle {
+                    horizontal-stretch: 1;
+                    min-height: 200px;
+                    property <length> cs: floor(min(self.width / root.arcade-cols, self.height / root.arcade-rows) / 1px) * 1px;
+                    // Tetris pieces I J L O S T Z, then snake body, head, food.
+                    property <[color]> pal: [#00000000, #5fe3cf, #4d7cff, #ff9a3a, #ffe14d, #6be36b, #b36bff, #ff5f5f, Dy.accent2, Dy.accent1, Dy.accent3];
+                    Rectangle {
+                        width: board.cs * root.arcade-cols;
+                        height: board.cs * root.arcade-rows;
+                        background: Dy.panel;
+                        border-width: 1px;
+                        border-color: Dy.line;
+                        for c in root.arcade-cells: Rectangle {
+                            x: c.col * board.cs + 1px;
+                            y: c.row * board.cs + 1px;
+                            width: board.cs - 2px;
+                            height: board.cs - 2px;
+                            background: board.pal[c.c];
+                        }
+                        if root.arcade-over || !root.arcade-running: Text {
+                            text: root.arcade-over ? "Game over" : "Press start";
+                            color: Dy.text;
+                            font-size: Dy.type-hero;
+                            font-family: Dy.caps;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    width: 200px;
+                    spacing: Dy.gap;
+                    Text { text: "Score"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
+                    Text { text: root.arcade-score; color: Dy.accent1; font-size: Dy.type-hero; font-family: Dy.caps; }
+                    if root.arcade-game == 1: Text { text: "Lines \{root.arcade-lines}"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
+                    if root.arcade-game == 1: Rectangle {
+                        height: 4 * 14px;
+                        for c in root.arcade-next: Rectangle {
+                            x: c.col * 14px;
+                            y: c.row * 14px;
+                            width: 12px;
+                            height: 12px;
+                            background: board.pal[c.c];
+                        }
+                    }
+                    Rectangle { vertical-stretch: 1; }
+                    // Touch controls; a pad or the arrow keys do the same.
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: center;
+                        Pill { label: root.arcade-game == 1 ? "Rot" : "^"; zoom: 1.6; width: 60px; clicked => { root.arcade-key(2); } }
+                    }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Pill { label: "<"; zoom: 1.6; horizontal-stretch: 1; clicked => { root.arcade-key(0); } }
+                        Pill { label: "v"; zoom: 1.6; horizontal-stretch: 1; clicked => { root.arcade-key(3); } }
+                        Pill { label: ">"; zoom: 1.6; horizontal-stretch: 1; clicked => { root.arcade-key(1); } }
+                    }
+                    if root.arcade-game == 1: Pill { label: "Drop"; zoom: 1.6; clicked => { root.arcade-key(5); } }
+                }
+            }
+            if root.arcade-game == 0: Rectangle {
                 vertical-stretch: 1;
                 min-height: 200px;
             court := TouchArea {
@@ -2469,7 +2581,7 @@ export component MainWindow inherits Window {
                 spacing: 10px;
                 alignment: start;
                 VerticalLayout { alignment: center; PiMark { width: 40px; } }
-                Text { text: "Judie"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                Text { text: "PiPanel"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
             }
             Flickable {
                 vertical-stretch: 1;
@@ -2480,7 +2592,7 @@ export component MainWindow inherits Window {
                     for t in [
                         { id: "", label: "Home" }, { id: "lights", label: "Lights" }, { id: "climate", label: "Climate" },
                         { id: "calendar", label: "Calendar" }, { id: "weather", label: "Weather" }, { id: "media", label: "Media" },
-                        { id: "purifier", label: "Purifier" }, { id: "terminal", label: "Terminal" }, { id: "pong", label: "Pong" },
+                        { id: "purifier", label: "Purifier" }, { id: "terminal", label: "Terminal" }, { id: "pong", label: "Arcade" },
                         { id: "settings", label: "Settings" },
                     ]: rail-tab := TouchArea {
                         property <bool> on: t.id == "settings" ? root.settings-page : (root.expanded == t.id && !root.settings-page);
@@ -2766,7 +2878,7 @@ export component MainWindow inherits Window {
             alignment: center;
             spacing: 12px;
             HorizontalLayout { alignment: center; PiMark { width: 96px; } }
-            Text { text: "Judie"; color: Dy.text; font-size: Dy.type-hero; font-family: "Press Start 2P"; horizontal-alignment: center; }
+            Text { text: "PiPanel"; color: Dy.text; font-size: Dy.type-hero; font-family: "Press Start 2P"; horizontal-alignment: center; }
             HorizontalLayout { alignment: center; Bar { width: 100px; zoom: 1.5; segments: 8; level: root.boot-step / 8; } }
         }
     }

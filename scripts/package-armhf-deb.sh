@@ -54,7 +54,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: sudo, openssl,iw, wpasupplicant, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6, alsa-utils
+Depends: sudo, openssl,iw, wpasupplicant, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, bluez, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6, alsa-utils
 Recommends: mpg123
 Maintainer: Judie <judie@local>
 Description: Judie room control (native Pi kiosk)
@@ -94,7 +94,7 @@ DROP
   else
     rm -f /etc/sudoers.d/judie-update.new
   fi
-  for grp in video input render; do
+  for grp in video input render bluetooth; do
     if getent group "$grp" >/dev/null 2>&1; then
       usermod -aG "$grp" "$KIOSK_USER" 2>/dev/null || true
     fi

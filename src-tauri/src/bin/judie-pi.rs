@@ -14,6 +14,8 @@ mod widget_preview;
 mod releases;
 #[path = "../philips.rs"]
 mod philips;
+#[path = "../arcade.rs"]
+mod arcade;
 
 slint::include_modules!();
 
@@ -219,6 +221,20 @@ impl PongGame {
 }
 
 static PONG: Mutex<PongGame> = Mutex::new(PongGame::new());
+
+/// Tetris and Snake for the Arcade page (game 1 and 2; Pong is game 0).
+struct Arcade {
+    tetris: arcade::Tetris,
+    snake: arcade::Snake,
+    /// Frames each direction has been held on a pad, for auto-repeat.
+    held: [u32; 4],
+}
+
+static ARCADE: Mutex<Arcade> = Mutex::new(Arcade {
+    tetris: arcade::Tetris::new(),
+    snake: arcade::Snake::new(),
+    held: [0; 4],
+});
 static LAST_INPUT: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 static SCREEN_ASLEEP: AtomicBool = AtomicBool::new(false);
 static BEEP_VOL: AtomicU8 = AtomicU8::new(62);
@@ -655,9 +671,111 @@ fn pong_step() {
         let target = g.by + n * jitter / 10.0;
         g.ry += (target - g.ry) * lag;
     }
+    // Pad 1 drives the left paddle, pad 2 the right one in 2P.
+    let stick = |i: usize| {
+        let y = arcade::PAD_Y[i].load(Ordering::Relaxed);
+        if arcade::PAD_ON[i].load(Ordering::Relaxed) && y.abs() > 6000 {
+            y as f32 / 32767.0 * 2.4
+        } else {
+            0.0
+        }
+    };
+    g.ly += stick(0);
+    if g.mode == 3 {
+        g.ry += stick(1);
+    }
     g.ly = g.ly.clamp(8.0, 92.0);
     g.ry = g.ry.clamp(8.0, 92.0);
     g.vy = g.vy.clamp(-2.2, 2.2);
+}
+
+fn pong_start() {
+    if let Ok(mut g) = PONG.lock() {
+        g.running = true;
+        g.bx = 50.0;
+        g.by = 50.0;
+        g.vx = if (g.ls + g.rs) % 2 == 0 { 1.15 } else { -1.15 };
+        g.vy = 0.85;
+        g.ls = 0;
+        g.rs = 0;
+    }
+    play_beep(660, 100);
+}
+
+fn push_pong(ui: &MainWindow) {
+    let pong = PONG.lock().unwrap();
+    ui.set_pong_ly(pong.ly.round() as i32);
+    ui.set_pong_ry(pong.ry.round() as i32);
+    ui.set_pong_bx(pong.bx.round() as i32);
+    ui.set_pong_by(pong.by.round() as i32);
+    ui.set_pong_ls(pong.ls);
+    ui.set_pong_rs(pong.rs);
+    ui.set_pong_mode(pong.mode);
+    ui.set_pong_running(pong.running);
+}
+
+fn arcade_press(game: i32, b: arcade::Btn) {
+    let beep = |f, ms| play_beep(f, ms);
+    match game {
+        0 if matches!(b, arcade::Btn::Start | arcade::Btn::A) => pong_start(),
+        1 => ARCADE.lock().unwrap().tetris.press(b, &beep),
+        2 => ARCADE.lock().unwrap().snake.press(b, &beep),
+        _ => {}
+    }
+}
+
+fn push_arcade(ui: &MainWindow) {
+    let a = ARCADE.lock().unwrap();
+    let cell = |(col, row, c): arcade::Cell| ArcadeCell { col, row, c };
+    let (cells, next, score, running, over, cols, rows) = match ui.get_arcade_game() {
+        1 => (a.tetris.cells(), a.tetris.next_cells(), a.tetris.score, a.tetris.running, a.tetris.over, arcade::T_COLS, arcade::T_ROWS),
+        _ => (a.snake.cells(), vec![], a.snake.score, a.snake.running, a.snake.over, arcade::S_COLS, arcade::S_ROWS),
+    };
+    ui.set_arcade_cells(ModelRc::new(VecModel::from(cells.into_iter().map(cell).collect::<Vec<_>>())));
+    ui.set_arcade_next(ModelRc::new(VecModel::from(next.into_iter().map(cell).collect::<Vec<_>>())));
+    ui.set_arcade_score(score);
+    ui.set_arcade_lines(a.tetris.lines);
+    ui.set_arcade_running(running);
+    ui.set_arcade_over(over);
+    ui.set_arcade_cols(cols);
+    ui.set_arcade_rows(rows);
+}
+
+/// One 16 ms frame of whichever arcade game is showing.
+fn arcade_frame(ui: &MainWindow) {
+    let game = ui.get_arcade_game();
+    let presses = std::mem::take(&mut *arcade::PAD_QUEUE.lock().unwrap());
+    let mut changed = !presses.is_empty();
+    for (_, b) in presses {
+        arcade_press(game, b);
+    }
+    if game == 0 {
+        pong_step();
+        push_pong(ui);
+        return;
+    }
+    // Held d-pad / stick repeats after 10 frames, then every 3 (Left, Right, Down).
+    let held = arcade::PAD_HELD[0].load(Ordering::Relaxed) | arcade::PAD_HELD[1].load(Ordering::Relaxed);
+    for b in [arcade::Btn::Left, arcade::Btn::Right, arcade::Btn::Down] {
+        let n = {
+            let mut a = ARCADE.lock().unwrap();
+            let n = &mut a.held[b as usize];
+            *n = if held & (1 << b as u8) != 0 { *n + 1 } else { 0 };
+            *n
+        };
+        if n > 10 && n % 3 == 0 {
+            arcade_press(game, b);
+            changed = true;
+        }
+    }
+    let beep = |f, ms| play_beep(f, ms);
+    {
+        let mut a = ARCADE.lock().unwrap();
+        changed |= if game == 1 { a.tetris.step(&beep) } else { a.snake.step(&beep) };
+    }
+    if changed {
+        push_arcade(ui);
+    }
 }
 
 fn dispatch_terminal(ui: &MainWindow) {
@@ -854,16 +972,7 @@ fn push_ui(ui: &MainWindow) {
                 .into(),
         );
         ui.set_expanded(expanded_name(room.expanded));
-        let pong = PONG.lock().unwrap();
-        ui.set_pong_ly(pong.ly.round() as i32);
-        ui.set_pong_ry(pong.ry.round() as i32);
-        ui.set_pong_bx(pong.bx.round() as i32);
-        ui.set_pong_by(pong.by.round() as i32);
-        ui.set_pong_ls(pong.ls);
-        ui.set_pong_rs(pong.rs);
-        ui.set_pong_mode(pong.mode);
-        ui.set_pong_running(pong.running);
-        drop(pong);
+        push_pong(ui);
         let (settings, palette, gallery, creator) = overlay_name(room.overlay);
         ui.set_settings_open(settings);
         ui.set_palette_open(palette);
@@ -1686,18 +1795,45 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_pong_start(move || {
-        if let Ok(mut g) = PONG.lock() {
-            g.running = true;
-            g.bx = 50.0;
-            g.by = 50.0;
-            g.vx = if (g.ls + g.rs) % 2 == 0 { 1.15 } else { -1.15 };
-            g.vy = 0.85;
-            g.ls = 0;
-            g.rs = 0;
-        }
-        play_beep(660, 100);
+        pong_start();
         note_input();
         r();
+    });
+    let weak = ui.as_weak();
+    ui.on_arcade_select(move |_| {
+        note_input();
+        if let Some(ui) = weak.upgrade() {
+            push_arcade(&ui);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_arcade_key(move |code| {
+        note_input();
+        let (Some(ui), Some(b)) = (weak.upgrade(), arcade::Btn::from_code(code)) else { return };
+        arcade_press(ui.get_arcade_game(), b);
+        if ui.get_arcade_game() != 0 {
+            push_arcade(&ui);
+        }
+    });
+    let weak = ui.as_weak();
+    ui.on_arcade_pair(move || {
+        note_input();
+        let Some(ui) = weak.upgrade() else { return };
+        if ui.get_arcade_pairing() {
+            return;
+        }
+        ui.set_arcade_pairing(true);
+        ui.set_arcade_note("Hold the controller's pair button until the logo flashes fast...".into());
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let msg = arcade::pair_xbox().unwrap_or_else(|e| e);
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(ui) = weak.upgrade() {
+                    ui.set_arcade_pairing(false);
+                    ui.set_arcade_note(msg.into());
+                }
+            });
+        });
     });
     let r = refresh.clone();
     ui.on_quick(move |a| {
@@ -2825,19 +2961,15 @@ fn main() {
 
     note_input();
     let weak = ui.as_weak();
-    let pong_timer = slint::Timer::default();
-    pong_timer.start(TimerMode::Repeated, Duration::from_millis(16), move || {
+    arcade::start_pads(note_input);
+    let arcade_timer = slint::Timer::default();
+    arcade_timer.start(TimerMode::Repeated, Duration::from_millis(16), move || {
         if let Some(ui) = weak.upgrade() {
+            // "pong" is the Arcade page's id (kept so saved home layouts still open it).
             if ui.get_expanded() == "pong" {
-                pong_step();
-                let pong = PONG.lock().unwrap();
-                ui.set_pong_ly(pong.ly.round() as i32);
-                ui.set_pong_ry(pong.ry.round() as i32);
-                ui.set_pong_bx(pong.bx.round() as i32);
-                ui.set_pong_by(pong.by.round() as i32);
-                ui.set_pong_ls(pong.ls);
-                ui.set_pong_rs(pong.rs);
-                ui.set_pong_running(pong.running);
+                arcade_frame(&ui);
+            } else {
+                arcade::PAD_QUEUE.lock().unwrap().clear();
             }
         }
     });
@@ -2864,6 +2996,9 @@ fn main() {
             }
             let dragging = !ui.get_drag_id().is_empty();
             let pong_open = ui.get_expanded() == "pong";
+            if pong_open {
+                ui.set_pad_status(arcade::pad_status().into());
+            }
             if !SCREEN_ASLEEP.load(Ordering::Relaxed) && !dragging && !pong_open {
                 push_ui(&ui);
             }

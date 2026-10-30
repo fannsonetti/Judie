@@ -272,7 +272,7 @@ pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] 
         ("digitalClock", "Digital Clock", "A digital time readout."),
         ("lights", "Lights", "Toggles, brightness, and colour for the room."),
         ("media", "Media", "Now playing, volume, and skip."),
-        ("pong", "Pong", "A two-player or vs-AI pong court."),
+        ("pong", "Arcade", "Pong, Tetris and Snake. Works with an Xbox controller."),
         ("purifier", "Air Purifier", "Air quality, filter, and purifier mode."),
         ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
         ("server", "Server Status", "Health and latency of local services."),
