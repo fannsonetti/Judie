@@ -235,8 +235,16 @@ fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
     let mut stdin: Option<std::process::ChildStdin> = None;
     while let Ok((freq, ms, vol)) = rx.recv() {
         if stdin.is_none() {
+            // ALSA's default is the 3.5mm jack; the panel's speaker is on HDMI.
+            let dev = std::env::var("JUDIE_AUDIO_DEV").unwrap_or_else(|_| {
+                if std::path::Path::new("/proc/asound/vc4hdmi").exists() {
+                    "default:CARD=vc4hdmi".into()
+                } else {
+                    "default".into()
+                }
+            });
             match std::process::Command::new("aplay")
-                .args(["-q", "-t", "raw", "-r", "22050", "-c", "1", "-f", "S16_LE", "-"])
+                .args(["-q", "-D", &dev, "-t", "raw", "-r", "22050", "-c", "1", "-f", "S16_LE", "-"])
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
@@ -1080,8 +1088,29 @@ fn kb_seed(ui: &MainWindow, field: &str) -> String {
     }
 }
 
+static LINK_BUSY: AtomicBool = AtomicBool::new(false);
+
+/// `wifi detail` goes through sudo + nmcli and takes ~600ms on a Pi 3, so fetch
+/// off the UI thread; running it inline froze the screen every 5s.
 fn load_link(ui: &MainWindow) {
-    let d = pi_ctl::connection_detail();
+    if LINK_BUSY.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    let weak = ui.as_weak();
+    std::thread::spawn(move || {
+        let d = pi_ctl::connection_detail();
+        let dhcp = pi_ctl::dhcp_enabled();
+        let preferred = pi_ctl::preferred_iface();
+        let _ = slint::invoke_from_event_loop(move || {
+            LINK_BUSY.store(false, Ordering::Release);
+            if let Some(ui) = weak.upgrade() {
+                apply_link(&ui, d, dhcp, preferred);
+            }
+        });
+    });
+}
+
+fn apply_link(ui: &MainWindow, d: pi_ctl::ConnectionDetail, dhcp: bool, preferred: String) {
     ui.set_net_kind(d.conn_type.clone().into());
     ui.set_net_iface(d.iface.clone().into());
     ui.set_net_bars(
@@ -1103,8 +1132,8 @@ fn load_link(ui: &MainWindow) {
     ui.set_net_reach(d.reach.clone().into());
     ui.set_net_signal(d.signal.clone().into());
     ui.set_net_headline(pi_ctl::connection_headline(&d).into());
-    ui.set_dhcp_on(pi_ctl::dhcp_enabled());
-    ui.set_preferred_net(pi_ctl::preferred_iface().into());
+    ui.set_dhcp_on(dhcp);
+    ui.set_preferred_net(preferred.into());
 }
 
 fn load_wifi_status(ui: &MainWindow) {
