@@ -204,7 +204,8 @@ export function WidgetContainer({
     if (!cancelled) {
       const snap = snapFromDelta(from.x, from.y);
       if (snap) {
-        leftover = leftoverDelta(from.x, from.y, widget.col, widget.row, snap.col, snap.row, cellW);
+        const d = leftoverDelta(from.x, from.y, widget.col, widget.row, snap.col, snap.row, cellW);
+        leftover = { x: d.dx, y: d.dy };
         const clone = cloneRef.current;
         if (clone) {
           const nextLeft = parseFloat(clone.style.left) + (snap.col - widget.col) * cellW;

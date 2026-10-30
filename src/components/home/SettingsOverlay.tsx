@@ -177,7 +177,7 @@ export function SettingsOverlay() {
       setRoutineDrafts((prev) => prev.filter((d) => d.id !== draft.id));
       addRoutine(draft.phrase.trim(), draft.command.trim(), draft.name.trim());
       if (!draft.enabled) {
-        const created = useRoomStore.getState().routines.filter((r) => !r.builtin).at(-1);
+        const created = useRoomStore.getState().routines.filter((r) => !r.builtin).pop();
         if (created) setRoutineEnabled(created.id, false);
       }
       return;
