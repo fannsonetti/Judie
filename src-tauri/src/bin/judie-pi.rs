@@ -233,7 +233,36 @@ fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
     let rate = 22050u32;
     let mut child: Option<std::process::Child> = None;
     let mut stdin: Option<std::process::ChildStdin> = None;
-    while let Ok((freq, ms, vol)) = rx.recv() {
+    // HDMI sinks mute when the stream stops and take ~0.5s to unmute, which
+    // swallowed every 100ms beep. Keep the stream alive with silence, written
+    // against the clock so only ~60ms queues up ahead of a beep (the pipe
+    // alone would buffer ~1.5s).
+    let chunk = std::time::Duration::from_millis(20);
+    let silence = vec![0u8; (rate / 50 * 2) as usize];
+    let mut queued_until = std::time::Instant::now();
+    loop {
+        let (freq, ms, vol) = match rx.recv_timeout(std::time::Duration::from_millis(10)) {
+            Ok(b) => b,
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                let now = std::time::Instant::now();
+                queued_until = queued_until.max(now);
+                let mut ok = true;
+                if let Some(s) = stdin.as_mut() {
+                    while ok && queued_until < now + 3 * chunk {
+                        ok = s.write_all(&silence).is_ok();
+                        queued_until += chunk;
+                    }
+                }
+                if !ok {
+                    stdin = None;
+                    if let Some(mut c) = child.take() {
+                        let _ = c.kill();
+                    }
+                }
+                continue;
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        };
         if stdin.is_none() {
             // ALSA's default is the 3.5mm jack; the panel's speaker is on HDMI.
             let dev = std::env::var("JUDIE_AUDIO_DEV").unwrap_or_else(|_| {
@@ -244,7 +273,7 @@ fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
                 }
             });
             match std::process::Command::new("aplay")
-                .args(["-q", "-D", &dev, "-t", "raw", "-r", "22050", "-c", "1", "-f", "S16_LE", "-"])
+                .args(["-q", "-D", &dev, "-B", "100000", "-t", "raw", "-r", "22050", "-c", "1", "-f", "S16_LE", "-"])
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
@@ -253,6 +282,14 @@ fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
                 Ok(mut c) => {
                     stdin = c.stdin.take();
                     child = Some(c);
+                    // Lead-in so the sink has unmuted before the first beep.
+                    queued_until = std::time::Instant::now();
+                    if let Some(s) = stdin.as_mut() {
+                        for _ in 0..30 {
+                            let _ = s.write_all(&silence);
+                            queued_until += chunk;
+                        }
+                    }
                 }
                 Err(_) => continue,
             }
@@ -268,6 +305,8 @@ fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
             .as_mut()
             .map(|s| s.write_all(&pcm).is_ok())
             .unwrap_or(false);
+        queued_until = queued_until.max(std::time::Instant::now())
+            + std::time::Duration::from_millis(u64::from(n * 1000 / rate));
         if !ok {
             stdin = None;
             if let Some(mut c) = child.take() {
