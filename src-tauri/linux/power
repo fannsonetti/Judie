@@ -1,5 +1,5 @@
 #!/bin/sh
-# Passwordless helper: power reboot | poweroff | uninstall | suspend
+# Passwordless helper: power reboot | poweroff | uninstall | suspend | lowres | fullres
 #
 # Only these actions are accepted. The frontend cannot pass a shell.
 #
@@ -15,8 +15,8 @@ fail() { echo "$1" >&2; exit 1; }
 
 ACTION="${1:-}"
 case "$ACTION" in
-  reboot|poweroff|uninstall|suspend) ;;
-  *) fail "usage: power reboot|poweroff|uninstall|suspend" ;;
+  reboot|poweroff|uninstall|suspend|lowres|fullres) ;;
+  *) fail "usage: power reboot|poweroff|uninstall|suspend|lowres|fullres" ;;
 esac
 
 [ "$#" -eq 1 ] || fail "refused extra arguments"
@@ -36,6 +36,19 @@ case "$ACTION" in
     ;;
   suspend)
     /bin/systemctl suspend
+    ;;
+  lowres|fullres)
+    # The kiosk X server uses fbdev, which keeps the boot mode, so the panel
+    # resolution is set on the kernel command line and takes a reboot.
+    CMD=/boot/firmware/cmdline.txt
+    [ -f "$CMD" ] || CMD=/boot/cmdline.txt
+    [ -f "$CMD" ] || fail "cmdline.txt missing"
+    line="$(head -n 1 "$CMD" | sed -E 's/ *video=HDMI-A-1:[^ ]*//g')"
+    [ "$ACTION" = lowres ] && line="$line video=HDMI-A-1:960x600M@60"
+    printf '%s\n' "$line" > "$CMD.judie"
+    mv "$CMD.judie" "$CMD"
+    sync
+    /sbin/reboot
     ;;
   uninstall)
     command -v apt-get >/dev/null 2>&1 || fail "apt-get missing"

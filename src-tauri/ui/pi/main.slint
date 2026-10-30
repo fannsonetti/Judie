@@ -191,6 +191,7 @@ export component MainWindow inherits Window {
     in-out property <string> display-mode: "—";
     in-out property <string> display-rate: "—";
     in-out property <int> display-scale: 100;
+    in-out property <bool> display-lowres: false;
     in-out property <string> wifi-detail: "";
     in-out property <string> net-iface: "—";
     in-out property <string> net-security: "—";
@@ -1448,6 +1449,12 @@ export component MainWindow inherits Window {
                             SegBtn { label: "Quality"; on: root.display-scale == 100; clicked => { root.set-display-scale(100); } }
                         }
                         Text { text: root.display-scale == 50 ? "12 fps stepped motion · no transitions" : "30 fps transitions · cross-fades between screens"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.caps; wrap: word-wrap; }
+                        Text { text: "Resolution"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
+                        Seg {
+                            SegBtn { label: "Full"; on: !root.display-lowres; clicked => { if root.display-lowres { root.begin-confirm("fullres"); } } }
+                            SegBtn { label: "Low quality"; on: root.display-lowres; clicked => { if !root.display-lowres { root.begin-confirm("lowres"); } } }
+                        }
+                        Text { text: root.display-lowres ? "Panel runs at 960x600 · restarts to change" : "Panel runs at its native resolution · restarts to change"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.caps; wrap: word-wrap; }
                         Text { text: "Theme"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
                         Seg {
                             SegBtn { label: "Dusk"; on: root.theme == 0; clicked => { root.set-theme(0); } }
@@ -1547,13 +1554,13 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.confirm-kind == "restart" || root.confirm-kind == "sleep" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi": ConfirmSheet {
+    if root.confirm-kind == "restart" || root.confirm-kind == "sleep" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi" || root.confirm-kind == "lowres" || root.confirm-kind == "fullres" || root.confirm-kind == "keep-lowres": ConfirmSheet {
         x: root.rail-w;
         width: parent.width - root.rail-w;
         title: root.confirm-title;
         body: root.confirm-body;
-        primary: root.confirm-kind == "forget-wifi" ? "Forget" : "Continue";
-        secondary: "Cancel";
+        primary: root.confirm-kind == "forget-wifi" ? "Forget" : root.confirm-kind == "keep-lowres" ? "Keep" : "Continue";
+        secondary: root.confirm-kind == "keep-lowres" ? "Revert" : "Cancel";
         accept => { root.accept-confirm(); }
         dismiss => { root.cancel-confirm(); }
     }

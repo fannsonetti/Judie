@@ -685,6 +685,8 @@ pub fn allowed_power_action(action: &str) -> Result<&'static str, String> {
         "poweroff" | "shutdown" => Ok("poweroff"),
         "uninstall" => Ok("uninstall"),
         "suspend" | "sleep" => Ok("suspend"),
+        "lowres" => Ok("lowres"),
+        "fullres" => Ok("fullres"),
         _ => Err("Unknown power action".into()),
     }
 }
@@ -706,6 +708,8 @@ pub fn power_status_label(action: &str) -> &'static str {
         "poweroff" => "Shutting down…",
         "suspend" => "Going to sleep…",
         "uninstall" => "Removing Judie. Settings stay on this computer…",
+        "lowres" => "Restarting at 960x600…",
+        "fullres" => "Restarting at full resolution…",
         _ => "Working…",
     }
 }

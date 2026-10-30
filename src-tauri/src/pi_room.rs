@@ -438,7 +438,7 @@ fn days_in_month(year: i32, month: u32) -> u32 {
     }
 }
 
-fn data_dir() -> PathBuf {
+pub fn data_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("JUDIE_DATA_DIR") {
         if !dir.trim().is_empty() {
             return PathBuf::from(dir);

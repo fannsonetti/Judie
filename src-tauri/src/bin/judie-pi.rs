@@ -229,41 +229,85 @@ fn note_input() {
     *LAST_INPUT.lock().unwrap() = Some(std::time::Instant::now());
 }
 
+/// Media card mp3 that should be playing, if any (set by push_ui).
+static MEDIA_FILE: Mutex<Option<std::path::PathBuf>> = Mutex::new(None);
+
+/// `<data dir>/media/rain.mp3` for "Rain on Window", and so on, if it exists.
+fn media_file(title: &str) -> Option<std::path::PathBuf> {
+    let name = title.split_whitespace().next()?.to_lowercase();
+    let path = pi_room::data_dir().join("media").join(format!("{name}.mp3"));
+    path.exists().then_some(path)
+}
+
+/// Decodes the Media card's mp3 through mpg123 (22050 Hz mono s16, looping).
+#[derive(Default)]
+struct MediaPlayer {
+    path: Option<std::path::PathBuf>,
+    child: Option<std::process::Child>,
+    out: Option<std::process::ChildStdout>,
+}
+
+impl MediaPlayer {
+    /// Mixes the next `buf.len() / 2` media samples into `buf` (s16le).
+    fn mix_into(&mut self, buf: &mut [u8], vol: u8) {
+        use std::io::Read;
+        let want = MEDIA_FILE.lock().unwrap().clone();
+        if want != self.path {
+            if let Some(mut c) = self.child.take() {
+                let _ = c.kill();
+                let _ = c.wait();
+            }
+            self.out = None;
+            if let Some(path) = &want {
+                if let Ok(mut c) = std::process::Command::new("mpg123")
+                    .args(["-q", "-s", "-r", "22050", "-m", "--loop", "-1"])
+                    .arg(path)
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                {
+                    self.out = c.stdout.take();
+                    self.child = Some(c);
+                }
+            }
+            self.path = want;
+        }
+        let Some(out) = self.out.as_mut() else { return };
+        let mut pcm = vec![0u8; buf.len()];
+        if out.read_exact(&mut pcm).is_err() {
+            self.out = None;
+            return;
+        }
+        let gain = vol.min(100) as f32 / 100.0;
+        for (o, m) in buf.chunks_exact_mut(2).zip(pcm.chunks_exact(2)) {
+            let v = f32::from(i16::from_le_bytes([o[0], o[1]]))
+                + f32::from(i16::from_le_bytes([m[0], m[1]])) * gain;
+            o.copy_from_slice(&(v.clamp(-32768.0, 32767.0) as i16).to_le_bytes());
+        }
+    }
+}
+
 fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
     let rate = 22050u32;
     let mut child: Option<std::process::Child> = None;
     let mut stdin: Option<std::process::ChildStdin> = None;
     // HDMI sinks mute when the stream stops and take ~0.5s to unmute, which
-    // swallowed every 100ms beep. Keep the stream alive with silence, written
-    // against the clock so only ~60ms queues up ahead of a beep (the pipe
-    // alone would buffer ~1.5s).
+    // swallowed every 100ms beep. Keep the stream alive with silence (or the
+    // Media card's track), written against the clock so only ~60ms queues up
+    // ahead of a beep (the pipe alone would buffer ~1.5s).
     let chunk = std::time::Duration::from_millis(20);
     let silence = vec![0u8; (rate / 50 * 2) as usize];
+    let mut buf = silence.clone();
+    let mut media = MediaPlayer::default();
     let mut queued_until = std::time::Instant::now();
     loop {
-        let (freq, ms, vol) = match rx.recv_timeout(std::time::Duration::from_millis(10)) {
-            Ok(b) => b,
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                let now = std::time::Instant::now();
-                queued_until = queued_until.max(now);
-                let mut ok = true;
-                if let Some(s) = stdin.as_mut() {
-                    while ok && queued_until < now + 3 * chunk {
-                        ok = s.write_all(&silence).is_ok();
-                        queued_until += chunk;
-                    }
-                }
-                if !ok {
-                    stdin = None;
-                    if let Some(mut c) = child.take() {
-                        let _ = c.kill();
-                    }
-                }
-                continue;
-            }
+        let beep = match rx.recv_timeout(std::time::Duration::from_millis(10)) {
+            Ok(b) => Some(b),
+            Err(mpsc::RecvTimeoutError::Timeout) => None,
             Err(mpsc::RecvTimeoutError::Disconnected) => break,
         };
-        if stdin.is_none() {
+        if stdin.is_none() && (beep.is_some() || MEDIA_FILE.lock().unwrap().is_some()) {
             // ALSA's default is the 3.5mm jack; the panel's speaker is on HDMI.
             let dev = std::env::var("JUDIE_AUDIO_DEV").unwrap_or_else(|_| {
                 if std::path::Path::new("/proc/asound/vc4hdmi").exists() {
@@ -291,22 +335,45 @@ fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
                         }
                     }
                 }
-                Err(_) => continue,
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                    continue;
+                }
             }
         }
-        let n = (rate * ms.max(1) / 1000).max(1);
-        let amp = 18000.0 * (vol.min(100) as f32 / 100.0);
-        let mut pcm = Vec::with_capacity(n as usize * 2);
-        for i in 0..n {
-            let s = ((i as f32 * freq as f32 * 2.0 * std::f32::consts::PI / rate as f32).sin() * amp) as i16;
-            pcm.extend_from_slice(&s.to_le_bytes());
-        }
-        let ok = stdin
-            .as_mut()
-            .map(|s| s.write_all(&pcm).is_ok())
-            .unwrap_or(false);
-        queued_until = queued_until.max(std::time::Instant::now())
-            + std::time::Duration::from_millis(u64::from(n * 1000 / rate));
+        let ok = match beep {
+            None => {
+                let now = std::time::Instant::now();
+                queued_until = queued_until.max(now);
+                let mut ok = true;
+                if let Some(s) = stdin.as_mut() {
+                    while ok && queued_until < now + 3 * chunk {
+                        buf.fill(0);
+                        media.mix_into(&mut buf, BEEP_VOL.load(Ordering::Relaxed));
+                        ok = s.write_all(&buf).is_ok();
+                        queued_until += chunk;
+                    }
+                }
+                ok
+            }
+            Some((freq, ms, vol)) => {
+                let n = (rate * ms.max(1) / 1000).max(1);
+                let amp = 18000.0 * (vol.min(100) as f32 / 100.0);
+                let mut pcm = Vec::with_capacity(n as usize * 2);
+                for i in 0..n {
+                    let s = ((i as f32 * freq as f32 * 2.0 * std::f32::consts::PI / rate as f32).sin() * amp) as i16;
+                    pcm.extend_from_slice(&s.to_le_bytes());
+                }
+                media.mix_into(&mut pcm, vol);
+                let ok = stdin
+                    .as_mut()
+                    .map(|s| s.write_all(&pcm).is_ok())
+                    .unwrap_or(false);
+                queued_until = queued_until.max(std::time::Instant::now())
+                    + std::time::Duration::from_millis(u64::from(n * 1000 / rate));
+                ok
+            }
+        };
         if !ok {
             stdin = None;
             if let Some(mut c) = child.take() {
@@ -316,15 +383,18 @@ fn beep_loop(rx: mpsc::Receiver<(u32, u32, u8)>) {
     }
 }
 
-fn play_beep(freq: u32, ms: u32) {
-    let tx = BEEP_TX.get_or_init(|| {
+fn audio_tx() -> &'static Sender<(u32, u32, u8)> {
+    BEEP_TX.get_or_init(|| {
         let (tx, rx) = mpsc::channel();
         let _ = std::thread::Builder::new()
             .name("judie-beep".into())
             .spawn(move || beep_loop(rx));
         tx
-    });
-    let _ = tx.send((freq, ms, BEEP_VOL.load(Ordering::Relaxed)));
+    })
+}
+
+fn play_beep(freq: u32, ms: u32) {
+    let _ = audio_tx().send((freq, ms, BEEP_VOL.load(Ordering::Relaxed)));
 }
 
 fn set_backlight(on: bool) {
@@ -472,6 +542,19 @@ fn ensure_mode(output: &str, w: u32, h: u32, hz: u32) -> Option<String> {
     } else {
         None
     }
+}
+
+/// Present while a switch to 960x600 waits for the user to tap Keep.
+fn lowres_trial_path() -> std::path::PathBuf {
+    pi_room::data_dir().join("lowres-trial")
+}
+
+/// Low quality lives on the kernel command line (see linux/power), not in layout.json.
+fn display_lowres() -> bool {
+    ["/boot/firmware/cmdline.txt", "/boot/cmdline.txt"]
+        .iter()
+        .filter_map(|p| std::fs::read_to_string(p).ok())
+        .any(|s| s.contains("video=HDMI-A-1:960x600"))
 }
 
 fn apply_persisted_display() {
@@ -666,6 +749,11 @@ fn push_ui(ui: &MainWindow) {
         ui.set_grid_cols(room.cols());
         ui.set_screen_sleep(SCREEN_ASLEEP.load(Ordering::Relaxed));
         ui.set_media_progress(room.progress);
+        let file = if room.playing { media_file(&room.current_track().title) } else { None };
+        if file.is_some() {
+            audio_tx();
+        }
+        *MEDIA_FILE.lock().unwrap() = file;
         ui.set_indoor(format!("{:.1}°", room.indoor).into());
         ui.set_outdoor(format!("{}°", room.outdoor).into());
         ui.set_humidity(format!("{}%", room.humidity).into());
@@ -2451,6 +2539,16 @@ fn bind(ui: &MainWindow) {
                 ui.set_confirm_body("The panel will power off. Judie stays on screen until the computer shuts down.".into());
                 ui.set_confirm_kind("shutdown".into());
             }
+            "lowres" => {
+                ui.set_confirm_title("Switch to low quality?".into());
+                ui.set_confirm_body("The panel restarts at 960x600. If the screen stays black, it switches back on its own after 20 seconds.".into());
+                ui.set_confirm_kind("lowres".into());
+            }
+            "fullres" => {
+                ui.set_confirm_title("Switch to full resolution?".into());
+                ui.set_confirm_body("The panel restarts at its native resolution.".into());
+                ui.set_confirm_kind("fullres".into());
+            }
             "uninstall1" => {
                 ui.set_confirm_title("Uninstall Judie?".into());
                 ui.set_confirm_body(pi_ctl::uninstall_warning().into());
@@ -2462,6 +2560,11 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_cancel_confirm(move || {
         if let Some(ui) = weak.upgrade() {
+            if ui.get_confirm_kind() == "keep-lowres" {
+                ui.set_confirm_kind("".into());
+                begin_power_action(&ui, "fullres");
+                return;
+            }
             ui.set_confirm_kind("".into());
             ui.set_pending_routine_id("".into());
             ui.set_forget_ssid("".into());
@@ -2492,6 +2595,19 @@ fn bind(ui: &MainWindow) {
             return;
         }
         match ui.get_confirm_kind().as_str() {
+            "keep-lowres" => {
+                ui.set_confirm_kind("".into());
+                let _ = std::fs::remove_file(lowres_trial_path());
+            }
+            "lowres" => {
+                ui.set_confirm_kind("".into());
+                let _ = std::fs::write(lowres_trial_path(), "");
+                begin_power_action(&ui, "lowres");
+            }
+            "fullres" => {
+                ui.set_confirm_kind("".into());
+                begin_power_action(&ui, "fullres");
+            }
             "restart" => {
                 ui.set_confirm_kind("".into());
                 begin_power_action(&ui, "reboot");
@@ -2644,6 +2760,29 @@ fn main() {
     push_ui(&ui);
     load_link(&ui);
     poll_latest(ui.as_weak());
+
+    ui.set_display_lowres(display_lowres());
+    // After a switch to 960x600, revert unless Keep is tapped: the panel may
+    // not take that mode, and then nobody can see the setting to undo it.
+    let lowres_timer = slint::Timer::default();
+    if lowres_trial_path().exists() {
+        if framebuffer_size().map(|s| s.width) == Some(960) {
+            ui.set_confirm_title("Keep low quality?".into());
+            ui.set_confirm_body("The panel is at 960x600. It switches back in 20 seconds unless you tap Keep.".into());
+            ui.set_confirm_kind("keep-lowres".into());
+            let weak = ui.as_weak();
+            lowres_timer.start(TimerMode::SingleShot, Duration::from_secs(20), move || {
+                if let Some(ui) = weak.upgrade() {
+                    if ui.get_confirm_kind() == "keep-lowres" {
+                        ui.set_confirm_kind("".into());
+                        begin_power_action(&ui, "fullres");
+                    }
+                }
+            });
+        } else {
+            let _ = std::fs::remove_file(lowres_trial_path());
+        }
+    }
 
     note_input();
     let weak = ui.as_weak();
