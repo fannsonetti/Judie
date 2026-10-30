@@ -18,6 +18,16 @@ jobs:
         with:
           targets: armv7-unknown-linux-gnueabihf
 
+      # Native tests before the sysroot step, which exports cross-compile env.
+      - name: Test (blocks the release on failure)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            pkg-config libx11-dev libxcb1-dev libxkbcommon-dev libfontconfig1-dev libfreetype6-dev
+          cd src-tauri
+          cargo test --no-default-features --features pi-native
+
       - name: Armhf sysroot
         run: bash scripts/ci-armhf-sysroot.sh
 
@@ -45,6 +55,21 @@ jobs:
           bash scripts/package-armhf-deb.sh
           bash scripts/ci-check-armhf-deb.sh
 
+      # apply-update on the Pi refuses any .deb without a valid .sig.
+      - name: Sign .deb
+        env:
+          JUDIE_SIGNING_KEY: ${{ secrets.JUDIE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          [ -n "$JUDIE_SIGNING_KEY" ] || { echo "JUDIE_SIGNING_KEY secret is not set" >&2; exit 1; }
+          key=$(mktemp)
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$JUDIE_SIGNING_KEY" > "$key"
+          for f in src-tauri/target/armv7-unknown-linux-gnueabihf/release/bundle/deb/*_armhf.deb; do
+            openssl dgst -sha256 -sign "$key" -out "$f.sig" "$f"
+            openssl dgst -sha256 -verify src-tauri/linux/release.pub -signature "$f.sig" "$f"
+          done
+
       - name: Create release and upload armhf .deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,9 +82,11 @@ jobs:
             exit 1
           fi
           cp "${files[0]}" /tmp/judie_armhf.deb
+          cp "${files[0]}.sig" /tmp/judie_armhf.deb.sig
           if ! gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release create "${{ github.ref_name }}" \
               --title "Judie ${{ github.ref_name }}" \
               --notes "Raspberry Pi 32-bit native Slint kiosk .deb (no WebKit). Windows is unsupported beginning with v0.2.14. See docs/raspberry-pi.md. Pi 3 (1 GB) should run 32-bit Raspberry Pi OS."
           fi
-          gh release upload "${{ github.ref_name }}" "${files[@]}" /tmp/judie_armhf.deb --clobber
+          gh release upload "${{ github.ref_name }}" "${files[@]}" "${files[0]}.sig" \
+            /tmp/judie_armhf.deb /tmp/judie_armhf.deb.sig --clobber

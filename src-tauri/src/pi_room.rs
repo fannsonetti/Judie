@@ -518,12 +518,67 @@ pub fn migrate_units_preset(temp: &str, distance: &str) -> &'static str {
     "c-km"
 }
 
+fn read_persist(path: &Path) -> Result<Persist, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+/// layout.json, else layout.json.bak (the previous good save), else defaults.
+fn load_persist_from(path: &Path) -> Persist {
+    let bak = path.with_extension("json.bak");
+    match read_persist(path) {
+        Ok(p) => return p,
+        Err(e) if path.exists() => eprintln!("judie: {} unreadable ({e}), trying backup", path.display()),
+        Err(_) => {}
+    }
+    match read_persist(&bak) {
+        Ok(p) => p,
+        Err(e) => {
+            if bak.exists() {
+                eprintln!("judie: {} unreadable ({e}), using defaults", bak.display());
+            }
+            Persist::default()
+        }
+    }
+}
+
 fn load_persist() -> Persist {
-    let path = persist_path();
-    std::fs::read_to_string(&path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+    load_persist_from(&persist_path())
+}
+
+/// Write via temp file + fsync + rename so a power cut leaves either the old
+/// or the new file, never a torn one. The old file becomes layout.json.bak.
+fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let tmp = path.with_extension("json.tmp");
+    let mut f = std::fs::File::create(&tmp)?;
+    f.write_all(data)?;
+    f.sync_all()?;
+    drop(f);
+    if path.exists() {
+        std::fs::rename(path, path.with_extension("json.bak"))?;
+    }
+    std::fs::rename(&tmp, path)?;
+    if let Some(dir) = path.parent() {
+        if let Ok(d) = std::fs::File::open(dir) {
+            let _ = d.sync_all();
+        }
+    }
+    Ok(())
+}
+
+static SAVE_GEN: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Coalesce rapid changes (slider drags) into one SD write ~1 s after the last.
+pub fn save_soon() {
+    use std::sync::atomic::Ordering;
+    let gen = SAVE_GEN.fetch_add(1, Ordering::Relaxed) + 1;
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(1));
+        if SAVE_GEN.load(Ordering::Relaxed) == gen {
+            with(|room| room.save());
+        }
+    });
 }
 
 fn save_persist(room: &Room) {
@@ -564,7 +619,9 @@ fn save_persist(room: &Room) {
         reduced_motion: room.reduced_motion,
     };
     if let Ok(json) = serde_json::to_string_pretty(&persist) {
-        let _ = std::fs::write(persist_path(), json);
+        if let Err(e) = write_atomic(&persist_path(), json.as_bytes()) {
+            eprintln!("judie: could not save settings: {e}");
+        }
     }
     save_face_layout_file(&room.face_layouts);
 }
@@ -1703,6 +1760,18 @@ impl Room {
             return Some(TerminalJob::Done);
         }
 
+        // Anyone at the panel could otherwise run commands as the kiosk user.
+        // ponytail: flag file over SSH, a PIN prompt if it needs toggling on the panel.
+        let flag = data_dir().join("terminal-enabled");
+        if !flag.exists() {
+            push_terminal_output(
+                &mut self.terminal_lines,
+                &format!("Terminal is off. To turn it on, over SSH: touch {}", flag.display()),
+            );
+            trim_terminal_history(&mut self.terminal_lines);
+            return Some(TerminalJob::Done);
+        }
+
         Some(TerminalJob::Shell {
             cmdline: raw,
             cwd: self.terminal_cwd.clone(),
@@ -2616,6 +2685,24 @@ mod tests {
 
     static HOME_LOCK: Mutex<()> = Mutex::new(());
 
+    #[test]
+    fn torn_layout_loads_from_backup() {
+        let dir = std::env::temp_dir().join(format!("judie-persist-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("layout.json");
+        let mut a = Persist::default();
+        a.room_name = "First".into();
+        write_atomic(&path, serde_json::to_string(&a).unwrap().as_bytes()).unwrap();
+        let mut b = Persist::default();
+        b.room_name = "Second".into();
+        write_atomic(&path, serde_json::to_string(&b).unwrap().as_bytes()).unwrap();
+        assert_eq!(load_persist_from(&path).room_name, "Second");
+        std::fs::write(&path, "{\"room_name\": \"Tor").unwrap();
+        assert_eq!(load_persist_from(&path).room_name, "First");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     fn with_temp_room(f: impl FnOnce(&mut Room)) {
         let _g = HOME_LOCK.lock().expect("home lock");
         let dir = std::env::temp_dir().join(format!(
@@ -2856,6 +2943,10 @@ mod tests {
     #[test]
     fn terminal_widget_runs_shell_commands_and_keeps_history() {
         with_temp_room(|room| {
+            room.terminal_input = "echo hello-judie".into();
+            assert!(matches!(room.take_terminal_job(), Some(TerminalJob::Done)), "shell must be off by default");
+            assert!(room.terminal_lines.iter().any(|l| l.text.contains("Terminal is off")));
+            std::fs::write(data_dir().join("terminal-enabled"), "").unwrap();
             room.terminal_input = "echo hello-judie".into();
             let reply = room.submit_terminal();
             assert!(

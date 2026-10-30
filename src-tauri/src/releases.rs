@@ -44,6 +44,7 @@ pub struct ReleaseInfo {
     pub installable: bool,
     pub asset_name: String,
     pub asset_url: String,
+    pub sig_url: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -222,6 +223,14 @@ fn get_json(url: &str) -> Result<String, String> {
 
 fn to_info(rel: GhRelease, current: &str, os: &str, arch: &str) -> ReleaseInfo {
     let asset = pick_asset(&rel.assets, os, arch);
+    // apply-update refuses unsigned packages, so releases before signing are not installable.
+    let sig_url = asset
+        .and_then(|a| {
+            let want = format!("{}.sig", a.name);
+            rel.assets.iter().find(|s| s.name == want)
+        })
+        .map(|s| s.browser_download_url.clone())
+        .unwrap_or_default();
     let tag = rel.tag_name.clone();
     ReleaseInfo {
         current: same_version(&tag, current),
@@ -230,7 +239,8 @@ fn to_info(rel: GhRelease, current: &str, os: &str, arch: &str) -> ReleaseInfo {
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| rel.tag_name.clone()),
         published_at: rel.published_at.unwrap_or_default(),
-        installable: asset.is_some() && !rel.draft && !rel.prerelease,
+        installable: asset.is_some() && !sig_url.is_empty() && !rel.draft && !rel.prerelease,
+        sig_url,
         asset_name: asset.map(|a| a.name.clone()).unwrap_or_default(),
         asset_url: asset
             .map(|a| a.browser_download_url.clone())
@@ -522,10 +532,15 @@ pub fn install_tag_with_progress(
     }
     let expected = normalize_version(&rel.tag);
     let dest = package_dest(&rel.asset_name);
+    let sig = PathBuf::from(format!("{}.sig", dest.display()));
+    let cleanup = || {
+        cleanup_path(&dest);
+        cleanup_path(&sig);
+    };
 
     progress(InstallStage::Downloading);
-    if let Err(err) = download(&rel.asset_url, &dest) {
-        cleanup_path(&dest);
+    if let Err(err) = download(&rel.asset_url, &dest).and_then(|_| download(&rel.sig_url, &sig)) {
+        cleanup();
         return Err(err);
     }
 
@@ -533,7 +548,7 @@ pub fn install_tag_with_progress(
     #[cfg(target_os = "linux")]
     {
         if let Err(err) = validate_judie_deb(&dest, &expected, &host_arch()) {
-            cleanup_path(&dest);
+            cleanup();
             return Err(err);
         }
     }
@@ -542,7 +557,7 @@ pub fn install_tag_with_progress(
         if let Ok(prefix) = read_prefix(&dest, 64) {
             if dest.extension().and_then(|e| e.to_str()) == Some("deb") {
                 if let Err(err) = validate_deb_bytes(&prefix) {
-                    cleanup_path(&dest);
+                    cleanup();
                     return Err(err);
                 }
             }
@@ -551,7 +566,7 @@ pub fn install_tag_with_progress(
 
     progress(InstallStage::Installing);
     if let Err(err) = apply_package(&dest, &expected) {
-        cleanup_path(&dest);
+        cleanup();
         return Err(err);
     }
 
@@ -560,24 +575,15 @@ pub fn install_tag_with_progress(
     let verified = match verify_installed(&expected) {
         Ok(v) => v,
         Err(err) => {
-            cleanup_path(&dest);
+            cleanup();
             return Err(err);
         }
     };
     #[cfg(not(target_os = "linux"))]
     let verified = expected.clone();
 
-    cleanup_path(&dest);
+    cleanup();
     Ok(verified)
-}
-
-#[allow(dead_code)]
-pub fn download_and_apply(asset_url: &str, asset_name: &str) -> Result<(), String> {
-    let dest = package_dest(asset_name);
-    download(asset_url, &dest)?;
-    apply_package(&dest, "")?;
-    cleanup_path(&dest);
-    Ok(())
 }
 
 pub fn find_release(tag: &str) -> Result<ReleaseInfo, String> {
@@ -639,14 +645,27 @@ mod tests {
             draft,
             prerelease: pre,
             published_at: Some("2026-09-01".into()),
+            // Every .deb gets its .sig, as the release workflow uploads them.
             assets: assets
                 .iter()
-                .map(|(n, u)| GhAsset {
-                    name: (*n).into(),
-                    browser_download_url: (*u).into(),
+                .flat_map(|(n, u)| {
+                    [
+                        GhAsset { name: (*n).into(), browser_download_url: (*u).into() },
+                        GhAsset { name: format!("{n}.sig"), browser_download_url: format!("{u}.sig") },
+                    ]
                 })
                 .collect(),
         }
+    }
+
+    #[test]
+    fn unsigned_release_is_not_installable() {
+        let mut rel = gh("v0.3.13", false, false, &[("Judie_0.3.13_armhf.deb", "https://x/a.deb")]);
+        let signed = to_info(rel.clone(), "0.3.12", "linux", "armhf");
+        assert!(signed.installable);
+        assert_eq!(signed.sig_url, "https://x/a.deb.sig");
+        rel.assets.retain(|a| !a.name.ends_with(".sig"));
+        assert!(!to_info(rel, "0.3.12", "linux", "armhf").installable);
     }
 
     #[test]

@@ -29,8 +29,7 @@ mkdir -p \
   "$STAGING/usr/lib/judie" \
   "$STAGING/usr/share/applications" \
   "$STAGING/usr/share/icons/hicolor/128x128/apps" \
-  "$STAGING/lib/systemd/system" \
-  "$STAGING/etc/sudoers.d"
+  "$STAGING/lib/systemd/system"
 
 install -m755 "$BIN" "$STAGING/usr/bin/judie"
 install -m755 "$ROOT/src-tauri/linux/apply-update" "$STAGING/usr/lib/judie/apply-update"
@@ -44,7 +43,8 @@ install -m644 "$ROOT/src-tauri/linux/10-noscreenblank.conf" "$STAGING/usr/lib/ju
 install -m644 "$ROOT/src-tauri/linux/20-pi-fbdev.conf" "$STAGING/usr/lib/judie/20-pi-fbdev.conf"
 install -m644 "$ROOT/src-tauri/linux/20-pi-modeset.conf" "$STAGING/usr/lib/judie/20-pi-modeset.conf"
 install -m644 "$ROOT/src-tauri/linux/judie.service" "$STAGING/lib/systemd/system/judie.service"
-install -m440 "$ROOT/src-tauri/linux/sudoers-judie-update" "$STAGING/etc/sudoers.d/judie-update"
+install -m644 "$ROOT/src-tauri/linux/sudoers-judie-update" "$STAGING/usr/lib/judie/sudoers-judie-update"
+install -m644 "$ROOT/src-tauri/linux/release.pub" "$STAGING/usr/lib/judie/release.pub"
 install -m644 "$ROOT/src-tauri/linux/judie.desktop" "$STAGING/usr/share/applications/judie.desktop"
 install -m644 "$ROOT/src-tauri/icons/128x128.png" "$STAGING/usr/share/icons/hicolor/128x128/apps/judie.png"
 
@@ -54,7 +54,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: sudo, iw, wpasupplicant, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6, alsa-utils
+Depends: sudo, openssl,iw, wpasupplicant, xserver-xorg, xinit, x11-xserver-utils, xserver-xorg-input-libinput, xserver-xorg-video-fbdev, xdotool, fonts-dejavu-core, libx11-6, libx11-xcb1, libxcb1, libxkbcommon0, libxkbcommon-x11-0, libxcursor1, libxi6, libxrandr2, libfontconfig1, libfreetype6, alsa-utils
 Recommends: mpg123
 Maintainer: Judie <judie@local>
 Description: Judie room control (native Pi kiosk)
@@ -65,7 +65,6 @@ cat >"$STAGING/DEBIAN/postinst" <<'EOF'
 #!/bin/sh
 set -e
 chmod 755 /usr/lib/judie/apply-update /usr/lib/judie/wifi /usr/lib/judie/power /usr/lib/judie/kiosk /usr/lib/judie/xinitrc /usr/lib/judie/wait-display 2>/dev/null || true
-chmod 440 /etc/sudoers.d/judie-update 2>/dev/null || true
 
 KIOSK_USER=""
 if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ]; then
@@ -86,6 +85,15 @@ Group=${KIOSK_GROUP}
 Environment=HOME=${KIOSK_HOME}
 Environment=XDG_RUNTIME_DIR=/run/user/${KIOSK_UID}
 DROP
+  # Passwordless helpers for the kiosk user only (was ALL, which let any
+  # local account install a package as root).
+  sed "s/^KIOSK_USER /${KIOSK_USER} /" /usr/lib/judie/sudoers-judie-update >/etc/sudoers.d/judie-update.new
+  chmod 440 /etc/sudoers.d/judie-update.new
+  if visudo -cf /etc/sudoers.d/judie-update.new >/dev/null; then
+    mv /etc/sudoers.d/judie-update.new /etc/sudoers.d/judie-update
+  else
+    rm -f /etc/sudoers.d/judie-update.new
+  fi
   for grp in video input render; do
     if getent group "$grp" >/dev/null 2>&1; then
       usermod -aG "$grp" "$KIOSK_USER" 2>/dev/null || true
@@ -141,6 +149,7 @@ cat >"$STAGING/DEBIAN/postrm" <<'EOF'
 set -e
 if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
   rm -rf /etc/systemd/system/judie.service.d
+  rm -f /etc/sudoers.d/judie-update
   if command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
     # Do not start getty@tty1 here. judie.service Conflicts=getty@tty1, so

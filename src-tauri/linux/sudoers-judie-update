@@ -1,4 +1,5 @@
-# Judie kiosk helpers — no password on the panel.
-ALL ALL=(root) NOPASSWD: /usr/lib/judie/apply-update
-ALL ALL=(root) NOPASSWD: /usr/lib/judie/wifi
-ALL ALL=(root) NOPASSWD: /usr/lib/judie/power
+# Judie kiosk helpers — no password, kiosk user only.
+# Template: postinst replaces KIOSK_USER and installs it as /etc/sudoers.d/judie-update.
+KIOSK_USER ALL=(root) NOPASSWD: /usr/lib/judie/apply-update
+KIOSK_USER ALL=(root) NOPASSWD: /usr/lib/judie/wifi
+KIOSK_USER ALL=(root) NOPASSWD: /usr/lib/judie/power

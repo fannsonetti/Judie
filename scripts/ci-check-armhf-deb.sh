@@ -57,4 +57,9 @@ echo "$script" | grep -q 'dpkg-query' || {
   exit 1
 }
 
+echo "$script" | grep -q 'release.pub' || {
+  echo "FAIL: apply-update must verify the package signature" >&2
+  exit 1
+}
+
 echo "armhf .deb metadata OK"

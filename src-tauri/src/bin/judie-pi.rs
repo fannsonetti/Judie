@@ -1518,10 +1518,8 @@ fn bind(ui: &MainWindow) {
     ui.on_volume_changed(move |v| {
         let vol = v.clamp(0, 100) as u8;
         BEEP_VOL.store(vol, Ordering::Relaxed);
-        pi_room::with(|room| {
-            room.volume = vol;
-            room.save();
-        });
+        pi_room::with(|room| room.volume = vol);
+        pi_room::save_soon();
         r();
     });
     ui.on_note_input(move || {

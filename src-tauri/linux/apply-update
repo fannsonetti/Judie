@@ -38,6 +38,18 @@ fi
 
 [ -s "$DEB" ] || fail "empty package"
 
+# Copy into a root-only dir first so the caller cannot swap the file after
+# the signature check, then verify against the key this package installed.
+SIG="${DEB}.sig"
+[ -f "$SIG" ] || fail "package is not signed"
+WORK=$(mktemp -d /tmp/judie-apply.XXXXXX)
+trap 'rm -rf "$WORK"' EXIT
+cp "$DEB" "$WORK/judie.deb"
+cp "$SIG" "$WORK/judie.deb.sig"
+DEB="$WORK/judie.deb"
+openssl dgst -sha256 -verify /usr/lib/judie/release.pub -signature "$DEB.sig" "$DEB" >/dev/null 2>&1 \
+  || fail "package signature is invalid"
+
 magic=$(dd if="$DEB" bs=8 count=1 2>/dev/null || true)
 case "$magic" in
   '!<arch>'*) ;;
