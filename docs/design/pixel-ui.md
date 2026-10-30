@@ -25,8 +25,11 @@ The Pi 3B renders on the CPU (Slint `renderer-software`) at 1920×1200. A pixel 
 
    Dusk is the default.
 4. **Type.** Two faces:
-   - Labels, clock and buttons use a blocky caps face (mockup: Silkscreen).
-   - Body and chat text use a readable pixel face (mockup: Pixelify Sans). Not bundled yet. The only bundled face is `src-tauri/ui/pi/fonts/PressStart2P.ttf` (OFL), which fits the blocky caps role.
+   - Labels, clock and buttons: Silkscreen (`Dy.caps`).
+   - Body and chat text: Pixelify Sans (`Dy.mono`, also the window's default font).
+   - Terminal: Press Start 2P (`Dy.code`), which is monospaced.
+
+   All three are bundled in `src-tauri/ui/pi/fonts/` under the SIL Open Font License.
 
    Pick fonts with an OFL licence and bundle them. Render at integer multiples of the font's design size only.
 5. **Icons.** 8×8 bitmaps drawn on a grid, scaled by whole numbers (2× inline, 4× in tiles). They're coloured with `text`, or `accent1` for "warm" things like sun and light.
@@ -72,11 +75,11 @@ Keep it to two tiers plus Reduced motion. More tiers multiply design and test wo
 
 | | Performance (default on Pi 3B) | Quality |
 |---|---|---|
-| Resolution | half (960×600, existing `display_scale == 50`) | native |
+| Canvas | 960 wide, drawn at 2x | same |
 | Motion | stepped, about 12 fps, no screen transitions | 30 fps transitions, cross-fades between screens |
 | Reduced motion | cuts all animation except touch feedback | same |
 
-Before relying on half resolution, check on the real panel that its upscaler gives crisp pixels (nearest-neighbour), not blur. That's unverified.
+The UI is always laid out on a 960-wide canvas (960×600 on the 1920×1200 panel). `judie-pi` sets `SLINT_SCALE_FACTOR` to the whole number `panel width / 960`, so every canvas pixel is an exact 2×2 block. Sizes in the `.slint` files are canvas pixels, the same numbers as the mockup. For a desktop preview, run `judie-pi` with `JUDIE_WINDOWED=1 SLINT_SCALE_FACTOR=1` (on Windows also `DISPLAY=:0`) to get a 960×600 window.
 
 ## Implementation notes (Slint)
 

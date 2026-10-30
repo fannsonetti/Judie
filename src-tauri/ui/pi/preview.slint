@@ -63,20 +63,23 @@ export component WidgetPreview inherits Rectangle {
     in property <int> pong-bx: 50;
     in property <int> pong-by: 50;
 
-    property <length> canon-w: root.size == "1x1" ? 240px : 480px;
-    property <length> canon-h: root.size == "2x2" ? 480px : 240px;
+    property <length> canon-w: root.size == "1x1" ? 120px : 240px;
+    property <length> canon-h: root.size == "2x2" ? 240px : 120px;
     property <float> zs: root.preview-scale;
 
     width: round((root.canon-w / 1px) * root.zs) * 1px;
     height: round((root.canon-h / 1px) * root.zs) * 1px;
     clip: true;
-    background: Dy.bg;
+    background: Dy.panel;
     border-width: Dy.stroke;
     border-color: Dy.line;
 
+    // Same inner padding as a home tile (TileShell).
     WidgetFace {
-        width: round((root.canon-w / 1px) * root.zs) * 1px;
-        height: round((root.canon-h / 1px) * root.zs) * 1px;
+        x: round(8 * root.zs) * 1px;
+        y: round(8 * root.zs) * 1px;
+        width: round((root.canon-w / 1px - 16) * root.zs) * 1px;
+        height: round((root.canon-h / 1px - 16) * root.zs) * 1px;
         face-scale: root.zs;
         kind: root.kind;
         size: root.size;

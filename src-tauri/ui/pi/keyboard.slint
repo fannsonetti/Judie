@@ -19,11 +19,11 @@ export component AnsiKeyboard inherits Rectangle {
     property <bool> upper: root.shift || root.caps;
 
     VerticalLayout {
-        padding: 10px;
-        spacing: 6px;
+        padding: 5px;
+        spacing: 3px;
 
         HorizontalLayout {
-            spacing: 10px;
+            spacing: 5px;
             height: Dy.hit-target;
             Text {
                 text: root.field;
@@ -43,7 +43,7 @@ export component AnsiKeyboard inherits Rectangle {
             }
             TouchArea {
                 clicked => { root.close(); }
-                width: max(88px, Dy.hit-target * 1.4);
+                width: max(44px, Dy.hit-target * 1.4);
                 Rectangle {
                     border-width: Dy.stroke;
                     border-color: Dy.dim;
@@ -61,7 +61,7 @@ export component AnsiKeyboard inherits Rectangle {
         }
 
         HorizontalLayout {
-            spacing: 5px;
+            spacing: 3px;
             vertical-stretch: 1;
             KeyBtn { u: 1.25; glyph: "Esc"; clicked => { root.command("esc"); } }
             KeyBtn {
@@ -119,7 +119,7 @@ export component AnsiKeyboard inherits Rectangle {
         }
 
         HorizontalLayout {
-            spacing: 5px;
+            spacing: 3px;
             vertical-stretch: 1;
             KeyBtn { u: 1.5; glyph: "Tab"; clicked => { root.command("tab"); } }
             KeyBtn { u: 1; glyph: root.upper ? "Q" : "q"; clicked => { root.typed(root.upper ? "Q" : "q"); } }
@@ -138,7 +138,7 @@ export component AnsiKeyboard inherits Rectangle {
         }
 
         HorizontalLayout {
-            spacing: 5px;
+            spacing: 3px;
             vertical-stretch: 1;
             KeyBtn { u: 1.75; glyph: "Caps"; on: root.caps; clicked => { root.caps = !root.caps; } }
             KeyBtn { u: 1; glyph: root.upper ? "A" : "a"; clicked => { root.typed(root.upper ? "A" : "a"); } }
@@ -156,7 +156,7 @@ export component AnsiKeyboard inherits Rectangle {
         }
 
         HorizontalLayout {
-            spacing: 5px;
+            spacing: 3px;
             vertical-stretch: 1;
             shift-l := KeyBtn { u: 2.25; glyph: "Shift"; on: root.shift; }
             KeyBtn { u: 1; glyph: root.upper ? "Z" : "z"; clicked => { root.typed(root.upper ? "Z" : "z"); } }
@@ -173,7 +173,7 @@ export component AnsiKeyboard inherits Rectangle {
         }
 
         HorizontalLayout {
-            spacing: 5px;
+            spacing: 3px;
             vertical-stretch: 1;
             ctrl-l := KeyBtn { u: 1.25; glyph: "Ctrl"; on: root.ctrl; }
             KeyBtn {

@@ -1,7 +1,7 @@
 import { Dy, SlopNode, TileShell, Pill } from "cards.slint";
 import { WidgetFace } from "faces.slint";
 
-// 1:1 home-grid stage: same TileShell pad (12px) and WidgetFace slop percents as Debian.
+// 1:1 home-grid stage: same TileShell pad (6px) and WidgetFace slop percents as Debian.
 export component DesignerStage inherits Rectangle {
     in property <string> size: "1x1";
     in property <string> kind: "custom";
@@ -11,9 +11,9 @@ export component DesignerStage inherits Rectangle {
     callback select-node(string);
     callback patch-node(string, float, float, float, float);
 
-    property <length> tile-w: root.size == "1x1" ? 240px : 480px;
-    property <length> tile-h: root.size == "2x2" ? 480px : 240px;
-    property <length> pad: 12px;
+    property <length> tile-w: root.size == "1x1" ? 120px : 240px;
+    property <length> tile-h: root.size == "2x2" ? 240px : 120px;
+    property <length> pad: 6px;
     property <string> drag-id: "";
     property <int> drag-mode: 0;
     property <float> grab-x: 0;
@@ -52,8 +52,8 @@ export component DesignerStage inherits Rectangle {
         for n in root.nodes: TouchArea {
             x: parent.width * n.x / 100;
             y: parent.height * n.y / 100;
-            width: max(12px, parent.width * n.w / 100);
-            height: max(12px, parent.height * n.h / 100);
+            width: max(6px, parent.width * n.w / 100);
+            height: max(6px, parent.height * n.h / 100);
             pointer-event(ev) => {
                 if ev.kind == PointerEventKind.down {
                     root.select-node(n.id);
@@ -82,17 +82,17 @@ export component DesignerStage inherits Rectangle {
                 }
             }
             Rectangle {
-                border-width: root.selected == n.id ? 1.5px : 1px;
+                border-width: root.selected == n.id ? 1px : 1px;
                 border-color: root.selected == n.id ? Dy.text : Dy.line;
                 background: transparent;
             }
         }
 
         for n in root.nodes: TouchArea {
-            x: parent.width * (n.x + n.w) / 100 - 14px;
-            y: parent.height * (n.y + n.h) / 100 - 14px;
-            width: 16px;
-            height: 16px;
+            x: parent.width * (n.x + n.w) / 100 - 7px;
+            y: parent.height * (n.y + n.h) / 100 - 7px;
+            width: 8px;
+            height: 8px;
             visible: root.selected == n.id;
             pointer-event(ev) => {
                 if ev.kind == PointerEventKind.down {

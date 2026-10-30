@@ -42,6 +42,11 @@ fn prefers_reduced_motion() -> bool {
 }
 
 fn apply_kiosk_geometry(ui: &MainWindow) {
+    // Desktop preview: one canvas-sized window instead of fullscreen.
+    if std::env::var_os("JUDIE_WINDOWED").is_some() {
+        ui.window().set_size(slint::LogicalSize::new(960.0, 600.0));
+        return;
+    }
     if let Some(size) = framebuffer_size() {
         ui.window().set_size(size);
     }
@@ -438,10 +443,15 @@ fn apply_persisted_display() {
         let w = parts.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1920) / 2;
         let h = parts.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1200) / 2;
         let _ = ensure_mode(&info.output, w.max(320), h.max(240), 60);
-        let phys = framebuffer_size().map(|s| s.width).unwrap_or(w.max(320));
-        let factor = (phys as f32 / 1920.0).clamp(0.25, 1.0);
+    }
+    // The UI is laid out on a 960-wide canvas. Scale by a whole number so each
+    // canvas pixel is an exact block (2x2 on a 1920 panel). SLINT_SCALE_FACTOR
+    // in the environment still wins, for desktop testing.
+    if std::env::var_os("SLINT_SCALE_FACTOR").is_none() {
+        let phys = framebuffer_size().map(|s| s.width).unwrap_or(1920);
+        let factor = (phys / 960).max(1);
         unsafe {
-            std::env::set_var("SLINT_SCALE_FACTOR", format!("{factor:.4}"));
+            std::env::set_var("SLINT_SCALE_FACTOR", factor.to_string());
         }
     }
 }
@@ -2220,6 +2230,8 @@ fn bind(ui: &MainWindow) {
             }
         } else if field == "terminal" {
             dispatch_terminal(&ui);
+        } else if field == "palette" {
+            ui.invoke_submit_palette();
         }
     });
     let weak = ui.as_weak();

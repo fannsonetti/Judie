@@ -202,7 +202,7 @@ struct Persist {
 }
 
 pub const GRID_COLS: i32 = 6;
-pub const GRID_COLS_SIDE: i32 = 4;
+pub const GRID_COLS_SIDE: i32 = 6;
 pub const GRID_ROWS: i32 = 4;
 pub const MAX_PAGES: i32 = 6;
 
@@ -264,6 +264,7 @@ pub fn supported_sizes(kind: &str) -> &'static [&'static str] {
 
 pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
     &[
+        ("ask", "Ask Judie", "Type or hold to talk to Judie."),
         ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
         ("calendar", "Calendar", "Upcoming events and the month at a glance."),
         ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
