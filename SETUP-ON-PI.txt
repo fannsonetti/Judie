@@ -1,0 +1,20 @@
+Raspberry Pi setup (read this on the Pi)
+========================================
+
+Do NOT double-click .sh files.
+On Raspberry Pi OS that just opens the file manager / editor.
+
+1. Open Terminal (black icon in the top bar)
+
+2. Go to the Judie folder, for example:
+     cd ~/Judie
+
+3. Run this once:
+     chmod +x scripts/enable-pi-launchers.sh
+     ./scripts/enable-pi-launchers.sh
+
+4. Look on your Desktop for two icons:
+     • Build Judie  — double-click this first (builds the Pi app; slow on Pi 3)
+     • Judie        — double-click after the build to open the app
+
+If a popup asks what to do, choose "Execute" or "Execute in Terminal".

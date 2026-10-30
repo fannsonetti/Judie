@@ -1,0 +1,802 @@
+You are doing a major UI/UX correction pass on the existing interface. Do not treat this as a minor polish pass. Several current interaction models and visual decisions are wrong and need to be replaced.
+
+Before changing code, inspect the existing project carefully so you understand the current widget grid, settings implementation, keyboard, network handling, power/version handling, and available assets. Preserve working functionality that is not explicitly being replaced.
+
+The interface should feel extremely minimal, deliberate, responsive, and close to a native embedded operating system rather than a generic web dashboard.
+
+## GLOBAL VISUAL RULES
+
+The core UI is monochrome.
+
+Primary background:
+
+* `#000000`
+
+Primary foreground/text:
+
+* `#FFFFFF`
+
+Dark and light greys may be used where genuinely necessary for hierarchy, disabled states, secondary text, separators, hover states, etc.
+
+Do NOT introduce accent colors anywhere unless they have explicitly been defined.
+
+Accent colors should generally only exist inside widgets whose content actually requires color.
+
+Do not make the interface blue.
+
+Do not add unnecessary colored status indicators.
+
+Do not assume borders must be 1px. Use whatever thickness creates the best visual hierarchy.
+
+There must NOT be a horizontal line running across the top of the interface.
+
+Avoid excessive containers and outlines. Not everything needs a box around it.
+
+## GLOBAL TOP AREA
+
+Every normal page should have only these persistent elements at the top:
+
+Left:
+
+* Current application version.
+
+Center:
+
+* Current time.
+
+Right:
+
+* Current network icon.
+
+The version should be:
+
+* white
+* approximately 10% opacity
+* deliberately difficult to notice unless someone looks for it
+
+Do not display:
+
+* IP address
+* "Ask"
+* "Set"
+* unnecessary status text
+* branding
+
+The top should otherwise feel empty and clean.
+
+---
+
+# SETTINGS GESTURE
+
+Settings must NOT open using a conventional settings button.
+
+Settings are accessed using a pull-down gesture.
+
+Only the RIGHTMOST ONE THIRD of the top edge should activate this gesture.
+
+Interaction:
+
+1. User touches/drags downward from the top-right third of the display.
+2. The settings interface physically follows the finger downward.
+3. Movement must remain 1:1 and smooth while dragging.
+4. Releasing after dragging sufficiently far opens Settings.
+5. Releasing before the threshold smoothly retracts it.
+6. Dragging the Settings sheet upward should dismiss it.
+7. It must never teleport between states.
+
+The left two-thirds of the top edge must NOT trigger Settings.
+
+The network icon remains located inside this top-right region but should still respond normally to a direct tap.
+
+Settings should behave like a native pull-down OS sheet rather than opening another webpage.
+
+---
+
+# SETTINGS STRUCTURE
+
+Keep the existing overall locations/layout logic of the settings categories, but replace broken or unnecessary behavior.
+
+The main categories are:
+
+* General
+* Network
+* Power
+
+Do not invent additional top-level categories unless genuinely required by implementation.
+
+---
+
+# GENERAL SETTINGS
+
+Keep the existing sections in roughly their current locations.
+
+## Profile
+
+Username
+
+This is the name used by the assistant/interface.
+
+## Location
+
+Location name
+
+Latitude
+
+Longitude
+
+The manual coordinates remain available as an override.
+
+## Units
+
+Temperature:
+
+* Celsius
+* Fahrenheit
+* Kelvin
+
+Distance:
+
+* Kilometres
+* Miles
+* Nautical miles
+* Furlongs
+
+Keep these options.
+
+## Voice
+
+Voice Response:
+
+* enabled/disabled
+
+Microphone:
+
+* enabled/disabled
+
+## Routines
+
+Keep the routine creator/list concept.
+
+Existing routine functionality may remain for now.
+
+Do not substantially redesign this system unless required to make it fit the new visual language.
+
+---
+
+# NETWORK SETTINGS PAGE
+
+The existing Network settings page is structurally acceptable but its current implementation is not finished.
+
+Keep approximately the existing placement of:
+
+## Connection
+
+Preferred interface:
+
+* Ethernet
+* Wi-Fi
+
+## Automatic Configuration
+
+DHCP toggle.
+
+## Reconnect
+
+Reconnect current network connection.
+
+Clean up anything broken in this menu.
+
+However, DO NOT use the Network settings page as the primary way of connecting to Wi-Fi.
+
+Wi-Fi connection is handled through the persistent network icon described below.
+
+---
+
+# GLOBAL NETWORK ICON
+
+There should always be a network icon in the upper-right corner.
+
+It must have NO surrounding border, box, pill, button background, or container.
+
+It should visually exist directly on the black background.
+
+Create the following states:
+
+### Ethernet
+
+Display an Ethernet/network-cable icon.
+
+Ethernet completely replaces the Wi-Fi icon whenever Ethernet is the active connection.
+
+### Wi-Fi states
+
+* 4 bars
+* 3 bars
+* 2 bars
+* 1 bar
+* disconnected
+
+The disconnected state should be a Wi-Fi symbol with an `×` positioned at the lower-right.
+
+Keep all of these monochrome unless a color is explicitly defined later.
+
+---
+
+# WI-FI CONNECTION MENU
+
+Clicking/tapping the network icon should open a compact network menu similar in behavior to Windows Wi-Fi controls.
+
+This is separate from the full Settings pull-down.
+
+Show available Wi-Fi networks.
+
+Each network should be directly selectable.
+
+When selecting an available network, show:
+
+* SSID/network name
+* status such as "Available network"
+* Connect button
+
+Pressing Connect on a secured network should request its password.
+
+Use the custom on-screen keyboard for password entry.
+
+Provide an:
+
+☑ Automatically connect
+
+option.
+
+Saved credentials should be reused appropriately so the user does not need to enter the password every time.
+
+For the currently connected network, show something equivalent to:
+
+* Connected
+* Disconnect
+
+The network list should update appropriately as availability changes.
+
+Do not make the user manually choose between absurdly technical connection flows for normal Wi-Fi usage.
+
+The experience should be immediately understandable to somebody familiar with Windows' Wi-Fi menu.
+
+---
+
+# ON-SCREEN KEYBOARD
+
+The existing keyboard layout is unacceptable and should be rebuilt.
+
+Create a proper ANSI-inspired 60% keyboard.
+
+It needs to visually and spatially resemble a real physical keyboard.
+
+Approximate structure:
+
+Row 1:
+Esc
+1
+2
+3
+4
+5
+6
+7
+8
+9
+0
+-
+
+=
+Backspace
+
+Row 2:
+Tab
+Q
+W
+E
+R
+T
+Y
+U
+I
+O
+P
+[
+]
+\
+
+Row 3:
+Caps Lock
+A
+S
+D
+F
+G
+H
+J
+K
+L
+;
+'
+Enter
+
+Row 4:
+Shift
+Z
+X
+C
+V
+B
+N
+M
+,
+.
+/
+Shift
+
+Bottom:
+Ctrl
+Pi
+Alt
+Space
+Alt
+Fn
+Ctrl
+
+Backspace must be at the upper-right.
+
+Enter must visually sit directly beneath/right-aligned relative to Backspace in a way consistent with a proper ANSI keyboard.
+
+Key sizing should resemble a physical keyboard:
+
+* Tab wider
+* Caps wider
+* Shift wider
+* Enter wider
+* Backspace wider
+* Spacebar significantly wider
+
+Do NOT use an arbitrary uniform key grid.
+
+## Pi Key
+
+Replace the normal Windows/Super key with a Raspberry Pi key.
+
+There is an asset:
+
+`root/references/raspberry.png`
+
+Use that asset for the Pi key.
+
+Do not substitute it with text saying "Pi" if the image can be used correctly.
+
+## Fn Layer
+
+Because this is a 60% keyboard, Fn should expose missing secondary keys/functions.
+
+At minimum make F1–F12 accessible using Fn.
+
+Implement the layer in a logical way and visibly indicate the secondary functions on relevant keys.
+
+Ensure every character required by the application can actually be entered using this keyboard.
+
+This includes:
+
+* lowercase letters
+* uppercase letters
+* digits
+* symbols
+* special characters
+
+Shift, Caps Lock, Ctrl, Alt and Fn should behave correctly rather than merely appearing decorative.
+
+---
+
+# WIDGET EDIT MODE
+
+The widget system needs substantial interaction improvements.
+
+## Grid
+
+Widgets still ultimately live on the existing invisible grid.
+
+Do NOT remove grid alignment.
+
+However, dragging must become completely smooth.
+
+Current behavior where widgets snap around while actively being dragged is wrong.
+
+Correct behavior:
+
+1. Widget follows the pointer/finger freely while dragging.
+2. Do not constantly snap its visible position to grid cells during the drag.
+3. Determine the closest valid grid position in the background.
+4. On release, smoothly animate the widget into the nearest valid grid position.
+5. The widget must glide into place.
+6. It must never instantly teleport.
+
+The interaction should feel similar to moving apps/widgets in iOS.
+
+Grid collision rules should still prevent invalid overlap.
+
+## Widget Size Label
+
+Do NOT display things like:
+
+* 1×1
+* 2×1
+* 2×2
+
+in the upper-left corner of placed widgets.
+
+Remove those labels completely.
+
+## Delete Widget Control
+
+In edit mode, the delete control must be exactly:
+
+`30px × 30px`
+
+Place it at the widget's upper-right edge.
+
+It should overlap the border similar to iOS edit controls rather than sitting completely inside the widget.
+
+Do not enlarge it unnecessarily.
+
+---
+
+# QUICK TASKS
+
+Every Quick Task must use exactly the same fixed dimensions.
+
+Longer labels must NOT cause one task to become wider/taller than another.
+
+Design the component around a fixed geometry.
+
+Handle text appropriately inside that geometry.
+
+---
+
+# ADD WIDGET INTERFACE
+
+The current add-widget menu and widget creator are both inadequate.
+
+Rebuild them.
+
+## Widget Selection
+
+When selecting a widget type, do NOT show widget sizes merely as text buttons at the bottom.
+
+Instead show the widget itself.
+
+There are currently three widget sizes:
+
+* Small
+* Medium
+* Large
+
+The size selector should be a horizontally swipeable carousel.
+
+For example:
+
+← swipe → between:
+
+Small → Medium → Large
+
+The preview should move naturally with the user's finger.
+
+At the bottom, show three pagination dots.
+
+Example:
+
+`● ○ ○`
+
+The currently selected page:
+
+* white
+
+Inactive dots:
+
+* grey
+* visibly dimmer than the selected dot
+
+Do not use an accent color.
+
+## Preview Rendering
+
+For now, every preview should be an EXACT live render of the actual widget component.
+
+Use its default/sample data in the preview.
+
+Do NOT retrieve the user's real widget data until the widget has actually been placed.
+
+Architect this preview system so it can later be changed from live-rendered widgets to static thumbnails/mockups without rewriting the entire widget-selection system.
+
+For example, the widget definition should eventually be able to specify a preview renderer/source independently of the actual placed widget.
+
+Do not hard-code the carousel exclusively around live DOM rendering in a way that makes future thumbnail support painful.
+
+---
+
+# CUSTOM WIDGET CREATOR
+
+The widget creator is not for editing the current demo widgets.
+
+All current widgets are temporary demonstration widgets and will eventually be removed.
+
+The widget creator exists to construct new custom widgets from reusable components.
+
+Treat it as a component-based widget builder.
+
+Its internal architecture should therefore be generic.
+
+Do not couple it to the current demo widgets.
+
+A widget should eventually be capable of being assembled from reusable elements such as:
+
+* text
+* labels
+* icons
+* values
+* buttons
+* graphs
+* status indicators
+* images
+* simple controls
+* layout containers
+
+Do not over-engineer functionality that does not exist yet, but structure the system so additional component types can be introduced later.
+
+The creator itself should visually match the main interface and should not look like an unrelated developer tool.
+
+---
+
+# POWER PAGE
+
+The current Power page is far too dense.
+
+Remove unnecessary update-management buttons and status clutter.
+
+The page should be deliberately sparse.
+
+There are THREE primary actions:
+
+* Restart
+* Shutdown
+* Uninstall
+
+That is the main purpose of the page.
+
+---
+
+# RESTART
+
+Restart should have a sensible confirmation before executing.
+
+Do not make Restart go through the extreme uninstall verification sequence.
+
+---
+
+# SHUTDOWN
+
+Shutdown should have a sensible confirmation before executing.
+
+Do not make Shutdown go through the extreme uninstall verification sequence.
+
+---
+
+# UNINSTALL
+
+Uninstall is deliberately difficult.
+
+It should require THREE escalating confirmation stages.
+
+## Confirmation 1
+
+Simple confirmation:
+
+"Are you sure?"
+
+The user explicitly chooses to continue.
+
+## Confirmation 2 — Math
+
+Display a randomly generated equation using single-digit numbers.
+
+Format:
+
+`x + y × z`
+
+Example:
+
+`4 + 3 × 7`
+
+Follow normal mathematical order of operations.
+
+The answer in that example would therefore be:
+
+`25`
+
+not:
+
+`49`
+
+Generate new single-digit values rather than hard-coding the example.
+
+Require the correct answer before continuing.
+
+## Confirmation 3 — Verification String
+
+Generate and display a random verification string.
+
+It must contain a mixture of:
+
+* lowercase letters
+* uppercase letters
+* numbers
+* special characters
+
+The user must type the string exactly.
+
+Example style only:
+
+`dK7@q2P!x`
+
+Do not permanently use that exact string.
+
+The verification string must be fully typeable using the custom on-screen keyboard.
+
+If the user enters it incorrectly, do not uninstall.
+
+Only after all three stages should uninstall actually become possible.
+
+These confirmations should be presented cleanly rather than as browser `confirm()` dialogs.
+
+Build proper interface modals/sheets matching the rest of the UI.
+
+---
+
+# SOFTWARE VERSION CONTROL
+
+Version management stays on the Power page but should be dramatically simplified.
+
+Do not show:
+
+* giant update controls
+* GitHub polling status
+* "Check releases"
+* "Install selected version"
+* separate "latest update" clutter
+* verbose version descriptions
+* release details
+
+Instead show something simple like:
+
+Version                     v0.x.x ▼
+
+The currently installed version appears normally.
+
+Clicking/tapping it opens a dropdown containing all available application releases.
+
+The list must be scrollable when there are more versions than fit comfortably.
+
+The current version should be clearly identifiable.
+
+Do not show changelogs or release details here.
+
+## Upgrading
+
+Selecting a newer version may proceed through the normal version-change confirmation.
+
+## Downgrading
+
+Downgrading is potentially destructive.
+
+If the selected release is older than the installed release:
+
+First confirmation:
+
+"Are you sure you want to downgrade?"
+
+If accepted:
+
+Second confirmation should be substantially stronger and clearly explain that downgrading may remove or invalidate user data/settings.
+
+Something intentionally forceful such as:
+
+"Are you REALLY sure? Downgrading may delete some of your data."
+
+Require another explicit confirmation.
+
+Do not trigger downgrade merely because somebody accidentally selected an older item in the dropdown.
+
+---
+
+# REMOVE OLD POWER FOOTER / UPDATE BAR
+
+The current bottom update/action area should be removed.
+
+Specifically remove the old model where the bottom of the interface contains several controls for things such as:
+
+* checking GitHub releases
+* installing a selected GitHub version
+* latest-update controls
+* restart
+* shutdown
+
+Restart and Shutdown now belong cleanly within Power.
+
+Version changing belongs in the Version selector.
+
+Do not recreate the old clutter somewhere else.
+
+---
+
+# MOTION AND TOUCH INTERACTION
+
+This is a touchscreen-oriented interface.
+
+Motion quality matters.
+
+Use continuous finger tracking for:
+
+* dragging widgets
+* opening Settings
+* closing Settings
+* widget-size carousel swiping
+* other swipe interactions
+
+Avoid interactions where the element remains stationary while dragging and suddenly jumps after release.
+
+Use appropriate easing only AFTER the user's finger/pointer has been released.
+
+During active dragging, movement should track the pointer directly rather than easing behind it.
+
+Use momentum/inertia only where it makes sense.
+
+Do not make animations excessively long or flashy.
+
+The desired feeling is:
+
+* immediate
+* physical
+* controlled
+* smooth
+
+not decorative.
+
+---
+
+# GENERAL ENGINEERING REQUIREMENTS
+
+Do not implement these features as visual mockups only.
+
+Where functionality already exists, reconnect the redesigned interface to it.
+
+Avoid browser-native `alert()`, `prompt()`, and `confirm()` dialogs for final UI flows.
+
+Use application-native modals/sheets.
+
+Do not duplicate logic unnecessarily.
+
+Keep components reusable.
+
+Keep network logic separate from its visual representation.
+
+Keep widget preview generation separate enough that previews can later switch between:
+
+* actual live widget renders
+* static generated previews
+* thumbnails
+
+Keep the keyboard input system generic so any text field can invoke it.
+
+Keep Settings gesture handling separate from the Settings page contents.
+
+Do not destroy currently functioning backend integrations unless the new interaction explicitly replaces them.
+
+The final result should feel like one coherent operating interface rather than several independent web components.
+
+Most importantly: do not reinterpret these requirements into a colorful modern dashboard. The intended identity is predominantly BLACK, WHITE, sparse, sharp, minimal and functional.
+</user_query>

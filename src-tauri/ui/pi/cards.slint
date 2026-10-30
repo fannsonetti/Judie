@@ -132,18 +132,18 @@ export struct DiagRow {
     detail: string,
 }
 
-// Theme tokens (docs/design/pixel-ui.md). Index: 0 Dusk, 1 Amber CRT, 2 Pocket, 3 Paper.
+// Theme tokens (docs/design/pixel-ui.md). Index: 0 Dusk, 1 Mono, 2 Ink, 3 Paper.
 // Only these eight colours go on screen; light swatches are the one exception.
 export global Dy {
     in-out property <int> theme: 0;
-    out property <color> bg: theme == 1 ? #0f0a02 : theme == 2 ? #0f380f : theme == 3 ? #efe8d8 : #15121f;
-    out property <color> panel: theme == 1 ? #1c1305 : theme == 2 ? #1f4f1f : theme == 3 ? #fbf7ee : #211c30;
-    out property <color> line: theme == 1 ? #4a3208 : theme == 2 ? #306230 : theme == 3 ? #2b2620 : #3b3354;
-    out property <color> text: theme == 1 ? #ffcf7a : theme == 2 ? #c8e07a : theme == 3 ? #1e1a16 : #f3ecda;
-    out property <color> dim: theme == 1 ? #b07d2a : theme == 2 ? #8bac0f : theme == 3 ? #6b6257 : #9d93b5;
-    out property <color> accent1: theme == 1 ? #ffb000 : theme == 2 ? #e0f8a0 : theme == 3 ? #d9480f : #ffb43a;
-    out property <color> accent2: theme == 1 ? #ffd36b : theme == 2 ? #9bbc0f : theme == 3 ? #1c7c74 : #5fe3cf;
-    out property <color> accent3: theme == 1 ? #ff7a1a : theme == 2 ? #e0f8a0 : theme == 3 ? #c2255c : #ff5f8d;
+    out property <color> bg: theme == 1 ? #000000 : theme == 2 ? #e8e8e8 : theme == 3 ? #efe8d8 : #15121f;
+    out property <color> panel: theme == 1 ? #111111 : theme == 2 ? #ffffff : theme == 3 ? #fbf7ee : #211c30;
+    out property <color> line: theme == 1 ? #5a5a5a : theme == 2 ? #000000 : theme == 3 ? #2b2620 : #3b3354;
+    out property <color> text: theme == 1 ? #ffffff : theme == 2 ? #000000 : theme == 3 ? #1e1a16 : #f3ecda;
+    out property <color> dim: theme == 1 ? #9a9a9a : theme == 2 ? #5c5c5c : theme == 3 ? #6b6257 : #9d93b5;
+    out property <color> accent1: theme == 1 ? #ffffff : theme == 2 ? #000000 : theme == 3 ? #d9480f : #ffb43a;
+    out property <color> accent2: theme == 1 ? #cfcfcf : theme == 2 ? #3a3a3a : theme == 3 ? #1c7c74 : #5fe3cf;
+    out property <color> accent3: theme == 1 ? #ffffff : theme == 2 ? #000000 : theme == 3 ? #c2255c : #ff5f8d;
     // Pixel border weight (spec rule 2). The UI is laid out on a 960-wide
     // canvas and drawn at 2x, so one unit here is a 2x2 block on the panel.
     out property <length> stroke: 3px;
@@ -619,7 +619,7 @@ export component QuickTask inherits Rectangle {
             color: root.on ? Dy.accent1 : Dy.text;
             font-size: Dy.type-control * root.zoom;
             horizontal-alignment: center;
-            wrap: word-wrap;
+            vertical-alignment: center;
             overflow: elide;
         }
     }

@@ -1,0 +1,1694 @@
+EXISTS D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint True size=109937
+EXISTS D:\Vibecoded\Judie\src-tauri\ui\pi\cards.slint True size=22833
+EXISTS D:\Vibecoded\Judie\src-tauri\ui\pi\faces.slint True size=31361
+EXISTS D:\Vibecoded\Judie\src-tauri\src\pi_room.rs True size=91717
+EXISTS D:\Vibecoded\Judie\src-tauri\src\bin\judie-pi.rs True size=72968
+===== Dy tokens D:\Vibecoded\Judie\src-tauri\ui\pi\cards.slint L134-155 =====
+134|export global Dy {
+135|    out property <color> canvas: #000000;
+136|    out property <color> border: #2a2a2a;
+137|    out property <color> border-hi: #5a5a5a;
+138|    out property <color> text: #ffffff;
+139|    out property <color> muted: #8a8a8a;
+140|    out property <color> dim: #4a4a4a;
+141|    out property <string> mono: "DejaVu Sans Mono";
+142|    // Home-screen type scale. Clock stays the strongest text (2× the previous 22px).
+143|    out property <length> type-clock: 44px;
+144|    out property <length> type-hero: 32px;
+145|    out property <length> type-value: 28px;
+146|    out property <length> type-title: 16px;
+147|    out property <length> type-control: 16px;
+148|    out property <length> type-secondary: 14px;
+149|    out property <length> type-status: 14px;
+150|    out property <length> type-dense: 12px;
+151|    out property <length> header-h: 88px;
+152|}
+153|
+154|export component Card inherits Rectangle {
+155|    in property <string> kicker;
+
+===== NetGlyph D:\Vibecoded\Judie\src-tauri\ui\pi\cards.slint L568-600 =====
+568|export component NetGlyph inherits Rectangle {
+569|    in property <string> kind: "wifi";
+570|    in property <int> bars: 0;
+571|    width: 28px;
+572|    height: 22px;
+573|    background: transparent;
+574|
+575|    if root.kind == "ethernet": Rectangle {
+576|        background: transparent;
+577|        Rectangle { x: 10px; y: 2px; width: 8px; height: 6px; background: #ffffff; }
+578|        Rectangle { x: 4px; y: 8px; width: 20px; height: 3px; background: #ffffff; }
+579|        Rectangle { x: 6px; y: 11px; width: 3px; height: 8px; background: #ffffff; }
+580|        Rectangle { x: 12.5px; y: 11px; width: 3px; height: 8px; background: #ffffff; }
+581|        Rectangle { x: 19px; y: 11px; width: 3px; height: 8px; background: #ffffff; }
+582|    }
+583|
+584|    if root.kind != "ethernet": Rectangle {
+585|        background: transparent;
+586|        Rectangle { x: 2px; y: 16px; width: 5px; height: 4px; background: root.bars >= 1 ? #ffffff : #3a3a3a; }
+587|        Rectangle { x: 8px; y: 12px; width: 5px; height: 8px; background: root.bars >= 2 ? #ffffff : #3a3a3a; }
+588|        Rectangle { x: 14px; y: 7px; width: 5px; height: 13px; background: root.bars >= 3 ? #ffffff : #3a3a3a; }
+589|        Rectangle { x: 20px; y: 2px; width: 5px; height: 18px; background: root.bars >= 4 ? #ffffff : #3a3a3a; }
+590|        if root.bars <= 0: Text {
+591|            x: 14px;
+592|            y: 8px;
+593|            text: "×";
+594|            color: #ffffff;
+595|            font-size: 14px;
+596|            font-weight: 700;
+597|            font-family: Dy.mono;
+598|        }
+599|    }
+600|}
+
+===== Slot struct cards D:\Vibecoded\Judie\src-tauri\ui\pi\cards.slint L42-55 =====
+42|export struct Slot {
+43|    id: string,
+44|    kind: string,
+45|    size: string,
+46|    col: int,
+47|    row: int,
+48|    cols: int,
+49|    rows: int,
+50|    page: int,
+51|    label: string,
+52|    custom-id: string,
+53|    use-layout: bool,
+54|}
+55|
+
+===== main props header settings volume D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint L16-160 =====
+16|    in-out property <string> clock: "--:--";
+17|    in-out property <string> date-text: "";
+18|    in-out property <string> version-text: "";
+19|    in-out property <string> status-label: "";
+20|    in-out property <string> host-ip: "NO IP";
+21|    in-out property <bool> dnd: false;
+22|    in-out property <int> page: 0;
+23|    in-out property <int> page-count: 1;
+24|
+25|    in-out property <bool> update-available: false;
+26|    in-out property <string> update-label: "";
+27|    in-out property <string> update-error: "";
+28|    in-out property <bool> updating: false;
+29|
+30|    in-out property <string> weather-loc: "";
+31|    in-out property <string> weather-temp: "";
+32|    in-out property <string> weather-cond: "";
+33|    in-out property <string> weather-range: "";
+34|    in-out property <string> weather-feel: "";
+35|    in-out property <string> weather-note: "";
+36|    in-out property <[HourRow]> hours: [];
+37|
+38|    in-out property <bool> master-on: true;
+39|    in-out property <int> brightness: 70;
+40|    in-out property <string> scene: "Cozy";
+41|    in-out property <string> master-color: "#FFB366";
+42|    in-out property <[LightRow]> lights: [];
+43|
+44|    in-out property <bool> playing: false;
+45|    in-out property <string> track-title: "";
+46|    in-out property <string> track-artist: "";
+47|    in-out property <int> volume: 62;
+48|    in-out property <float> media-progress: 0.2;
+49|
+50|    in-out property <string> indoor: "";
+51|    in-out property <string> outdoor: "";
+52|    in-out property <string> humidity: "";
+53|    in-out property <string> comfort: "";
+54|    in-out property <[EventRow]> events: [];
+55|    in-out property <string> month-name: "";
+56|
+57|    in-out property <bool> purifier-on: true;
+58|    in-out property <string> purifier-mode: "Auto";
+59|    in-out property <string> purifier-aq: "Good";
+60|    in-out property <int> purifier-filter: 38;
+61|
+62|    in-out property <float> cpu: 0;
+63|    in-out property <float> memory: 0;
+64|    in-out property <string> mem-detail: "";
+65|    in-out property <string> temp-text: "";
+66|    in-out property <[ServiceRow]> services: [];
+67|    in-out property <[ActivityRow]> activity: [];
+68|    in-out property <[TimerRow]> timers: [];
+69|
+70|    in-out property <bool> settings-open: false;
+71|    in-out property <bool> reduced-motion: false;
+72|    in-out property <bool> palette-open: false;
+73|    in-out property <bool> gallery-open: false;
+74|    in-out property <bool> creator-open: false;
+75|    in-out property <bool> edit-mode: false;
+76|    in-out property <int> settings-tab: 0;
+77|    in-out property <string> room-name: "Room";
+78|    in-out property <string> assistant-url: "http://127.0.0.1:8742";
+79|    in-out property <string> latitude: "64.07";
+80|    in-out property <string> longitude: "-21.95";
+81|    in-out property <bool> voice-enabled: true;
+82|    in-out property <bool> speak-replies: true;
+83|    in-out property <bool> units-metric: true;
+84|    in-out property <bool> notice-timers: true;
+85|    in-out property <bool> notice-calendar: true;
+86|    in-out property <bool> notice-weather: true;
+87|    in-out property <bool> notice-air: true;
+88|    in-out property <bool> notice-devices: true;
+89|    in-out property <string> palette-query: "";
+90|    in-out property <string> palette-reply: "";
+91|    in-out property <string> terminal-input: "";
+92|    in-out property <string> terminal-cwd: "~";
+93|    in-out property <[TerminalLine]> terminal-lines: [];
+94|    in-out property <[PaletteHit]> palette-hits: [];
+95|    in-out property <[RoutineRow]> routines: [];
+96|    in-out property <string> expanded: "";
+97|    in-out property <[Slot]> slots: [];
+98|    in-out property <[GalleryItem]> gallery-items: [];
+99|    in-out property <string> gallery-kind: "activity";
+100|    in-out property <string> gallery-size: "1x1";
+101|    in-out property <string> gallery-desc: "";
+102|    in-out property <string> gallery-query: "";
+103|    in-out property <bool> gallery-custom: false;
+104|    in-out property <string> gallery-custom-id: "";
+105|    in-out property <string> creator-name: "Untitled";
+106|    in-out property <string> creator-template: "stat";
+107|    in-out property <string> creator-size: "1x1";
+108|    in-out property <[CalCell]> cal-cells: [];
+109|    in-out property <[SlopNode]> slop-nodes: [];
+110|    in-out property <[SlopNode]> creator-nodes: [];
+111|    in-out property <string> creator-selected: "";
+112|    in-out property <string> creator-selected-kind: "";
+113|    in-out property <string> creator-node-text: "";
+114|    in-out property <string> pending-remove: "";
+115|    in-out property <string> pending-label: "";
+116|
+117|    in-out property <bool> kb-open: false;
+118|    in-out property <string> kb-field: "";
+119|    in-out property <string> kb-text: "";
+120|    in-out property <bool> kb-shift: false;
+121|    in-out property <bool> kb-symbols: false;
+122|    in-out property <[ReleaseRow]> releases: [];
+123|    in-out property <string> selected-release: "";
+124|    in-out property <string> release-status: "";
+125|    in-out property <string> wifi-ssid: "—";
+126|    in-out property <string> wifi-ip: "—";
+127|    in-out property <string> wifi-state: "—";
+128|    in-out property <string> wifi-pick: "";
+129|    in-out property <string> wifi-pass: "";
+130|    in-out property <string> wifi-status: "";
+131|    in-out property <bool> wifi-busy: false;
+132|    in-out property <[WifiNet]> wifi-nets: [];
+133|    in-out property <string> net-kind: "wifi";
+134|    in-out property <int> net-bars: 0;
+135|    in-out property <bool> net-menu-open: false;
+136|    in-out property <bool> dhcp-on: true;
+137|    in-out property <string> preferred-net: "wifi";
+138|    in-out property <bool> wifi-auto: true;
+139|    in-out property <string> temp-unit: "c";
+140|    in-out property <string> distance-unit: "km";
+141|    in-out property <string> confirm-kind: "";
+142|    in-out property <string> confirm-title: "";
+143|    in-out property <string> confirm-body: "";
+144|    in-out property <string> math-prompt: "";
+145|    in-out property <string> math-typed: "";
+146|    in-out property <string> verify-code: "";
+147|    in-out property <string> verify-typed: "";
+148|    in-out property <bool> version-menu-open: false;
+149|    in-out property <bool> power-busy: false;
+150|    in-out property <string> power-status: "";
+151|    in-out property <string> refresh-status: "";
+152|    in-out property <string> preview-source: "live";
+153|    in-out property <bool> gallery-use-layout: false;
+154|    in-out property <string> wifi-detail: "";
+155|    in-out property <string> net-iface: "—";
+156|    in-out property <string> net-security: "—";
+157|    in-out property <string> net-ipv6: "—";
+158|    in-out property <string> net-gateway: "—";
+159|    in-out property <string> net-dns: "—";
+160|    in-out property <string> net-mac: "—";
+
+===== settings funcs D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint L344-460 =====
+344|    function settings-pos(area-y: length, local-y: length) -> length {
+345|        return area-y + local-y;
+346|    }
+347|
+348|    function settings-follow(window-y: length) {
+349|        root.settings-pull = max(0, min(1, root.settings-base + ((window-y - root.settings-start) / root.height)));
+350|    }
+351|
+352|    function settings-begin(kind: int, window-y: length) {
+353|        root.settings-animating = false;
+354|        root.settings-kind = kind;
+355|        root.settings-armed = false;
+356|        root.settings-tracking = true;
+357|        root.settings-start = window-y;
+358|        root.settings-base = root.settings-pull;
+359|        root.settings-prev-pull = root.settings-pull;
+360|        root.settings-velocity = 0;
+361|        root.net-menu-open = false;
+362|    }
+363|
+364|    function settings-commit() {
+365|        root.settings-animating = false;
+366|        root.settings-pull = root.settings-goal;
+367|        if root.settings-goal >= 0.5 {
+368|            if root.sheet-id == 1 {
+369|                root.open-palette();
+370|            } else {
+371|                root.open-settings();
+372|            }
+373|        } else {
+374|            root.close-overlay();
+375|        }
+376|    }
+377|
+378|    function sheet-wanted() -> float {
+379|        return (root.settings-open || root.palette-open) ? 1.0 : 0.0;
+380|    }
+381|
+382|    function sheet-can-open() -> bool {
+383|        return !root.settings-open && !root.palette-open && root.settings-pull < 0.08;
+384|    }
+385|
+386|    function arm-sheet-open(id: int, window-y: length) {
+387|        if !root.sheet-can-open() {
+388|            return;
+389|        }
+390|        root.sheet-id = id;
+391|        root.settings-armed = true;
+392|        root.settings-kind = 0;
+393|        root.settings-start = window-y;
+394|        root.settings-base = root.settings-pull;
+395|    }
+396|
+397|    function sheet-sync-overlay() {
+398|        if root.settings-tracking || root.settings-animating {
+399|            return;
+400|        }
+401|        if abs(root.settings-pull - root.sheet-wanted()) < 0.001 {
+402|            return;
+403|        }
+404|        root.settings-from = root.settings-pull;
+405|        root.settings-goal = root.sheet-wanted();
+406|        root.settings-anim-t = 0;
+407|        root.settings-anim-ms = root.reduced-motion ? 90 : 240;
+408|        root.settings-animating = true;
+409|    }
+410|
+411|    function settings-finish(cancelled: bool) {
+412|        if !root.settings-tracking && !root.settings-armed {
+413|            return;
+414|        }
+415|        root.settings-armed = false;
+416|        if !root.settings-tracking {
+417|            return;
+418|        }
+419|        root.settings-tracking = false;
+420|        root.settings-from = root.settings-pull;
+421|        if cancelled {
+422|            root.settings-goal = root.settings-kind == 0 ? 0.0 : 1.0;
+423|        } else if root.settings-kind == 0 {
+424|            if root.settings-pull < 0.06 {
+425|                root.settings-goal = 0.0;
+426|            } else if root.settings-velocity > 0.85 {
+427|                root.settings-goal = 1.0;
+428|            } else if root.settings-velocity < -0.85 {
+429|                root.settings-goal = 0.0;
+430|            } else if root.settings-pull >= 0.32 {
+431|                root.settings-goal = 1.0;
+432|            } else {
+433|                root.settings-goal = 0.0;
+434|            }
+435|        } else if (1.0 - root.settings-pull) < 0.06 {
+436|            root.settings-goal = 1.0;
+437|        } else if root.settings-velocity < -0.85 {
+438|            root.settings-goal = 0.0;
+439|        } else if root.settings-velocity > 0.85 {
+440|            root.settings-goal = 1.0;
+441|        } else if root.settings-pull <= 0.68 {
+442|            root.settings-goal = 0.0;
+443|        } else {
+444|            root.settings-goal = 1.0;
+445|        }
+446|        if abs(root.settings-goal - root.settings-from) < 0.001 {
+447|            root.settings-commit();
+448|        } else {
+449|            root.settings-anim-t = 0;
+450|            root.settings-anim-ms = root.reduced-motion ? 90 : 240;
+451|            root.settings-animating = true;
+452|        }
+453|    }
+454|
+455|    changed settings-open => {
+456|        if root.settings-open {
+457|            root.sheet-id = 0;
+458|        }
+459|        root.sheet-sync-overlay();
+460|    }
+
+===== header UI D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint L469-610 =====
+469|    VerticalLayout {
+470|        padding: 0;
+471|        spacing: 0;
+472|
+473|        Rectangle {
+474|            height: Dy.header-h;
+475|            background: #000000;
+476|            HorizontalLayout {
+477|                x: root.pad;
+478|                y: 0;
+479|                height: 100%;
+480|                width: parent.width / 3 - root.pad * 2;
+481|                spacing: 10px;
+482|                Text {
+483|                    text: "v" + root.version-text;
+484|                    color: #ffffff;
+485|                    opacity: 0.1;
+486|                    font-size: Dy.type-status;
+487|                    font-family: Dy.mono;
+488|                    vertical-alignment: center;
+489|                }
+490|                if root.dnd: Text {
+491|                    text: "DND";
+492|                    color: #ffffff;
+493|                    font-size: Dy.type-status;
+494|                    font-family: Dy.mono;
+495|                    vertical-alignment: center;
+496|                }
+497|            }
+498|            actions-edge := TouchArea {
+499|                x: parent.width / 3;
+500|                width: parent.width / 3;
+501|                height: 100%;
+502|                pointer-event(ev) => {
+503|                    if ev.kind == PointerEventKind.down {
+504|                        root.arm-sheet-open(1, root.settings-pos(self.absolute-position.y, self.mouse-y));
+505|                    }
+506|                    if ev.kind == PointerEventKind.up {
+507|                        root.settings-finish(false);
+508|                    }
+509|                    if ev.kind == PointerEventKind.cancel {
+510|                        root.settings-finish(true);
+511|                    }
+512|                }
+513|                moved => {
+514|                    if self.pressed && !root.settings-open && !root.palette-open && (root.settings-tracking || root.settings-armed) && root.sheet-id == 1 {
+515|                        if !root.settings-tracking && root.settings-pos(self.absolute-position.y, self.mouse-y) - root.settings-start > 18px {
+516|                            root.settings-begin(0, root.settings-start);
+517|                        }
+518|                        if root.settings-tracking {
+519|                            root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+520|                        }
+521|                    }
+522|                }
+523|                VerticalLayout {
+524|                    padding-top: 8px;
+525|                    padding-bottom: 8px;
+526|                    spacing: 2px;
+527|                    alignment: center;
+528|                    Text {
+529|                        text: root.clock;
+530|                        color: #ffffff;
+531|                        font-size: Dy.type-clock;
+532|                        font-weight: 700;
+533|                        font-family: Dy.mono;
+534|                        horizontal-alignment: center;
+535|                        overflow: elide;
+536|                    }
+537|                    Text {
+538|                        text: root.date-text;
+539|                        color: #8a8a8a;
+540|                        font-size: Dy.type-status;
+541|                        font-family: Dy.mono;
+542|                        horizontal-alignment: center;
+543|                        overflow: elide;
+544|                    }
+545|                }
+546|            }
+547|            net-btn := TouchArea {
+548|                x: parent.width - 56px;
+549|                width: 48px;
+550|                height: 100%;
+551|                clicked => {
+552|                    if root.settings-pull < 0.08 && !root.settings-tracking && !root.settings-open && !root.palette-open {
+553|                        if root.net-menu-open { root.close-net-menu(); } else { root.open-net-menu(); }
+554|                    }
+555|                }
+556|                pointer-event(ev) => {
+557|                    if ev.kind == PointerEventKind.down {
+558|                        root.arm-sheet-open(0, root.settings-pos(self.absolute-position.y, self.mouse-y));
+559|                    }
+560|                    if ev.kind == PointerEventKind.up {
+561|                        root.settings-finish(false);
+562|                    }
+563|                    if ev.kind == PointerEventKind.cancel {
+564|                        root.settings-finish(true);
+565|                    }
+566|                }
+567|                moved => {
+568|                    if self.pressed && !root.settings-open && !root.palette-open && (root.settings-tracking || root.settings-armed) && root.sheet-id == 0 {
+569|                        if !root.settings-tracking && root.settings-pos(self.absolute-position.y, self.mouse-y) - root.settings-start > 18px {
+570|                            root.settings-begin(0, root.settings-start);
+571|                        }
+572|                        if root.settings-tracking {
+573|                            root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+574|                        }
+575|                    }
+576|                }
+577|                NetGlyph {
+578|                    x: (parent.width - 28px) / 2;
+579|                    y: (parent.height - 22px) / 2;
+580|                    kind: root.net-kind;
+581|                    bars: root.net-bars;
+582|                }
+583|            }
+584|            settings-edge := TouchArea {
+585|                x: parent.width * 2 / 3;
+586|                width: parent.width / 3 - 56px;
+587|                height: 100%;
+588|                pointer-event(ev) => {
+589|                    if ev.kind == PointerEventKind.down {
+590|                        root.arm-sheet-open(0, root.settings-pos(self.absolute-position.y, self.mouse-y));
+591|                    }
+592|                    if ev.kind == PointerEventKind.up {
+593|                        root.settings-finish(false);
+594|                    }
+595|                    if ev.kind == PointerEventKind.cancel {
+596|                        root.settings-finish(true);
+597|                    }
+598|                }
+599|                moved => {
+600|                    if self.pressed && !root.settings-open && !root.palette-open && (root.settings-tracking || root.settings-armed) && root.sheet-id == 0 {
+601|                        if !root.settings-tracking && root.settings-pos(self.absolute-position.y, self.mouse-y) - root.settings-start > 18px {
+602|                            root.settings-begin(0, root.settings-start);
+603|                        }
+604|                        if root.settings-tracking {
+605|                            root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+606|                        }
+607|                    }
+608|                }
+609|            }
+610|        }
+
+===== grid D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint L640-700 =====
+640|                interval: 450ms;
+641|                running: home-touch.pressed && !root.edit-mode && root.expanded == "" && !root.gallery-open && !root.creator-open && !root.settings-open && !root.palette-open;
+642|                triggered => { root.hold-home(); }
+643|            }
+644|            Rectangle {
+645|                property <length> cell: min(self.width / 6, self.height / 4);
+646|                property <length> ox: (self.width - cell * 6) / 2;
+647|                property <length> oy: (self.height - cell * 4) / 2;
+648|                property <length> g: 16px;
+649|
+650|                Timer {
+651|                    interval: 16ms;
+652|                    running: root.drag-settle;
+653|                    triggered => {
+654|                        root.drag-ease = 220ms;
+655|                        root.drag-dx = 0px;
+656|                        root.drag-dy = 0px;
+657|                        root.drag-settle = false;
+658|                        root.drag-closing = true;
+659|                    }
+660|                }
+661|                Timer {
+662|                    interval: 230ms;
+663|                    running: root.drag-closing;
+664|                    triggered => {
+665|                        root.drag-closing = false;
+666|                        root.drag-id = "";
+667|                        root.drag-live = false;
+668|                        root.drag-ease = 0ms;
+669|                    }
+670|                }
+671|
+672|                for w in root.slots: TileShell {
+673|                    x: ox + w.col * cell;
+674|                    y: oy + w.row * cell;
+675|                    width: w.cols * cell - g;
+676|                    height: w.rows * cell - g;
+677|                    visible: w.page == root.page;
+678|                    editing: root.edit-mode;
+679|                    pending: root.pending-remove == w.id;
+680|                    ghost: root.drag-id == w.id;
+681|                    vis-x: 0px;
+682|                    vis-y: 0px;
+683|                    tapped => { root.expand(w.kind); }
+684|                    held => { root.hold-home(); }
+685|                    remove => { root.request-remove(w.id); }
+686|                    drag-begin(lx, ly) => {
+687|                        root.drag-closing = false;
+688|                        root.drag-settle = false;
+689|                        root.drag-id = w.id;
+690|                        root.drag-kind = w.kind;
+691|                        root.drag-use-layout = w.use-layout;
+692|                        root.drag-size = w.size;
+693|                        root.drag-from-col = w.col;
+694|                        root.drag-from-row = w.row;
+695|                        root.drag-ox = ox + w.col * cell;
+696|                        root.drag-oy = oy + w.row * cell;
+697|                        root.drag-w = w.cols * cell - g;
+698|                        root.drag-h = w.rows * cell - g;
+699|                        root.drag-press-x = lx;
+700|                        root.drag-press-y = ly;
+
+===== settings sheet tabs D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint L984-1170 =====
+984|    if root.settings-pull > 0.001: Rectangle {
+985|        y: (root.settings-pull - 1.0) * parent.height;
+986|        width: 100%;
+987|        height: 100%;
+988|        background: #000000;
+989|        clip: true;
+990|        TouchArea {
+991|            width: 100%;
+992|            height: 100%;
+993|        }
+994|        VerticalLayout {
+995|            padding-left: 28px;
+996|            padding-right: 28px;
+997|            padding-top: 20px;
+998|            padding-bottom: 28px;
+999|            spacing: 12px;
+1000|            HorizontalLayout {
+1001|                height: 4px;
+1002|                alignment: center;
+1003|                Rectangle {
+1004|                    height: 4px;
+1005|                    width: 48px;
+1006|                    background: #3a3a3a;
+1007|                }
+1008|            }
+1009|            if root.sheet-id == 1: VerticalLayout {
+1010|                vertical-stretch: 1;
+1011|                spacing: 12px;
+1012|                Text { text: "JUDIE"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+1013|                FieldTap {
+1014|                    label: "ASK JUDIE";
+1015|                    value: root.palette-query;
+1016|                    active: root.kb-open && root.kb-field == "palette";
+1017|                    tapped => { root.open-keyboard("palette"); }
+1018|                }
+1019|                Flickable {
+1020|                    vertical-stretch: 1;
+1021|                    viewport-height: 12 * 40px;
+1022|                    interactive: !root.settings-tracking;
+1023|                    VerticalLayout {
+1024|                        spacing: 4px;
+1025|                        for hit in root.palette-hits: TouchArea {
+1026|                            clicked => { root.run-palette-hit(hit.id); }
+1027|                            Rectangle {
+1028|                                height: 36px; border-radius: 0px; background: #000000;
+1029|                                border-width: 1px; border-color: #2a2a2a;
+1030|                                HorizontalLayout {
+1031|                                    padding-left: 12px; padding-right: 12px;
+1032|                                    Text { text: hit.title; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+1033|                                    Text { text: hit.hint; color: #7a7a7a; font-size: 11px; font-family: Dy.mono; vertical-alignment: center; }
+1034|                                }
+1035|                            }
+1036|                        }
+1037|                    }
+1038|                }
+1039|                Text {
+1040|                    text: root.palette-reply;
+1041|                    color: #7a7a7a;
+1042|                    font-size: 12px;
+1043|                    font-family: Dy.mono;
+1044|                    wrap: word-wrap;
+1045|                }
+1046|                HorizontalLayout {
+1047|                    spacing: 8px;
+1048|                    Pill { label: "ASK"; on: true; clicked => { root.submit-palette(); } }
+1049|                    Pill { label: "CLOSE"; clicked => { root.close-overlay(); } }
+1050|                }
+1051|            }
+1052|            if root.sheet-id == 0: HorizontalLayout {
+1053|                spacing: 28px;
+1054|                height: 36px;
+1055|                TouchArea {
+1056|                    clicked => { root.set-tab(0); }
+1057|                    Text { text: "General"; color: root.settings-tab == 0 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+1058|                }
+1059|                TouchArea {
+1060|                    clicked => { root.set-tab(1); }
+1061|                    Text { text: "Network"; color: root.settings-tab == 1 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+1062|                }
+1063|                TouchArea {
+1064|                    clicked => { root.set-tab(2); }
+1065|                    Text { text: "Power"; color: root.settings-tab == 2 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+1066|                }
+1067|                Rectangle { horizontal-stretch: 1; }
+1068|            }
+1069|            if root.sheet-id == 0: Flickable {
+1070|                vertical-stretch: 1;
+1071|                viewport-height: settings-scroll.preferred-height;
+1072|                interactive: !root.settings-tracking;
+1073|                settings-scroll := VerticalLayout {
+1074|                    alignment: start;
+1075|                    spacing: 14px;
+1076|                    if root.settings-tab == 0: HorizontalLayout {
+1077|                        alignment: center;
+1078|                        VerticalLayout {
+1079|                            alignment: start;
+1080|                            width: root.general-col;
+1081|                            spacing: 18px;
+1082|                            padding-bottom: 80px;
+1083|                            FieldTap { label: "Username"; value: root.room-name; active: root.kb-field == "room-name"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("room-name"); } }
+1084|                            Text { text: "Location"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+1085|                            FieldTap { label: "Location name"; value: root.weather-loc; active: root.kb-field == "location"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("location"); } }
+1086|                            HorizontalLayout {
+1087|                                spacing: 20px;
+1088|                                FieldTap { label: "Latitude"; value: root.latitude; active: root.kb-field == "latitude"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("latitude"); } }
+1089|                                FieldTap { label: "Longitude"; value: root.longitude; active: root.kb-field == "longitude"; label-size: 15px; value-size: 22px; tap-height: 78px; tapped => { root.open-keyboard("longitude"); } }
+1090|                            }
+1091|                            Text { text: "Units"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+1092|                            VerticalLayout {
+1093|                                spacing: 10px;
+1094|                                Rectangle {
+1095|                                    height: 58px;
+1096|                                    border-width: 1.5px;
+1097|                                    border-color: root.temp-unit == "c" ? #ffffff : #2a2a2a;
+1098|                                    TouchArea { clicked => { root.set-units-preset("c-km"); } }
+1099|                                    Text {
+1100|                                        x: 16px;
+1101|                                        height: 100%;
+1102|                                        text: "Celsius and kilometres";
+1103|                                        color: root.temp-unit == "c" ? #ffffff : #8a8a8a;
+1104|                                        font-size: 20px;
+1105|                                        font-family: Dy.mono;
+1106|                                        vertical-alignment: center;
+1107|                                    }
+1108|                                }
+1109|                                Rectangle {
+1110|                                    height: 58px;
+1111|                                    border-width: 1.5px;
+1112|                                    border-color: root.temp-unit == "f" ? #ffffff : #2a2a2a;
+1113|                                    TouchArea { clicked => { root.set-units-preset("f-mi"); } }
+1114|                                    Text {
+1115|                                        x: 16px;
+1116|                                        height: 100%;
+1117|                                        text: "Fahrenheit and miles";
+1118|                                        color: root.temp-unit == "f" ? #ffffff : #8a8a8a;
+1119|                                        font-size: 20px;
+1120|                                        font-family: Dy.mono;
+1121|                                        vertical-alignment: center;
+1122|                                    }
+1123|                                }
+1124|                                Rectangle {
+1125|                                    height: 58px;
+1126|                                    border-width: 1.5px;
+1127|                                    border-color: root.temp-unit == "k" ? #ffffff : #2a2a2a;
+1128|                                    TouchArea { clicked => { root.set-units-preset("k-fur"); } }
+1129|                                    Text {
+1130|                                        x: 16px;
+1131|                                        height: 100%;
+1132|                                        text: "Kelvin and furlongs";
+1133|                                        color: root.temp-unit == "k" ? #ffffff : #8a8a8a;
+1134|                                        font-size: 20px;
+1135|                                        font-family: Dy.mono;
+1136|                                        vertical-alignment: center;
+1137|                                    }
+1138|                                }
+1139|                            }
+1140|                            Text { text: "Voice"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+1141|                            HorizontalLayout {
+1142|                                spacing: 20px;
+1143|                                height: 56px;
+1144|                                Text { text: "Microphone"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+1145|                                Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } }
+1146|                                Rectangle { horizontal-stretch: 1; }
+1147|                            }
+1148|                            HorizontalLayout {
+1149|                                spacing: 20px;
+1150|                                height: 56px;
+1151|                                Text { text: "Voice Response"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+1152|                                Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } }
+1153|                                Rectangle { horizontal-stretch: 1; }
+1154|                            }
+1155|                            Text { text: "Routines"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+1156|                            Pill { label: "Add"; on: true; clicked => { root.add-routine(); } }
+1157|                            for r in root.routines: RoutineCard {
+1158|                                item: r;
+1159|                                kb-field: root.kb-field;
+1160|                                edit-name => { root.open-keyboard("routine-name:" + r.id); }
+1161|                                edit-phrase => { root.open-keyboard("routine-phrase:" + r.id); }
+1162|                                edit-command => { root.open-keyboard("routine-command:" + r.id); }
+1163|                                save => { root.save-routine(r.id); }
+1164|                                cancel => { root.cancel-routine(r.id); }
+1165|                                duplicate => { root.duplicate-routine(r.id); }
+1166|                                toggle-enabled => { root.toggle-routine(r.id); }
+1167|                                delete => { root.delete-routine(r.id); }
+1168|                            }
+1169|                        }
+1170|                    }
+
+===== settings swipe close D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint L1400-1500 =====
+1400|            }
+1401|        }
+1402|        TouchArea {
+1403|            y: parent.height - 28px;
+1404|            width: 100%;
+1405|            height: 28px;
+1406|            pointer-event(ev) => {
+1407|                if ev.kind == PointerEventKind.down {
+1408|                    if root.settings-open || root.palette-open || root.settings-pull > 0.92 {
+1409|                        root.settings-armed = true;
+1410|                        root.settings-kind = 1;
+1411|                        root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
+1412|                        root.settings-base = root.settings-pull;
+1413|                    }
+1414|                }
+1415|                if ev.kind == PointerEventKind.up {
+1416|                    root.settings-finish(false);
+1417|                }
+1418|                if ev.kind == PointerEventKind.cancel {
+1419|                    root.settings-finish(true);
+1420|                }
+1421|            }
+1422|            moved => {
+1423|                if self.pressed && (root.settings-tracking || root.settings-armed) && root.settings-kind == 1 {
+1424|                    if !root.settings-tracking && root.settings-start - root.settings-pos(self.absolute-position.y, self.mouse-y) > 18px {
+1425|                        root.settings-begin(1, root.settings-start);
+1426|                    }
+1427|                    if root.settings-tracking {
+1428|                        root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+1429|                    }
+1430|                }
+1431|            }
+1432|        }
+1433|    }
+1434|
+1435|    if root.net-menu-open: Rectangle {
+1436|        background: #00000000;
+1437|        TouchArea { clicked => { root.close-net-menu(); } }
+1438|        Rectangle {
+1439|            x: parent.width - 420px;
+1440|            y: 52px;
+1441|            width: 400px;
+1442|            height: min(parent.height - 80px, 640px);
+1443|            background: #000000;
+1444|            border-width: 1.5px;
+1445|            border-color: #2a2a2a;
+1446|            TouchArea { clicked => { } }
+1447|            VerticalLayout {
+1448|                padding: 16px;
+1449|                spacing: 10px;
+1450|                if root.net-kind == "ethernet": Text {
+1451|                    text: "Ethernet";
+1452|                    color: #ffffff;
+1453|                    font-size: 16px;
+1454|                    font-family: Dy.mono;
+1455|                }
+1456|                if root.wifi-detail == "": Flickable {
+1457|                    vertical-stretch: 1;
+1458|                    viewport-height: 24 * 52px;
+1459|                    VerticalLayout {
+1460|                        spacing: 4px;
+1461|                        for net in root.wifi-nets: TouchArea {
+1462|                            clicked => { root.pick-wifi(net.ssid); }
+1463|                            height: 48px;
+1464|                            HorizontalLayout {
+1465|                                spacing: 10px;
+1466|                                NetGlyph { kind: "wifi"; bars: net.bars; }
+1467|                                VerticalLayout {
+1468|                                    alignment: center;
+1469|                                    Text { text: net.ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+1470|                                    Text { text: net.connected ? "Connected" : (net.saved ? "Saved" : "Available network"); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; }
+1471|                                }
+1472|                            }
+1473|                        }
+1474|                    }
+1475|                }
+1476|                if root.wifi-detail != "": VerticalLayout {
+1477|                    spacing: 12px;
+1478|                    vertical-stretch: 1;
+1479|                    TouchArea {
+1480|                        clicked => { root.wifi-detail = ""; }
+1481|                        Text { text: "←  Networks"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; }
+1482|                    }
+1483|                    Text { text: root.wifi-pick; color: #ffffff; font-size: 18px; font-family: Dy.mono; }
+1484|                    Text { text: root.wifi-pick == root.wifi-ssid ? "Connected" : "Available network"; color: #6a6a6a; font-size: 13px; font-family: Dy.mono; }
+1485|                    if root.wifi-pick == root.wifi-ssid: Pill { label: "Disconnect"; clicked => { root.disconnect-wifi(); } }
+1486|                    if root.wifi-pick != root.wifi-ssid: VerticalLayout {
+1487|                        spacing: 10px;
+1488|                        HorizontalLayout {
+1489|                            Text { text: "Automatically connect"; color: #ffffff; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
+1490|                            Rectangle { horizontal-stretch: 1; }
+1491|                            Toggle { on: root.wifi-auto; toggled => { root.toggle-wifi-auto(); } }
+1492|                        }
+1493|                        Pill { label: "Connect"; on: true; clicked => { root.connect-wifi(); } }
+1494|                    }
+1495|                    Text { text: root.wifi-status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+1496|                }
+1497|            }
+1498|        }
+1499|    }
+1500|
+
+===== expanded media D:\Vibecoded\Judie\src-tauri\ui\pi\main.slint L1855-1970 =====
+1855|                }
+1856|            }
+1857|        }
+1858|    }
+1859|
+1860|    if root.expanded == "weather": Rectangle {
+1861|        background: #000000cc;
+1862|        TouchArea { clicked => { root.collapse(); } }
+1863|        Rectangle {
+1864|            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+1865|            border-radius: 0px; background: #000000;
+1866|            border-width: 1px; border-color: #3d3d3d;
+1867|            VerticalLayout {
+1868|                padding: 24px; spacing: 12px;
+1869|                HorizontalLayout {
+1870|                    Text { text: root.weather-loc; color: #e6e6e6; font-size: 22px; font-weight: 700; }
+1871|                    Rectangle { horizontal-stretch: 1; }
+1872|                    Pill { label: "CLOSE"; clicked => { root.collapse(); } }
+1873|                }
+1874|                Text { text: root.weather-temp + "  " + root.weather-cond; color: #e6e6e6; font-size: 42px; font-weight: 700; }
+1875|                Text { text: root.weather-range + "  ·  " + root.weather-feel; color: #7a7a7a; font-size: 16px; }
+1876|                Text { text: root.weather-note; color: #e6e6e6; font-size: 16px; }
+1877|                HorizontalLayout {
+1878|                    spacing: 16px;
+1879|                    for h in root.hours: VerticalLayout {
+1880|                        spacing: 4px;
+1881|                        Text { text: h.hour; color: #555555; font-size: 12px; horizontal-alignment: center; }
+1882|                        Text { text: h.temp; color: #e6e6e6; font-size: 18px; font-weight: 700; horizontal-alignment: center; }
+1883|                        Text { text: h.precip; color: #7a7a7a; font-size: 12px; horizontal-alignment: center; }
+1884|                    }
+1885|                }
+1886|            }
+1887|        }
+1888|    }
+1889|
+1890|    if root.expanded == "lights": Rectangle {
+1891|        background: #000000cc;
+1892|        TouchArea { clicked => { root.collapse(); } }
+1893|        Rectangle {
+1894|            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+1895|            border-radius: 0px; background: #000000;
+1896|            border-width: 1px; border-color: #3d3d3d;
+1897|            VerticalLayout {
+1898|                padding: 24px; spacing: 14px;
+1899|                HorizontalLayout {
+1900|                    Text { text: "LIGHTS"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+1901|                    Rectangle { horizontal-stretch: 1; }
+1902|                    Toggle { on: root.master-on; toggled => { root.toggle-master(); } }
+1903|                    Pill { label: "CLOSE"; clicked => { root.collapse(); } }
+1904|                }
+1905|                HorizontalLayout {
+1906|                    spacing: 8px;
+1907|                    Pill { label: "Cozy"; on: root.scene == "Cozy"; clicked => { root.set-scene("Cozy"); } }
+1908|                    Pill { label: "Movie"; on: root.scene == "Movie"; clicked => { root.set-scene("Movie"); } }
+1909|                    Pill { label: "Night"; on: root.scene == "Night"; clicked => { root.set-scene("Night"); } }
+1910|                    Pill { label: "Bright"; on: root.scene == "Bright"; clicked => { root.set-scene("Bright"); } }
+1911|                    Pill { label: "Gaming"; on: root.scene == "Gaming"; clicked => { root.set-scene("Gaming"); } }
+1912|                }
+1913|                Text { text: root.brightness + "%"; color: #e6e6e6; font-size: 28px; font-weight: 700; }
+1914|                Slider { minimum: 0; maximum: 100; value: root.brightness; changed(v) => { root.brightness-changed(round(v)); } }
+1915|                HorizontalLayout {
+1916|                    spacing: 8px;
+1917|                    Swatch { swatch: #ff5a5a; on: root.master-color == "#FF5A5A"; clicked => { root.set-color("#FF5A5A"); } }
+1918|                    Swatch { swatch: #ff8c42; on: root.master-color == "#FF8C42"; clicked => { root.set-color("#FF8C42"); } }
+1919|                    Swatch { swatch: #ffd166; on: root.master-color == "#FFD166"; clicked => { root.set-color("#FFD166"); } }
+1920|                    Swatch { swatch: #7cf29c; on: root.master-color == "#7CF29C"; clicked => { root.set-color("#7CF29C"); } }
+1921|                    Swatch { swatch: #5ce1ff; on: root.master-color == "#2D7BFF"; clicked => { root.set-color("#2D7BFF"); } }
+1922|                    Swatch { swatch: #7b61ff; on: root.master-color == "#7B61FF"; clicked => { root.set-color("#7B61FF"); } }
+1923|                    Swatch { swatch: #ff6bcb; on: root.master-color == "#FF6BCB"; clicked => { root.set-color("#FF6BCB"); } }
+1924|                    Swatch { swatch: #ffffff; on: root.master-color == "#FFFFFF"; clicked => { root.set-color("#FFFFFF"); } }
+1925|                }
+1926|                for light in root.lights: HorizontalLayout {
+1927|                    Text { text: light.name; color: #e6e6e6; font-size: 16px; vertical-alignment: center; }
+1928|                    Text { text: light.brightness; color: #7a7a7a; font-size: 14px; vertical-alignment: center; }
+1929|                    Rectangle { horizontal-stretch: 1; }
+1930|                    Pill { label: light.on ? "On" : "Off"; on: light.on; clicked => { root.toggle-light(light.id); } }
+1931|                }
+1932|            }
+1933|        }
+1934|    }
+1935|
+1936|    if root.expanded == "media": Rectangle {
+1937|        background: #000000cc;
+1938|        TouchArea { clicked => { root.collapse(); } }
+1939|        Rectangle {
+1940|            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+1941|            border-radius: 0px; background: #000000;
+1942|            border-width: 1px; border-color: #3d3d3d;
+1943|            VerticalLayout {
+1944|                padding: 24px; spacing: 14px;
+1945|                HorizontalLayout {
+1946|                    Text { text: "NOW PLAYING"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+1947|                    Rectangle { horizontal-stretch: 1; }
+1948|                    Pill { label: "CLOSE"; clicked => { root.collapse(); } }
+1949|                }
+1950|                Text { text: root.track-title; color: #e6e6e6; font-size: 32px; font-weight: 700; }
+1951|                Text { text: root.track-artist; color: #7a7a7a; font-size: 16px; }
+1952|                Bar { level: root.media-progress; fill: #e6e6e6; }
+1953|                HorizontalLayout {
+1954|                    spacing: 12px;
+1955|                    alignment: center;
+1956|                    IconBtn { glyph: "⟨"; clicked => { root.prev-track(); } }
+1957|                    IconBtn { glyph: root.playing ? "❚❚" : "▶"; primary: true; clicked => { root.toggle-play(); } }
+1958|                    IconBtn { glyph: "⟩"; clicked => { root.next-track(); } }
+1959|                }
+1960|                Text { text: "Volume " + root.volume + "%"; color: #7a7a7a; font-size: 13px; }
+1961|                Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
+1962|            }
+1963|        }
+1964|    }
+1965|
+1966|    if root.expanded == "calendar": Rectangle {
+1967|        background: #000000cc;
+1968|        TouchArea { clicked => { root.collapse(); } }
+1969|        Rectangle {
+1970|            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+
+===== faces kinds D:\Vibecoded\Judie\src-tauri\ui\pi\faces.slint L1-80 =====
+1|import { Slider } from "std-widgets.slint";
+2|import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, CalCell, SlopNode, TerminalLine, Pill, Toggle, Swatch, IconBtn, Bar, QuickTask, FieldTap } from "cards.slint";
+3|
+4|// Live widget face used on the home grid and in the add-widget carousel.
+5|// `sample` swaps in default preview data so gallery never reads the live room.
+6|// `source` is the preview renderer: "live" draws this component; "image" is reserved
+7|// for a later static thumbnail without changing the carousel.
+8|
+9|export component WidgetFace inherits Rectangle {
+10|    in property <string> kind: "activity";
+11|    in property <string> size: "1x1";
+12|    in property <bool> sample: false;
+13|    in property <string> source: "live";
+14|    in property <float> face-scale: 1.0;
+15|    in property <image> thumb;
+16|    in property <string> widget-id: "";
+17|
+18|    in property <string> weather-loc: "";
+19|    in property <string> weather-temp: "";
+20|    in property <string> weather-cond: "";
+21|    in property <string> weather-range: "";
+22|    in property <string> weather-feel: "";
+23|    in property <string> weather-note: "";
+24|    in property <[HourRow]> hours: [];
+25|
+26|    in property <bool> master-on: true;
+27|    in property <int> brightness: 70;
+28|    in property <string> scene: "Cozy";
+29|    in property <string> master-color: "#FFB366";
+30|    in property <[LightRow]> lights: [];
+31|
+32|    in property <bool> playing: false;
+33|    in property <string> track-title: "";
+34|    in property <string> track-artist: "";
+35|    in property <int> volume: 62;
+36|    in property <float> media-progress: 0.2;
+37|
+38|    in property <string> indoor: "";
+39|    in property <string> outdoor: "";
+40|    in property <string> humidity: "";
+41|    in property <string> comfort: "";
+42|    in property <[EventRow]> events: [];
+43|    in property <string> month-name: "";
+44|    in property <[CalCell]> cal-cells: [];
+45|
+46|    in property <bool> purifier-on: true;
+47|    in property <string> purifier-mode: "Auto";
+48|    in property <string> purifier-aq: "Good";
+49|    in property <int> purifier-filter: 38;
+50|
+51|    in property <float> cpu: 0;
+52|    in property <float> memory: 0;
+53|    in property <string> mem-detail: "";
+54|    in property <string> temp-text: "";
+55|    in property <[ServiceRow]> services: [];
+56|    in property <[ActivityRow]> activity: [];
+57|    in property <[TimerRow]> timers: [];
+58|    in property <[SlopNode]> slop-nodes: [];
+59|    in property <bool> dnd: false;
+60|    in property <bool> use-layout: false;
+61|    in property <string> terminal-input: "";
+62|    in property <[TerminalLine]> terminal-lines: [];
+63|    in property <bool> terminal-kb-active: false;
+64|
+65|    callback toggle-master();
+66|    callback brightness-changed(int);
+67|    callback set-color(string);
+68|    callback toggle-light(string);
+69|    callback toggle-play();
+70|    callback next-track();
+71|    callback prev-track();
+72|    callback volume-changed(int);
+73|    callback quick(string);
+74|    callback set-purifier-mode(string);
+75|    callback open-terminal-input();
+76|    callback submit-terminal();
+77|
+78|    background: transparent;
+79|    clip: true;
+80|
+
+===== faces media lights weather calendar D:\Vibecoded\Judie\src-tauri\ui\pi\faces.slint L320-420 =====
+320|        }
+321|
+322|        if !root.use-layout && root.kind == "weather": VerticalLayout {
+323|            HorizontalLayout {
+324|                Text { text: root.t-loc; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; overflow: elide; horizontal-stretch: 1; }
+325|                if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+326|            }
+327|            HorizontalLayout {
+328|                VerticalLayout {
+329|                    Text { text: root.t-temp; color: #ffffff; font-size: Dy.type-hero * root.face-scale; font-weight: 700; }
+330|                    Text { text: root.t-cond; color: #ffffff; font-size: Dy.type-title * root.face-scale; }
+331|                    Text { text: root.t-range; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+332|                }
+333|                Rectangle { horizontal-stretch: 1; }
+334|                Rectangle {
+335|                    width: 36px * root.face-scale; height: 36px * root.face-scale; background: #000000; y: 8px * root.face-scale;
+336|                    border-width: max(1px, 1px * root.face-scale); border-color: #f0a030;
+337|                    Text { text: "*"; color: #f0a030; font-size: 18px * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
+338|                }
+339|            }
+340|            if root.size == "2x2": Text { text: root.t-note; color: #ffffff; font-size: Dy.type-secondary * root.face-scale; wrap: word-wrap; }
+341|            if root.size != "1x1": HorizontalLayout {
+342|                spacing: 8px;
+343|                for h in root.sample ? root.demo-hours : root.hours: VerticalLayout {
+344|                    Text { text: h.hour; color: #555555; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; }
+345|                    Text { text: h.temp; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; horizontal-alignment: center; }
+346|                    Text { text: h.precip; color: #8a8a8a; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; }
+347|                }
+348|            }
+349|        }
+350|
+351|        if !root.use-layout && root.kind == "lights": VerticalLayout {
+352|            spacing: 6px;
+353|            HorizontalLayout {
+354|                Text { text: root.t-scene; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; vertical-alignment: center; }
+355|                Rectangle { horizontal-stretch: 1; }
+356|                Toggle { on: root.t-master; zoom: root.face-scale; toggled => { if !root.sample { root.toggle-master(); } } }
+357|            }
+358|            Text { text: root.t-master ? root.t-bright + "%" : "Off"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+359|            Slider { minimum: 0; maximum: 100; value: root.t-bright; changed(v) => { if !root.sample { root.brightness-changed(round(v)); } } }
+360|            HorizontalLayout {
+361|                spacing: 8px;
+362|                Swatch { swatch: #ff5a5a; zoom: root.face-scale; on: root.t-color == "#FF5A5A"; clicked => { if !root.sample { root.set-color("#FF5A5A"); } } }
+363|                Swatch { swatch: #ff8c42; zoom: root.face-scale; on: root.t-color == "#FF8C42"; clicked => { if !root.sample { root.set-color("#FF8C42"); } } }
+364|                Swatch { swatch: #ffd166; zoom: root.face-scale; on: root.t-color == "#FFD166"; clicked => { if !root.sample { root.set-color("#FFD166"); } } }
+365|                Swatch { swatch: #7cf29c; zoom: root.face-scale; on: root.t-color == "#7CF29C"; clicked => { if !root.sample { root.set-color("#7CF29C"); } } }
+366|                Swatch { swatch: #5ce1ff; zoom: root.face-scale; on: root.t-color == "#2D7BFF"; clicked => { if !root.sample { root.set-color("#2D7BFF"); } } }
+367|                if root.size != "1x1": Swatch { swatch: #7b61ff; zoom: root.face-scale; on: root.t-color == "#7B61FF"; clicked => { if !root.sample { root.set-color("#7B61FF"); } } }
+368|                if root.size != "1x1": Swatch { swatch: #ff6bcb; zoom: root.face-scale; on: root.t-color == "#FF6BCB"; clicked => { if !root.sample { root.set-color("#FF6BCB"); } } }
+369|                if root.size != "1x1": Swatch { swatch: #ffffff; zoom: root.face-scale; on: root.t-color == "#FFFFFF"; clicked => { if !root.sample { root.set-color("#FFFFFF"); } } }
+370|            }
+371|            if root.size == "2x2": GridLayout {
+372|                spacing: 8px;
+373|                for light[i] in root.sample ? root.demo-lights : root.lights: Rectangle {
+374|                    row: floor(i / 2); col: mod(i, 2);
+375|                    background: #000000; height: 48px;
+376|                    border-width: 1.5px; border-color: Dy.border;
+377|                    HorizontalLayout {
+378|                        spacing: 0px;
+379|                        Rectangle { width: 3px; background: light.on ? #f0a030 : #3d3d3d; }
+380|                        TouchArea {
+381|                            clicked => { if !root.sample { root.toggle-light(light.id); } }
+382|                            VerticalLayout {
+383|                                padding: 6px;
+384|                                Text { text: light.name; color: #ffffff; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; overflow: elide; }
+385|                                Text { text: light.brightness; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+386|                            }
+387|                        }
+388|                    }
+389|                }
+390|            }
+391|        }
+392|
+393|        if !root.use-layout && root.kind == "media": VerticalLayout {
+394|            Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+395|            Text { text: root.t-track; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 600; overflow: elide; }
+396|            if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; overflow: elide; }
+397|            if root.size != "1x1": Bar { level: root.t-prog; fill: #ffffff; zoom: root.face-scale; }
+398|            HorizontalLayout {
+399|                spacing: 8px;
+400|                if root.size != "1x1": IconBtn { glyph: "⟨"; zoom: root.face-scale; clicked => { if !root.sample { root.prev-track(); } } }
+401|                IconBtn { glyph: root.t-play ? "❚❚" : "▶"; primary: true; zoom: root.face-scale; clicked => { if !root.sample { root.toggle-play(); } } }
+402|                if root.size != "1x1": IconBtn { glyph: "⟩"; zoom: root.face-scale; clicked => { if !root.sample { root.next-track(); } } }
+403|                if root.size == "2x2": Rectangle { horizontal-stretch: 1; }
+404|                if root.size == "2x2": Text { text: root.t-vol + "%"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; vertical-alignment: center; }
+405|            }
+406|            if root.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.t-vol; changed(v) => { if !root.sample { root.volume-changed(round(v)); } } }
+407|        }
+408|
+409|        if !root.use-layout && root.kind == "system": VerticalLayout {
+410|            Text { text: "CPU"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+411|            Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+412|            Bar { level: root.t-cpu / 100; fill: #ffffff; zoom: root.face-scale; }
+413|            if root.size != "1x1": Text { text: "Memory"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+414|            if root.size != "1x1": Text { text: round(root.t-mem) + "%"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+415|            if root.size != "1x1": Bar { level: root.t-mem / 100; fill: #ffffff; zoom: root.face-scale; }
+416|            if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+417|            if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+418|        }
+419|
+420|        if !root.use-layout && root.kind == "terminal": VerticalLayout {
+
+===== faces kind branches =====
+169|if !root.use-layout && root.kind == "quickControls": GridLayout {
+178|if !root.use-layout && root.kind == "climate": HorizontalLayout {
+199|if !root.use-layout && root.kind == "calendar": HorizontalLayout {
+244|if !root.use-layout && root.kind == "purifier": VerticalLayout {
+297|if !root.use-layout && root.kind == "activity": VerticalLayout {
+306|if !root.use-layout && root.kind == "server": VerticalLayout {
+322|if !root.use-layout && root.kind == "weather": VerticalLayout {
+351|if !root.use-layout && root.kind == "lights": VerticalLayout {
+393|if !root.use-layout && root.kind == "media": VerticalLayout {
+409|if !root.use-layout && root.kind == "system": VerticalLayout {
+420|if !root.use-layout && root.kind == "terminal": VerticalLayout {
+480|if !root.use-layout && root.kind == "timers": VerticalLayout {
+488|if root.kind == "custom" || root.use-layout: Rectangle {
+497|background: (n.kind == "button" || n.kind == "chip" || n.kind == "bar" || n.kind == "toggle") ? rgb(n.r, n.g, n.b) : #00000000;
+499|opacity: (n.kind == "bar" || n.kind == "gauge") ? 0.85 : 1;
+503|font-size: n.kind == "metric" ? Dy.type-value : Dy.type-secondary;
+504|font-weight: n.kind == "metric" ? 700 : 500;
+
+===== GRID size Persist Room Expanded D:\Vibecoded\Judie\src-tauri\src\pi_room.rs L67-80 =====
+67|pub struct Slot {
+68|    pub id: String,
+69|    pub kind: String,
+70|    pub size: String,
+71|    pub col: i32,
+72|    pub row: i32,
+73|    #[serde(default)]
+74|    pub page: i32,
+75|    #[serde(default)]
+76|    pub label: String,
+77|    #[serde(default)]
+78|    pub custom_id: String,
+79|}
+80|
+
+===== Persist D:\Vibecoded\Judie\src-tauri\src\pi_room.rs L144-185 =====
+144|#[derive(Serialize, Deserialize, Default)]
+145|struct Persist {
+146|    #[serde(default)]
+147|    slots: Vec<Slot>,
+148|    #[serde(default)]
+149|    custom: Vec<CustomWidget>,
+150|    #[serde(default)]
+151|    room_name: String,
+152|    #[serde(default)]
+153|    weather_loc: String,
+154|    #[serde(default)]
+155|    latitude: String,
+156|    #[serde(default)]
+157|    longitude: String,
+158|    #[serde(default)]
+159|    temp_unit: String,
+160|    #[serde(default)]
+161|    distance_unit: String,
+162|    #[serde(default)]
+163|    voice: Option<bool>,
+164|    #[serde(default)]
+165|    speak: Option<bool>,
+166|    #[serde(default)]
+167|    routines: Vec<Routine>,
+168|    #[serde(default)]
+169|    deleted_builtin_ids: Vec<String>,
+170|    #[serde(default)]
+171|    face_layouts: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
+172|}
+173|
+174|pub const GRID_COLS: i32 = 6;
+175|pub const GRID_ROWS: i32 = 4;
+176|pub const MAX_PAGES: i32 = 6;
+177|
+178|fn size_dims(size: &str) -> (i32, i32) {
+179|    match size {
+180|        "1x2" => (2, 1),
+181|        "2x2" => (2, 2),
+182|        _ => (1, 1),
+183|    }
+184|}
+185|
+
+===== gallery+sizes D:\Vibecoded\Judie\src-tauri\src\pi_room.rs L200-235 =====
+200|fn default_slots() -> Vec<Slot> {
+201|    vec![
+202|        slot("quick-1", "quickControls", "1x1", 0, 0),
+203|        slot("climate-1", "climate", "1x1", 1, 0),
+204|        slot("calendar-1", "calendar", "1x2", 2, 0),
+205|        slot("purifier-1", "purifier", "2x2", 4, 0),
+206|        slot("activity-1", "activity", "1x1", 0, 1),
+207|        slot("server-1", "server", "1x2", 1, 1),
+208|        slot("weather-1", "weather", "1x1", 3, 1),
+209|        slot("lights-1", "lights", "2x2", 0, 2),
+210|        slot("activity-2", "activity", "2x2", 2, 2),
+211|    ]
+212|}
+213|
+214|pub fn supported_sizes(_kind: &str) -> &'static [&'static str] {
+215|    &["1x1", "1x2", "2x2"]
+216|}
+217|
+218|pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
+219|    &[
+220|        ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
+221|        ("calendar", "Calendar", "Upcoming events and the month at a glance."),
+222|        ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
+223|        ("lights", "Lights", "Toggles, brightness, and colour for the room."),
+224|        ("media", "Media", "Now playing, volume, and skip."),
+225|        ("purifier", "Air Purifier", "Air quality, filter, and purifier mode."),
+226|        ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
+227|        ("server", "Server Status", "Health and latency of local services."),
+228|        ("system", "System", "CPU, memory, and top processes."),
+229|        ("terminal", "Terminal", "A Linux shell on this panel for normal commands."),
+230|        ("timers", "Timers", "Running timers and reminders."),
+231|        ("weather", "Weather", "Local conditions and the next few hours."),
+232|    ]
+233|}
+234|
+235|fn occupied_grid(slots: &[Slot], page: i32, skip: Option<&str>) -> Vec<Vec<bool>> {
+
+===== Room struct D:\Vibecoded\Judie\src-tauri\src\pi_room.rs L851-940 =====
+851|pub struct Room {
+852|    pub lights: Vec<Light>,
+853|    pub scene: String,
+854|    pub dnd: bool,
+855|    pub playing: bool,
+856|    pub volume: u8,
+857|    pub track: usize,
+858|    pub queue: Vec<Track>,
+859|    pub progress: f32,
+860|    pub indoor: f32,
+861|    pub outdoor: i32,
+862|    pub humidity: u8,
+863|    pub weather_loc: String,
+864|    pub weather_temp: i32,
+865|    pub weather_cond: String,
+866|    pub weather_high: i32,
+867|    pub weather_low: i32,
+868|    pub weather_feel: String,
+869|    pub weather_note: String,
+870|    pub hours: Vec<Hour>,
+871|    pub events: Vec<Event>,
+872|    pub purifier_on: bool,
+873|    pub purifier_mode: String,
+874|    pub purifier_aq: String,
+875|    pub purifier_filter: u8,
+876|    pub room_name: String,
+877|    pub assistant_url: String,
+878|    pub latitude: String,
+879|    pub longitude: String,
+880|    pub voice: bool,
+881|    pub speak: bool,
+882|    pub units_metric: bool,
+883|    pub temp_unit: String,
+884|    pub distance_unit: String,
+885|    pub notice_timers: bool,
+886|    pub notice_calendar: bool,
+887|    pub notice_weather: bool,
+888|    pub notice_air: bool,
+889|    pub notice_devices: bool,
+890|    pub overlay: Overlay,
+891|    pub settings_tab: i32,
+892|    pub palette_query: String,
+893|    pub palette_reply: String,
+894|    pub terminal_input: String,
+895|    pub terminal_cwd: PathBuf,
+896|    pub terminal_lines: Vec<TerminalLine>,
+897|    pub edit_mode: bool,
+898|    pub page: i32,
+899|    pub slots: Vec<Slot>,
+900|    pub custom: Vec<CustomWidget>,
+901|    pub gallery_kind: String,
+902|    pub gallery_size: String,
+903|    pub gallery_query: String,
+904|    pub gallery_custom_id: String,
+905|    pub creator_name: String,
+906|    pub creator_template: String,
+907|    pub creator_size: String,
+908|    pub creator_nodes: Vec<SlopNode>,
+909|    pub creator_selected: String,
+910|    pub pending_remove: String,
+911|    pub cal_cells: Vec<CalCell>,
+912|    pub activity: Vec<Activity>,
+913|    pub timers: Vec<TimerItem>,
+914|    pub routines: Vec<Routine>,
+915|    pub deleted_builtin_ids: Vec<String>,
+916|    pub routine_edits: Vec<RoutineEdit>,
+917|    pub expanded: Expanded,
+918|    pub face_layouts: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
+919|}
+920|
+921|#[derive(Clone, Copy, PartialEq, Eq)]
+922|pub enum Overlay {
+923|    None,
+924|    Settings,
+925|    Palette,
+926|    Gallery,
+927|    Creator,
+928|}
+929|
+930|#[derive(Clone, Copy, PartialEq, Eq)]
+931|pub enum Expanded {
+932|    None,
+933|    Weather,
+934|    Lights,
+935|    Media,
+936|    Calendar,
+937|    Purifier,
+938|    Terminal,
+939|}
+940|
+
+===== save_persist D:\Vibecoded\Judie\src-tauri\src\pi_room.rs L400-470 =====
+400|fn persist_path() -> PathBuf {
+401|    data_dir().join("layout.json")
+402|}
+403|
+404|pub fn migrate_units_preset(temp: &str, distance: &str) -> &'static str {
+405|    let t = temp.to_ascii_lowercase();
+406|    let d = distance.to_ascii_lowercase();
+407|    if (t == "c" || t == "celsius") && (d == "km" || d == "kilometres" || d == "kilometers") {
+408|        return "c-km";
+409|    }
+410|    if (t == "f" || t == "fahrenheit") && (d == "mi" || d == "mile" || d == "miles") {
+411|        return "f-mi";
+412|    }
+413|    if (t == "k" || t == "kelvin") && (d == "fur" || d == "furlong" || d == "furlongs") {
+414|        return "k-fur";
+415|    }
+416|    if t == "f" || t == "fahrenheit" {
+417|        return "f-mi";
+418|    }
+419|    if t == "k" || t == "kelvin" {
+420|        return "k-fur";
+421|    }
+422|    if t == "c" || t == "celsius" {
+423|        return "c-km";
+424|    }
+425|    if d == "mi" || d == "nm" || d == "mile" || d == "miles" || d == "nautical" {
+426|        return "f-mi";
+427|    }
+428|    if d == "fur" || d == "furlong" || d == "furlongs" {
+429|        return "k-fur";
+430|    }
+431|    "c-km"
+432|}
+433|
+434|fn load_persist() -> Persist {
+435|    let path = persist_path();
+436|    std::fs::read_to_string(&path)
+437|        .ok()
+438|        .and_then(|s| serde_json::from_str(&s).ok())
+439|        .unwrap_or_default()
+440|}
+441|
+442|fn save_persist(room: &Room) {
+443|    let dir = data_dir();
+444|    let _ = std::fs::create_dir_all(&dir);
+445|    let persist = Persist {
+446|        slots: room.slots.clone(),
+447|        custom: room.custom.clone(),
+448|        room_name: room.room_name.clone(),
+449|        weather_loc: room.weather_loc.clone(),
+450|        latitude: room.latitude.clone(),
+451|        longitude: room.longitude.clone(),
+452|        temp_unit: room.temp_unit.clone(),
+453|        distance_unit: room.distance_unit.clone(),
+454|        voice: Some(room.voice),
+455|        speak: Some(room.speak),
+456|        routines: room
+457|            .routines
+458|            .iter()
+459|            .filter(|r| !r.builtin || !r.enabled)
+460|            .cloned()
+461|            .collect(),
+462|        deleted_builtin_ids: room.deleted_builtin_ids.clone(),
+463|        face_layouts: room.face_layouts.clone(),
+464|    };
+465|    if let Ok(json) = serde_json::to_string_pretty(&persist) {
+466|        let _ = std::fs::write(persist_path(), json);
+467|    }
+468|    save_face_layout_file(&room.face_layouts);
+469|}
+470|
+
+===== reduced motion + expand handlers D:\Vibecoded\Judie\src-tauri\src\bin\judie-pi.rs L33-40 =====
+33|fn prefers_reduced_motion() -> bool {
+34|    match std::env::var("JUDIE_REDUCED_MOTION") {
+35|        Ok(v) => matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes"),
+36|        Err(_) => matches!(std::env::var("GTK_ENABLE_ANIMATIONS").as_deref(), Ok("0")),
+37|    }
+38|}
+39|
+40|fn apply_kiosk_geometry(ui: &MainWindow) {
+
+===== expand handler D:\Vibecoded\Judie\src-tauri\src\bin\judie-pi.rs L970-1000 =====
+970|        pi_room::with(|room| {
+971|            let max = (room.visible_page_count() - 1).max(0);
+972|            room.page = p.clamp(0, max);
+973|        });
+974|        r();
+975|    });
+976|    let r = refresh.clone();
+977|    ui.on_expand(move |kind| {
+978|        pi_room::with(|room| {
+979|            if room.edit_mode {
+980|                return;
+981|            }
+982|            room.expanded = match kind.as_str() {
+983|                "weather" => Expanded::Weather,
+984|                "lights" => Expanded::Lights,
+985|                "media" => Expanded::Media,
+986|                "calendar" => Expanded::Calendar,
+987|                "purifier" => Expanded::Purifier,
+988|                "terminal" => Expanded::Terminal,
+989|                _ => Expanded::None,
+990|            };
+991|        });
+992|        r();
+993|    });
+994|    let r = refresh.clone();
+995|    ui.on_collapse(move || {
+996|        pi_room::with(|room| room.expanded = Expanded::None);
+997|        r();
+998|    });
+999|    let r = refresh.clone();
+1000|    ui.on_enter_edit(move || {
+
+===== volume handler D:\Vibecoded\Judie\src-tauri\src\bin\judie-pi.rs L890-900 =====
+890|        r();
+891|    });
+892|    let r = refresh.clone();
+893|    ui.on_volume_changed(move |v| {
+894|        pi_room::with(|room| room.volume = v.clamp(0, 100) as u8);
+895|        r();
+896|    });
+897|    let r = refresh.clone();
+898|    ui.on_quick(move |a| {
+899|        pi_room::with(|room| room.quick(a.as_str()));
+900|        r();
+
+===== set reduced D:\Vibecoded\Judie\src-tauri\src\bin\judie-pi.rs L1900-1910 =====
+1900|                 systemd kiosk:   journalctl -u judie -b\n\
+1901|                 Debug from SSH:  sudo systemctl stop judie && DISPLAY=:0 judie"
+1902|            );
+1903|            std::process::exit(1);
+1904|        }
+1905|    };
+1906|    apply_kiosk_geometry(&ui);
+1907|    ui.set_reduced_motion(prefers_reduced_motion());
+1908|    ui.set_version_text(releases::display_version().into());
+1909|    ui.set_selected_release(format!("v{}", releases::display_version()).into());
+1910|    bind(&ui);
+
+===== font mentions =====
+cards.slint:141|out property <string> mono: "DejaVu Sans Mono";
+cards.slint:192|font-family: Dy.mono;
+cards.slint:255|font-family: Dy.mono;
+cards.slint:286|font-family: Dy.mono;
+cards.slint:294|font-family: Dy.mono;
+cards.slint:321|font-family: Dy.mono;
+cards.slint:329|font-family: Dy.mono;
+cards.slint:359|Text { text: root.label; color: Dy.muted; font-size: root.label-size; font-family: Dy.mono; }
+cards.slint:368|font-family: Dy.mono;
+cards.slint:376|font-family: Dy.mono;
+cards.slint:408|font-family: Dy.mono;
+cards.slint:503|font-family: Dy.mono;
+cards.slint:513|font-family: Dy.mono;
+cards.slint:552|font-family: Dy.mono;
+cards.slint:560|font-family: Dy.mono;
+cards.slint:597|font-family: Dy.mono;
+cards.slint:630|font-family: Dy.mono;
+cards.slint:636|font-family: Dy.mono;
+cards.slint:673|pointer-event(ev) => {
+cards.slint:674|if ev.kind == PointerEventKind.down {
+cards.slint:677|if ev.kind == PointerEventKind.cancel {
+cards.slint:680|if ev.kind == PointerEventKind.up && root.active && !root.fired {
+cards.slint:699|font-family: Dy.mono;
+cards.slint:727|pointer-event(ev) => {
+cards.slint:728|if ev.kind == PointerEventKind.down && root.editing {
+cards.slint:733|if ev.kind == PointerEventKind.up && root.editing {
+cards.slint:736|if ev.kind == PointerEventKind.cancel && root.editing {
+cards.slint:747|interval: 450ms;
+cards.slint:770|// Drag clone only: interactive badges live in the home overlay so they
+cards.slint:787|font-family: Dy.mono;
+faces.slint:185|Text { text: root.t-in; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+faces.slint:186|Text { text: "NOW"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; }
+faces.slint:191|Text { text: "HUMIDITY"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:192|Text { text: root.t-hum; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+faces.slint:193|Text { text: "OUTDOOR"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:194|Text { text: root.t-out; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+faces.slint:195|if root.size == "1x2": Text { text: root.t-comfort; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:235|font-family: Dy.mono;
+faces.slint:253|Text { text: root.t-aq; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+faces.slint:254|Text { text: "AIR QUALITY"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; }
+faces.slint:264|Text { text: "PM2.5"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:265|Text { text: "7 µg/m³"; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+faces.slint:266|Text { text: "Fine particles"; color: #555555; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:274|Text { text: "ALLERGENS"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:275|Text { text: "4/12"; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; font-family: Dy.mono; }
+faces.slint:276|Text { text: "Allergen level"; color: #555555; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:337|Text { text: "*"; color: #f0a030; font-size: 18px * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
+faces.slint:384|Text { text: light.name; color: #ffffff; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; overflow: elide; }
+faces.slint:385|Text { text: light.brightness; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; font-family: Dy.mono; }
+faces.slint:426|font-family: Dy.mono;
+faces.slint:432|font-family: Dy.mono;
+faces.slint:446|font-family: Dy.mono;
+faces.slint:474|font-family: Dy.mono;
+main.slint:487|font-family: Dy.mono;
+main.slint:494|font-family: Dy.mono;
+main.slint:502|pointer-event(ev) => {
+main.slint:503|if ev.kind == PointerEventKind.down {
+main.slint:506|if ev.kind == PointerEventKind.up {
+main.slint:509|if ev.kind == PointerEventKind.cancel {
+main.slint:533|font-family: Dy.mono;
+main.slint:541|font-family: Dy.mono;
+main.slint:556|pointer-event(ev) => {
+main.slint:557|if ev.kind == PointerEventKind.down {
+main.slint:560|if ev.kind == PointerEventKind.up {
+main.slint:563|if ev.kind == PointerEventKind.cancel {
+main.slint:588|pointer-event(ev) => {
+main.slint:589|if ev.kind == PointerEventKind.down {
+main.slint:592|if ev.kind == PointerEventKind.up {
+main.slint:595|if ev.kind == PointerEventKind.cancel {
+main.slint:620|pointer-event(ev) => {
+main.slint:621|if ev.kind == PointerEventKind.down {
+main.slint:624|if ev.kind == PointerEventKind.up && !root.edit-mode && root.expanded == "" {
+main.slint:635|interval: 550ms;
+main.slint:640|interval: 450ms;
+main.slint:651|interval: 16ms;
+main.slint:662|interval: 230ms;
+main.slint:933|Text { text: "REMOVE WIDGET?"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+main.slint:934|Text { text: root.pending-label == "" ? "This tile will leave the home screen." : root.pending-label; color: #7a7a7a; font-size: 12px; font-family: Dy.mono; wra
+main.slint:945|pointer-event(ev) => {
+main.slint:946|if ev.kind == PointerEventKind.up {
+main.slint:949|if ev.kind == PointerEventKind.cancel {
+main.slint:959|interval: 16ms;
+main.slint:968|interval: 16ms;
+main.slint:1012|Text { text: "JUDIE"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+main.slint:1022|interactive: !root.settings-tracking;
+main.slint:1032|Text { text: hit.title; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+main.slint:1033|Text { text: hit.hint; color: #7a7a7a; font-size: 11px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1043|font-family: Dy.mono;
+main.slint:1057|Text { text: "General"; color: root.settings-tab == 0 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1061|Text { text: "Network"; color: root.settings-tab == 1 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1065|Text { text: "Power"; color: root.settings-tab == 2 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1072|interactive: !root.settings-tracking;
+main.slint:1084|Text { text: "Location"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+main.slint:1091|Text { text: "Units"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+main.slint:1105|font-family: Dy.mono;
+main.slint:1120|font-family: Dy.mono;
+main.slint:1135|font-family: Dy.mono;
+main.slint:1140|Text { text: "Voice"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+main.slint:1144|Text { text: "Microphone"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1151|Text { text: "Voice Response"; color: #ffffff; font-size: 22px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1155|Text { text: "Routines"; color: #6a6a6a; font-size: 18px; font-family: Dy.mono; }
+main.slint:1178|Text { text: root.net-headline; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+main.slint:1179|Text { text: "Type"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1180|Text { text: root.net-kind; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1181|Text { text: "Interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1182|Text { text: root.net-iface; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1183|Text { text: "SSID"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1184|Text { text: root.wifi-ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+main.slint:1185|Text { text: "State"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1186|Text { text: root.wifi-state; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1187|Text { text: "Signal"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1188|Text { text: root.net-signal; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1189|Text { text: "Security"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1190|Text { text: root.net-security; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1191|Text { text: "IPv4"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1192|Text { text: root.wifi-ip; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1193|Text { text: "IPv6"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1194|Text { text: root.net-ipv6; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+main.slint:1195|Text { text: "Gateway"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1196|Text { text: root.net-gateway; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1197|Text { text: "DNS"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1198|Text { text: root.net-dns; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+main.slint:1199|Text { text: "MAC"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1200|Text { text: root.net-mac; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1201|Text { text: "Link speed"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1202|Text { text: root.net-speed; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+main.slint:1203|Text { text: "Preferred interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1210|Text { text: "DHCP"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1221|Text { text: "Nearby Wi-Fi"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1229|font-family: Dy.mono;
+main.slint:1244|Text { text: net.ssid + (net.connected ? "  · connected" : ""); color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+main.slint:1245|Text { text: net.security + (net.saved ? "  · saved" : ""); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; overflow: elide; }
+main.slint:1267|Text { text: "Diagnostics"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1273|Text { text: d.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1275|Text { text: d.state + (d.detail == "" ? "" : "  " + d.detail); color: #8a8a8a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1307|font-family: Dy.mono;
+main.slint:1311|Text { text: "Software"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1313|Text { text: "Installed version"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1315|Text { text: "v" + root.version-text; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1321|font-family: Dy.mono;
+main.slint:1328|font-family: Dy.mono;
+main.slint:1331|Text { text: "Switch version"; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+main.slint:1351|font-family: Dy.mono;
+main.slint:1366|Text { text: rel.tag; color: rel.current ? #ffffff : #8a8a8a; font-size: 15px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1368|if rel.current: Text { text: "current"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1386|font-family: Dy.mono;
+main.slint:1395|font-family: Dy.mono;
+main.slint:1406|pointer-event(ev) => {
+main.slint:1407|if ev.kind == PointerEventKind.down {
+main.slint:1415|if ev.kind == PointerEventKind.up {
+main.slint:1418|if ev.kind == PointerEventKind.cancel {
+main.slint:1454|font-family: Dy.mono;
+main.slint:1469|Text { text: net.ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+main.slint:1470|Text { text: net.connected ? "Connected" : (net.saved ? "Saved" : "Available network"); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; }
+main.slint:1481|Text { text: "←  Networks"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; }
+main.slint:1483|Text { text: root.wifi-pick; color: #ffffff; font-size: 18px; font-family: Dy.mono; }
+main.slint:1484|Text { text: root.wifi-pick == root.wifi-ssid ? "Connected" : "Available network"; color: #6a6a6a; font-size: 13px; font-family: Dy.mono; }
+main.slint:1489|Text { text: "Automatically connect"; color: #ffffff; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1495|Text { text: root.wifi-status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+main.slint:1519|Text { text: root.math-prompt; color: #ffffff; font-size: 28px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+main.slint:1540|Text { text: "Type this exactly"; color: #6a6a6a; font-size: 13px; font-family: Dy.mono; }
+main.slint:1541|Text { text: root.verify-code; color: #ffffff; font-size: 22px; font-weight: 700; font-family: Dy.mono; horizontal-alignment: center; }
+main.slint:1606|Text { text: "ADD WIDGET"; color: #e6e6e6; font-size: 16px; font-weight: 700; font-family: Dy.mono; }
+main.slint:1611|Text { text: "Creator"; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1616|Text { text: "Import"; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1635|Text { text: item.label; color: #e6e6e6; font-size: 12px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1650|font-family: Dy.mono;
+main.slint:1660|pointer-event(ev) => {
+main.slint:1661|if ev.kind == PointerEventKind.down {
+main.slint:1666|if ev.kind == PointerEventKind.up || ev.kind == PointerEventKind.cancel {
+main.slint:1765|font-family: Dy.mono;
+main.slint:1796|Text { text: "Widget"; color: #ffffff; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+main.slint:1802|Text { text: "Size"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1809|Text { text: "Starting layout"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1823|Text { text: "Parts"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1827|Text { text: k.label; color: #ffffff; font-size: 13px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:1850|Text { text: "Selected"; color: #6a6a6a; font-size: 12px; font-family: Dy.mono; }
+main.slint:1851|Text { text: root.creator-selected == "" ? "Tap a part" : root.creator-selected-kind; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+main.slint:1900|Text { text: "LIGHTS"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+main.slint:1946|Text { text: "NOW PLAYING"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+main.slint:2002|Text { text: "AIR PURIFIER"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+main.slint:2031|Text { text: "SHELL"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+main.slint:2032|Text { text: root.terminal-cwd; color: #7a7a7a; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
+main.slint:2046|font-family: Dy.mono;
+main.slint:2053|font-family: Dy.mono;
+main.slint:2107|font-family: Dy.mono;
+main.slint:2113|font-family: Dy.mono;
+main.slint:2119|font-family: Dy.mono;
+main.slint:2147|font-family: Dy.mono;
+main.slint:2153|font-family: Dy.mono;
+main.slint:2161|font-family: Dy.mono;
+judie-pi.rs:1518|_ => "Internet",
+===== sidebar/nav =====
+===== games/clock widget search =====

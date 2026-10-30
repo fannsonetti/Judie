@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Build Judie
+Comment=Build Judie — run ./scripts/enable-pi-launchers.sh once on the Pi first
+Exec=bash -c 'echo Run ./scripts/enable-pi-launchers.sh first; read'
+Icon=judie
+Terminal=true
+Categories=Development;
+StartupNotify=true

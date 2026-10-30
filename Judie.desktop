@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Judie
+Comment=Open Judie — run ./scripts/enable-pi-launchers.sh once on the Pi first
+Exec=judie
+Icon=judie
+Terminal=false
+Categories=Utility;
+StartupNotify=true

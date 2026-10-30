@@ -1,0 +1,705 @@
+===== swipe-close+net-menu L1402-1510 =====
+1402|        TouchArea {
+1403|            y: parent.height - 28px;
+1404|            width: 100%;
+1405|            height: 28px;
+1406|            pointer-event(ev) => {
+1407|                if ev.kind == PointerEventKind.down {
+1408|                    if root.settings-open || root.palette-open || root.settings-pull > 0.92 {
+1409|                        root.settings-armed = true;
+1410|                        root.settings-kind = 1;
+1411|                        root.settings-start = root.settings-pos(self.absolute-position.y, self.mouse-y);
+1412|                        root.settings-base = root.settings-pull;
+1413|                    }
+1414|                }
+1415|                if ev.kind == PointerEventKind.up {
+1416|                    root.settings-finish(false);
+1417|                }
+1418|                if ev.kind == PointerEventKind.cancel {
+1419|                    root.settings-finish(true);
+1420|                }
+1421|            }
+1422|            moved => {
+1423|                if self.pressed && (root.settings-tracking || root.settings-armed) && root.settings-kind == 1 {
+1424|                    if !root.settings-tracking && root.settings-start - root.settings-pos(self.absolute-position.y, self.mouse-y) > 18px {
+1425|                        root.settings-begin(1, root.settings-start);
+1426|                    }
+1427|                    if root.settings-tracking {
+1428|                        root.settings-follow(root.settings-pos(self.absolute-position.y, self.mouse-y));
+1429|                    }
+1430|                }
+1431|            }
+1432|        }
+1433|    }
+1434|
+1435|    if root.net-menu-open: Rectangle {
+1436|        background: #00000000;
+1437|        TouchArea { clicked => { root.close-net-menu(); } }
+1438|        Rectangle {
+1439|            x: parent.width - 420px;
+1440|            y: 52px;
+1441|            width: 400px;
+1442|            height: min(parent.height - 80px, 640px);
+1443|            background: #000000;
+1444|            border-width: 1.5px;
+1445|            border-color: #2a2a2a;
+1446|            TouchArea { clicked => { } }
+1447|            VerticalLayout {
+1448|                padding: 16px;
+1449|                spacing: 10px;
+1450|                if root.net-kind == "ethernet": Text {
+1451|                    text: "Ethernet";
+1452|                    color: #ffffff;
+1453|                    font-size: 16px;
+1454|                    font-family: Dy.mono;
+1455|                }
+1456|                if root.wifi-detail == "": Flickable {
+1457|                    vertical-stretch: 1;
+1458|                    viewport-height: 24 * 52px;
+1459|                    VerticalLayout {
+1460|                        spacing: 4px;
+1461|                        for net in root.wifi-nets: TouchArea {
+1462|                            clicked => { root.pick-wifi(net.ssid); }
+1463|                            height: 48px;
+1464|                            HorizontalLayout {
+1465|                                spacing: 10px;
+1466|                                NetGlyph { kind: "wifi"; bars: net.bars; }
+1467|                                VerticalLayout {
+1468|                                    alignment: center;
+1469|                                    Text { text: net.ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+1470|                                    Text { text: net.connected ? "Connected" : (net.saved ? "Saved" : "Available network"); color: #6a6a6a; font-size: 11px; font-family: Dy.mono; }
+1471|                                }
+1472|                            }
+1473|                        }
+1474|                    }
+1475|                }
+1476|                if root.wifi-detail != "": VerticalLayout {
+1477|                    spacing: 12px;
+1478|                    vertical-stretch: 1;
+1479|                    TouchArea {
+1480|                        clicked => { root.wifi-detail = ""; }
+1481|                        Text { text: "←  Networks"; color: #8a8a8a; font-size: 13px; font-family: Dy.mono; }
+1482|                    }
+1483|                    Text { text: root.wifi-pick; color: #ffffff; font-size: 18px; font-family: Dy.mono; }
+1484|                    Text { text: root.wifi-pick == root.wifi-ssid ? "Connected" : "Available network"; color: #6a6a6a; font-size: 13px; font-family: Dy.mono; }
+1485|                    if root.wifi-pick == root.wifi-ssid: Pill { label: "Disconnect"; clicked => { root.disconnect-wifi(); } }
+1486|                    if root.wifi-pick != root.wifi-ssid: VerticalLayout {
+1487|                        spacing: 10px;
+1488|                        HorizontalLayout {
+1489|                            Text { text: "Automatically connect"; color: #ffffff; font-size: 14px; font-family: Dy.mono; vertical-alignment: center; }
+1490|                            Rectangle { horizontal-stretch: 1; }
+1491|                            Toggle { on: root.wifi-auto; toggled => { root.toggle-wifi-auto(); } }
+1492|                        }
+1493|                        Pill { label: "Connect"; on: true; clicked => { root.connect-wifi(); } }
+1494|                    }
+1495|                    Text { text: root.wifi-status; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; wrap: word-wrap; }
+1496|                }
+1497|            }
+1498|        }
+1499|    }
+1500|
+1501|    if root.confirm-kind == "restart" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi": ConfirmSheet {
+1502|        title: root.confirm-title;
+1503|        body: root.confirm-body;
+1504|        primary: root.confirm-kind == "forget-wifi" ? "Forget" : "Continue";
+1505|        secondary: "Cancel";
+1506|        accept => { root.accept-confirm(); }
+1507|        dismiss => { root.cancel-confirm(); }
+1508|    }
+1509|
+1510|    if root.confirm-kind == "uninstall2": Rectangle {
+
+===== faces kind== branches =====
+169|if !root.use-layout && root.kind == "quickControls": GridLayout {
+178|if !root.use-layout && root.kind == "climate": HorizontalLayout {
+199|if !root.use-layout && root.kind == "calendar": HorizontalLayout {
+244|if !root.use-layout && root.kind == "purifier": VerticalLayout {
+297|if !root.use-layout && root.kind == "activity": VerticalLayout {
+306|if !root.use-layout && root.kind == "server": VerticalLayout {
+322|if !root.use-layout && root.kind == "weather": VerticalLayout {
+351|if !root.use-layout && root.kind == "lights": VerticalLayout {
+393|if !root.use-layout && root.kind == "media": VerticalLayout {
+409|if !root.use-layout && root.kind == "system": VerticalLayout {
+420|if !root.use-layout && root.kind == "terminal": VerticalLayout {
+480|if !root.use-layout && root.kind == "timers": VerticalLayout {
+488|if root.kind == "custom" || root.use-layout: Rectangle {
+497|background: (n.kind == "button" || n.kind == "chip" || n.kind == "bar" || n.kind == "toggle") ? rgb(n.r, n.g, n.b) : #00000000;
+499|opacity: (n.kind == "bar" || n.kind == "gauge") ? 0.85 : 1;
+503|font-size: n.kind == "metric" ? Dy.type-value : Dy.type-secondary;
+504|font-weight: n.kind == "metric" ? 700 : 500;
+
+faces:35|in property <int> volume: 62;
+faces:72|callback volume-changed(int);
+faces:143|property <int> t-vol: root.sample ? 62 : root.volume;
+faces:393|if !root.use-layout && root.kind == "media": VerticalLayout {
+faces:406|if root.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.t-vol; changed(v) => { if !root.sample { root.volume-changed(round(v)); } } }
+===== faces media L393-423 =====
+393|        if !root.use-layout && root.kind == "media": VerticalLayout {
+394|            Text { text: root.t-play ? "Playing" : "Paused"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+395|            Text { text: root.t-track; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 600; overflow: elide; }
+396|            if root.size != "1x1": Text { text: root.t-artist; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; overflow: elide; }
+397|            if root.size != "1x1": Bar { level: root.t-prog; fill: #ffffff; zoom: root.face-scale; }
+398|            HorizontalLayout {
+399|                spacing: 8px;
+400|                if root.size != "1x1": IconBtn { glyph: "⟨"; zoom: root.face-scale; clicked => { if !root.sample { root.prev-track(); } } }
+401|                IconBtn { glyph: root.t-play ? "❚❚" : "▶"; primary: true; zoom: root.face-scale; clicked => { if !root.sample { root.toggle-play(); } } }
+402|                if root.size != "1x1": IconBtn { glyph: "⟩"; zoom: root.face-scale; clicked => { if !root.sample { root.next-track(); } } }
+403|                if root.size == "2x2": Rectangle { horizontal-stretch: 1; }
+404|                if root.size == "2x2": Text { text: root.t-vol + "%"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; vertical-alignment: center; }
+405|            }
+406|            if root.size == "2x2": Slider { minimum: 0; maximum: 100; value: root.t-vol; changed(v) => { if !root.sample { root.volume-changed(round(v)); } } }
+407|        }
+408|
+409|        if !root.use-layout && root.kind == "system": VerticalLayout {
+410|            Text { text: "CPU"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+411|            Text { text: round(root.t-cpu) + "%"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+412|            Bar { level: root.t-cpu / 100; fill: #ffffff; zoom: root.face-scale; }
+413|            if root.size != "1x1": Text { text: "Memory"; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+414|            if root.size != "1x1": Text { text: round(root.t-mem) + "%"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+415|            if root.size != "1x1": Bar { level: root.t-mem / 100; fill: #ffffff; zoom: root.face-scale; }
+416|            if root.size == "2x2": Text { text: root.t-memd; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+417|            if root.size == "2x2": Text { text: root.t-temp-host; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+418|        }
+419|
+420|        if !root.use-layout && root.kind == "terminal": VerticalLayout {
+421|            spacing: 4px * root.face-scale;
+422|            Text {
+423|                text: "TERMINAL";
+
+===== faces lights L351-376 =====
+351|        if !root.use-layout && root.kind == "lights": VerticalLayout {
+352|            spacing: 6px;
+353|            HorizontalLayout {
+354|                Text { text: root.t-scene; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; vertical-alignment: center; }
+355|                Rectangle { horizontal-stretch: 1; }
+356|                Toggle { on: root.t-master; zoom: root.face-scale; toggled => { if !root.sample { root.toggle-master(); } } }
+357|            }
+358|            Text { text: root.t-master ? root.t-bright + "%" : "Off"; color: #ffffff; font-size: Dy.type-value * root.face-scale; font-weight: 700; }
+359|            Slider { minimum: 0; maximum: 100; value: root.t-bright; changed(v) => { if !root.sample { root.brightness-changed(round(v)); } } }
+360|            HorizontalLayout {
+361|                spacing: 8px;
+362|                Swatch { swatch: #ff5a5a; zoom: root.face-scale; on: root.t-color == "#FF5A5A"; clicked => { if !root.sample { root.set-color("#FF5A5A"); } } }
+363|                Swatch { swatch: #ff8c42; zoom: root.face-scale; on: root.t-color == "#FF8C42"; clicked => { if !root.sample { root.set-color("#FF8C42"); } } }
+364|                Swatch { swatch: #ffd166; zoom: root.face-scale; on: root.t-color == "#FFD166"; clicked => { if !root.sample { root.set-color("#FFD166"); } } }
+365|                Swatch { swatch: #7cf29c; zoom: root.face-scale; on: root.t-color == "#7CF29C"; clicked => { if !root.sample { root.set-color("#7CF29C"); } } }
+366|                Swatch { swatch: #5ce1ff; zoom: root.face-scale; on: root.t-color == "#2D7BFF"; clicked => { if !root.sample { root.set-color("#2D7BFF"); } } }
+367|                if root.size != "1x1": Swatch { swatch: #7b61ff; zoom: root.face-scale; on: root.t-color == "#7B61FF"; clicked => { if !root.sample { root.set-color("#7B61FF"); } } }
+368|                if root.size != "1x1": Swatch { swatch: #ff6bcb; zoom: root.face-scale; on: root.t-color == "#FF6BCB"; clicked => { if !root.sample { root.set-color("#FF6BCB"); } } }
+369|                if root.size != "1x1": Swatch { swatch: #ffffff; zoom: root.face-scale; on: root.t-color == "#FFFFFF"; clicked => { if !root.sample { root.set-color("#FFFFFF"); } } }
+370|            }
+371|            if root.size == "2x2": GridLayout {
+372|                spacing: 8px;
+373|                for light[i] in root.sample ? root.demo-lights : root.lights: Rectangle {
+374|                    row: floor(i / 2); col: mod(i, 2);
+375|                    background: #000000; height: 48px;
+376|                    border-width: 1.5px; border-color: Dy.border;
+
+===== faces weather L322-347 =====
+322|        if !root.use-layout && root.kind == "weather": VerticalLayout {
+323|            HorizontalLayout {
+324|                Text { text: root.t-loc; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; overflow: elide; horizontal-stretch: 1; }
+325|                if root.size != "1x1": Text { text: root.t-feel; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+326|            }
+327|            HorizontalLayout {
+328|                VerticalLayout {
+329|                    Text { text: root.t-temp; color: #ffffff; font-size: Dy.type-hero * root.face-scale; font-weight: 700; }
+330|                    Text { text: root.t-cond; color: #ffffff; font-size: Dy.type-title * root.face-scale; }
+331|                    Text { text: root.t-range; color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; }
+332|                }
+333|                Rectangle { horizontal-stretch: 1; }
+334|                Rectangle {
+335|                    width: 36px * root.face-scale; height: 36px * root.face-scale; background: #000000; y: 8px * root.face-scale;
+336|                    border-width: max(1px, 1px * root.face-scale); border-color: #f0a030;
+337|                    Text { text: "*"; color: #f0a030; font-size: 18px * root.face-scale; font-family: Dy.mono; horizontal-alignment: center; vertical-alignment: center; }
+338|                }
+339|            }
+340|            if root.size == "2x2": Text { text: root.t-note; color: #ffffff; font-size: Dy.type-secondary * root.face-scale; wrap: word-wrap; }
+341|            if root.size != "1x1": HorizontalLayout {
+342|                spacing: 8px;
+343|                for h in root.sample ? root.demo-hours : root.hours: VerticalLayout {
+344|                    Text { text: h.hour; color: #555555; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; }
+345|                    Text { text: h.temp; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 700; horizontal-alignment: center; }
+346|                    Text { text: h.precip; color: #8a8a8a; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; }
+347|                }
+
+===== faces calendar L199-219 =====
+199|        if !root.use-layout && root.kind == "calendar": HorizontalLayout {
+200|            spacing: 10px * root.face-scale;
+201|            if root.size != "1x1": VerticalLayout {
+202|                spacing: 4px * root.face-scale; horizontal-stretch: 1;
+203|                Text { text: "Today"; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; }
+204|                for ev in root.sample ? root.demo-events : root.events: HorizontalLayout {
+205|                    spacing: 6px * root.face-scale;
+206|                    Rectangle { width: 4px * root.face-scale; height: 18px * root.face-scale; background: #ffffff; }
+207|                    VerticalLayout {
+208|                        Text { text: ev.title; color: #ffffff; font-size: Dy.type-title * root.face-scale; font-weight: 600; overflow: elide; }
+209|                        Text { text: ev.time + (ev.detail == "" ? "" : " · " + ev.detail); color: #8a8a8a; font-size: Dy.type-secondary * root.face-scale; overflow: elide; }
+210|                    }
+211|                }
+212|            }
+213|            VerticalLayout {
+214|                spacing: 4px * root.face-scale; horizontal-stretch: 1;
+215|                Text { text: root.t-month; color: #8a8a8a; font-size: Dy.type-title * root.face-scale; }
+216|                HorizontalLayout {
+217|                    spacing: 0;
+218|                    for d in ["S", "M", "T", "W", "T", "F", "S"]: Text {
+219|                        text: d; color: #555555; font-size: Dy.type-dense * root.face-scale; horizontal-alignment: center; horizontal-stretch: 1;
+
+===== GRID =====
+174|pub const GRID_COLS: i32 = 6;
+175|pub const GRID_ROWS: i32 = 4;
+176|pub const MAX_PAGES: i32 = 6;
+177|
+178|fn size_dims(size: &str) -> (i32, i32) {
+179|    match size {
+180|        "1x2" => (2, 1),
+181|        "2x2" => (2, 2),
+182|        _ => (1, 1),
+183|    }
+---
+175|pub const GRID_ROWS: i32 = 4;
+176|pub const MAX_PAGES: i32 = 6;
+177|
+178|fn size_dims(size: &str) -> (i32, i32) {
+179|    match size {
+180|        "1x2" => (2, 1),
+181|        "2x2" => (2, 2),
+182|        _ => (1, 1),
+183|    }
+---
+178|fn size_dims(size: &str) -> (i32, i32) {
+179|    match size {
+180|        "1x2" => (2, 1),
+181|        "2x2" => (2, 2),
+182|        _ => (1, 1),
+183|    }
+184|}
+---
+200|fn default_slots() -> Vec<Slot> {
+201|    vec![
+202|        slot("quick-1", "quickControls", "1x1", 0, 0),
+203|        slot("climate-1", "climate", "1x1", 1, 0),
+204|        slot("calendar-1", "calendar", "1x2", 2, 0),
+205|        slot("purifier-1", "purifier", "2x2", 4, 0),
+206|        slot("activity-1", "activity", "1x1", 0, 1),
+207|        slot("server-1", "server", "1x2", 1, 1),
+208|        slot("weather-1", "weather", "1x1", 3, 1),
+209|        slot("lights-1", "lights", "2x2", 0, 2),
+210|        slot("activity-2", "activity", "2x2", 2, 2),
+211|    ]
+212|}
+---
+214|pub fn supported_sizes(_kind: &str) -> &'static [&'static str] {
+215|    &["1x1", "1x2", "2x2"]
+216|}
+217|
+218|pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
+219|    &[
+220|        ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
+221|        ("calendar", "Calendar", "Upcoming events and the month at a glance."),
+222|        ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
+223|        ("lights", "Lights", "Toggles, brightness, and colour for the room."),
+224|        ("media", "Media", "Now playing, volume, and skip."),
+225|        ("purifier", "Air Purifier", "Air quality, filter, and purifier mode."),
+226|        ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
+227|        ("server", "Server Status", "Health and latency of local services."),
+228|        ("system", "System", "CPU, memory, and top processes."),
+229|        ("terminal", "Terminal", "A Linux shell on this panel for normal commands."),
+230|        ("timers", "Timers", "Running timers and reminders."),
+231|        ("weather", "Weather", "Local conditions and the next few hours."),
+232|    ]
+233|}
+---
+218|pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
+219|    &[
+220|        ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
+221|        ("calendar", "Calendar", "Upcoming events and the month at a glance."),
+222|        ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
+223|        ("lights", "Lights", "Toggles, brightness, and colour for the room."),
+224|        ("media", "Media", "Now playing, volume, and skip."),
+225|        ("purifier", "Air Purifier", "Air quality, filter, and purifier mode."),
+226|        ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
+227|        ("server", "Server Status", "Health and latency of local services."),
+228|        ("system", "System", "CPU, memory, and top processes."),
+229|        ("terminal", "Terminal", "A Linux shell on this panel for normal commands."),
+230|        ("timers", "Timers", "Running timers and reminders."),
+231|        ("weather", "Weather", "Local conditions and the next few hours."),
+232|    ]
+233|}
+---
+===== Persist =====
+145|struct Persist {
+146|    #[serde(default)]
+147|    slots: Vec<Slot>,
+148|    #[serde(default)]
+149|    custom: Vec<CustomWidget>,
+150|    #[serde(default)]
+151|    room_name: String,
+152|    #[serde(default)]
+153|    weather_loc: String,
+154|    #[serde(default)]
+155|    latitude: String,
+156|    #[serde(default)]
+157|    longitude: String,
+158|    #[serde(default)]
+159|    temp_unit: String,
+160|    #[serde(default)]
+161|    distance_unit: String,
+162|    #[serde(default)]
+163|    voice: Option<bool>,
+164|    #[serde(default)]
+165|    speak: Option<bool>,
+166|    #[serde(default)]
+167|    routines: Vec<Routine>,
+168|    #[serde(default)]
+169|    deleted_builtin_ids: Vec<String>,
+170|    #[serde(default)]
+171|    face_layouts: std::collections::BTreeMap<String, std::collections::BTreeMap<String, Vec<SlopNode>>>,
+172|}
+---
+===== Room =====
+851|pub struct Room {
+852|    pub lights: Vec<Light>,
+853|    pub scene: String,
+854|    pub dnd: bool,
+855|    pub playing: bool,
+856|    pub volume: u8,
+857|    pub track: usize,
+858|    pub queue: Vec<Track>,
+859|    pub progress: f32,
+860|    pub indoor: f32,
+861|    pub outdoor: i32,
+862|    pub humidity: u8,
+863|    pub weather_loc: String,
+864|    pub weather_temp: i32,
+865|    pub weather_cond: String,
+866|    pub weather_high: i32,
+867|    pub weather_low: i32,
+868|    pub weather_feel: String,
+869|    pub weather_note: String,
+870|    pub hours: Vec<Hour>,
+871|    pub events: Vec<Event>,
+872|    pub purifier_on: bool,
+873|    pub purifier_mode: String,
+874|    pub purifier_aq: String,
+875|    pub purifier_filter: u8,
+876|    pub room_name: String,
+877|    pub assistant_url: String,
+878|    pub latitude: String,
+879|    pub longitude: String,
+880|    pub voice: bool,
+881|    pub speak: bool,
+882|    pub units_metric: bool,
+883|    pub temp_unit: String,
+884|    pub distance_unit: String,
+885|    pub notice_timers: bool,
+886|    pub notice_calendar: bool,
+887|    pub notice_weather: bool,
+888|    pub notice_air: bool,
+889|    pub notice_devices: bool,
+890|    pub overlay: Overlay,
+---
+===== Expanded =====
+922|pub enum Overlay {
+923|    None,
+924|    Settings,
+925|    Palette,
+926|    Gallery,
+927|    Creator,
+928|}
+---
+931|pub enum Expanded {
+932|    None,
+933|    Weather,
+934|    Lights,
+935|    Media,
+936|    Calendar,
+937|    Purifier,
+938|    Terminal,
+939|}
+---
+===== save =====
+354|fn data_dir() -> PathBuf {
+355|    if let Ok(dir) = std::env::var("JUDIE_DATA_DIR") {
+356|        if !dir.trim().is_empty() {
+357|            return PathBuf::from(dir);
+358|        }
+359|    }
+360|    #[cfg(windows)]
+361|    {
+362|        if let Ok(home) = std::env::var("USERPROFILE") {
+363|            if !home.trim().is_empty() {
+364|                return PathBuf::from(home).join(".judie");
+365|            }
+---
+400|fn persist_path() -> PathBuf {
+401|    data_dir().join("layout.json")
+402|}
+403|
+404|pub fn migrate_units_preset(temp: &str, distance: &str) -> &'static str {
+405|    let t = temp.to_ascii_lowercase();
+406|    let d = distance.to_ascii_lowercase();
+407|    if (t == "c" || t == "celsius") && (d == "km" || d == "kilometres" || d == "kilometers") {
+408|        return "c-km";
+409|    }
+---
+442|fn save_persist(room: &Room) {
+443|    let dir = data_dir();
+444|    let _ = std::fs::create_dir_all(&dir);
+445|    let persist = Persist {
+446|        slots: room.slots.clone(),
+447|        custom: room.custom.clone(),
+448|        room_name: room.room_name.clone(),
+449|        weather_loc: room.weather_loc.clone(),
+450|        latitude: room.latitude.clone(),
+451|        longitude: room.longitude.clone(),
+452|        temp_unit: room.temp_unit.clone(),
+453|        distance_unit: room.distance_unit.clone(),
+454|        voice: Some(room.voice),
+455|        speak: Some(room.speak),
+456|        routines: room
+457|            .routines
+458|            .iter()
+459|            .filter(|r| !r.builtin || !r.enabled)
+460|            .cloned()
+461|            .collect(),
+462|        deleted_builtin_ids: room.deleted_builtin_ids.clone(),
+463|        face_layouts: room.face_layouts.clone(),
+464|    };
+465|    if let Ok(json) = serde_json::to_string_pretty(&persist) {
+466|        let _ = std::fs::write(persist_path(), json);
+467|    }
+---
+===== volume persist? =====
+2509|room.set_routine_edit_field(&saved.id, "command", "volume 10");
+856|pub volume: u8,
+988|volume: 62,
+===== judie-pi key =====
+33|fn prefers_reduced_motion() -> bool {
+254|ui.set_settings_tab(room.settings_tab.clamp(0, 2));
+273|ui.set_notice_timers(room.notice_timers);
+274|ui.set_notice_calendar(room.notice_calendar);
+275|ui.set_notice_weather(room.notice_weather);
+276|ui.set_notice_air(room.notice_air);
+277|ui.set_notice_devices(room.notice_devices);
+893|ui.on_volume_changed(move |v| {
+939|ui.on_set_tab(move |t| {
+940|pi_room::with(|room| room.settings_tab = t.clamp(0, 2));
+977|ui.on_expand(move |kind| {
+995|ui.on_collapse(move || {
+1205|ui.on_toggle_notice(move |key| {
+1207|"timers" => room.notice_timers = !room.notice_timers,
+1208|"calendar" => room.notice_calendar = !room.notice_calendar,
+1209|"weather" => room.notice_weather = !room.notice_weather,
+1210|"air" => room.notice_air = !room.notice_air,
+1211|"devices" => room.notice_devices = !room.notice_devices,
+1692|ui.on_open_net_menu(move || {
+1907|ui.set_reduced_motion(prefers_reduced_motion());
+===== size_dims L178-193 =====
+178|fn size_dims(size: &str) -> (i32, i32) {
+179|    match size {
+180|        "1x2" => (2, 1),
+181|        "2x2" => (2, 2),
+182|        _ => (1, 1),
+183|    }
+184|}
+185|
+186|fn slot(id: &str, kind: &str, size: &str, col: i32, row: i32) -> Slot {
+187|    Slot {
+188|        id: id.into(),
+189|        kind: kind.into(),
+190|        size: size.into(),
+191|        col,
+192|        row,
+193|        page: 0,
+
+===== default_slots L200-220 =====
+200|fn default_slots() -> Vec<Slot> {
+201|    vec![
+202|        slot("quick-1", "quickControls", "1x1", 0, 0),
+203|        slot("climate-1", "climate", "1x1", 1, 0),
+204|        slot("calendar-1", "calendar", "1x2", 2, 0),
+205|        slot("purifier-1", "purifier", "2x2", 4, 0),
+206|        slot("activity-1", "activity", "1x1", 0, 1),
+207|        slot("server-1", "server", "1x2", 1, 1),
+208|        slot("weather-1", "weather", "1x1", 3, 1),
+209|        slot("lights-1", "lights", "2x2", 0, 2),
+210|        slot("activity-2", "activity", "2x2", 2, 2),
+211|    ]
+212|}
+213|
+214|pub fn supported_sizes(_kind: &str) -> &'static [&'static str] {
+215|    &["1x1", "1x2", "2x2"]
+216|}
+217|
+218|pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
+219|    &[
+220|        ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
+
+===== supported_sizes L214-222 =====
+214|pub fn supported_sizes(_kind: &str) -> &'static [&'static str] {
+215|    &["1x1", "1x2", "2x2"]
+216|}
+217|
+218|pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
+219|    &[
+220|        ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
+221|        ("calendar", "Calendar", "Upcoming events and the month at a glance."),
+222|        ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
+
+===== gallery_kinds L218-238 =====
+218|pub fn gallery_kinds() -> &'static [(&'static str, &'static str, &'static str)] {
+219|    &[
+220|        ("activity", "Activity", "A live feed of what Judie and your automations have been doing."),
+221|        ("calendar", "Calendar", "Upcoming events and the month at a glance."),
+222|        ("climate", "Climate", "Indoor temperature, humidity, and outdoor air."),
+223|        ("lights", "Lights", "Toggles, brightness, and colour for the room."),
+224|        ("media", "Media", "Now playing, volume, and skip."),
+225|        ("purifier", "Air Purifier", "Air quality, filter, and purifier mode."),
+226|        ("quickControls", "Quick Controls", "One-tap scenes and room presets."),
+227|        ("server", "Server Status", "Health and latency of local services."),
+228|        ("system", "System", "CPU, memory, and top processes."),
+229|        ("terminal", "Terminal", "A Linux shell on this panel for normal commands."),
+230|        ("timers", "Timers", "Running timers and reminders."),
+231|        ("weather", "Weather", "Local conditions and the next few hours."),
+232|    ]
+233|}
+234|
+235|fn occupied_grid(slots: &[Slot], page: i32, skip: Option<&str>) -> Vec<Vec<bool>> {
+236|    let mut grid = vec![vec![false; GRID_COLS as usize]; GRID_ROWS as usize];
+237|    for s in slots {
+238|        if s.page != page {
+
+===== expanded overlays =====
+624|if ev.kind == PointerEventKind.up && !root.edit-mode && root.expanded == "" {
+641|running: home-touch.pressed && !root.edit-mode && root.expanded == "" && !root.gallery-open && !root.creator-open && !root.settings-open && !root.palette-open;
+1860|if root.expanded == "weather": Rectangle {
+1890|if root.expanded == "lights": Rectangle {
+1936|if root.expanded == "media": Rectangle {
+1966|if root.expanded == "calendar": Rectangle {
+1992|if root.expanded == "purifier": Rectangle {
+2021|if root.expanded == "terminal": Rectangle {
+tab:1061|Text { text: "Network"; color: root.settings-tab == 1 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+tab:1065|Text { text: "Power"; color: root.settings-tab == 2 ? #ffffff : #6a6a6a; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+tab:1171|if root.settings-tab == 1: HorizontalLayout {
+tab:1279|if root.settings-tab == 2: VerticalLayout {
+===== network-tab-start L1171-1220 =====
+1171|                    if root.settings-tab == 1: HorizontalLayout {
+1172|                        alignment: center;
+1173|                        VerticalLayout {
+1174|                            alignment: start;
+1175|                            width: root.general-col;
+1176|                            spacing: 10px;
+1177|                            padding-bottom: 80px;
+1178|                            Text { text: root.net-headline; color: #ffffff; font-size: 16px; font-family: Dy.mono; }
+1179|                            Text { text: "Type"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1180|                            Text { text: root.net-kind; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1181|                            Text { text: "Interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1182|                            Text { text: root.net-iface; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1183|                            Text { text: "SSID"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1184|                            Text { text: root.wifi-ssid; color: #ffffff; font-size: 14px; font-family: Dy.mono; overflow: elide; }
+1185|                            Text { text: "State"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1186|                            Text { text: root.wifi-state; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1187|                            Text { text: "Signal"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1188|                            Text { text: root.net-signal; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1189|                            Text { text: "Security"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1190|                            Text { text: root.net-security; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1191|                            Text { text: "IPv4"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1192|                            Text { text: root.wifi-ip; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1193|                            Text { text: "IPv6"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1194|                            Text { text: root.net-ipv6; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+1195|                            Text { text: "Gateway"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1196|                            Text { text: root.net-gateway; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1197|                            Text { text: "DNS"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1198|                            Text { text: root.net-dns; color: #ffffff; font-size: 14px; font-family: Dy.mono; wrap: word-wrap; }
+1199|                            Text { text: "MAC"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1200|                            Text { text: root.net-mac; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1201|                            Text { text: "Link speed"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1202|                            Text { text: root.net-speed; color: #ffffff; font-size: 14px; font-family: Dy.mono; }
+1203|                            Text { text: "Preferred interface"; color: #8a8a8a; font-size: 12px; font-family: Dy.mono; }
+1204|                            HorizontalLayout {
+1205|                                spacing: 8px;
+1206|                                Pill { label: "Ethernet"; on: root.preferred-net == "ethernet"; clicked => { root.set-preferred-net("ethernet"); } }
+1207|                                Pill { label: "Wi-Fi"; on: root.preferred-net == "wifi"; clicked => { root.set-preferred-net("wifi"); } }
+1208|                            }
+1209|                            HorizontalLayout {
+1210|                                Text { text: "DHCP"; color: #ffffff; font-size: 16px; font-family: Dy.mono; vertical-alignment: center; }
+1211|                                Rectangle { horizontal-stretch: 1; }
+1212|                                Toggle { on: root.dhcp-on; toggled => { root.toggle-dhcp(); } }
+1213|                            }
+1214|                            HorizontalLayout {
+1215|                                spacing: 8px;
+1216|                                Pill { label: "Reconnect"; on: true; clicked => { root.reconnect-net(); } }
+1217|                                if root.net-kind == "wifi": Pill { label: "Disconnect Wi-Fi"; clicked => { root.disconnect-wifi(); } }
+1218|                            }
+1219|                            HorizontalLayout {
+1220|                                spacing: 8px;
+
+===== power-tab-start L1279-1310 =====
+1279|                    if root.settings-tab == 2: VerticalLayout {
+1280|                        alignment: start;
+1281|                        spacing: 6px;
+1282|                        HorizontalLayout {
+1283|                            spacing: 8px;
+1284|                            PowerAction {
+1285|                                label: "Restart";
+1286|                                glyph: "↻";
+1287|                                enabled: !root.updating && !root.power-busy;
+1288|                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("restart"); } }
+1289|                            }
+1290|                            PowerAction {
+1291|                                label: "Shut Down";
+1292|                                glyph: "○";
+1293|                                enabled: !root.updating && !root.power-busy;
+1294|                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("shutdown"); } }
+1295|                            }
+1296|                            PowerAction {
+1297|                                label: "Uninstall";
+1298|                                glyph: "×";
+1299|                                enabled: !root.updating && !root.power-busy;
+1300|                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("uninstall1"); } }
+1301|                            }
+1302|                        }
+1303|                        if root.power-status != "": Text {
+1304|                            text: root.power-status;
+1305|                            color: #ffffff;
+1306|                            font-size: 14px;
+1307|                            font-family: Dy.mono;
+1308|                            wrap: word-wrap;
+1309|                        }
+1310|                        Rectangle { height: 1.5px; background: #2a2a2a; }
+
+===== media-expanded L1936-1965 =====
+1936|    if root.expanded == "media": Rectangle {
+1937|        background: #000000cc;
+1938|        TouchArea { clicked => { root.collapse(); } }
+1939|        Rectangle {
+1940|            x: 40px; y: 40px; width: parent.width - 80px; height: parent.height - 80px;
+1941|            border-radius: 0px; background: #000000;
+1942|            border-width: 1px; border-color: #3d3d3d;
+1943|            VerticalLayout {
+1944|                padding: 24px; spacing: 14px;
+1945|                HorizontalLayout {
+1946|                    Text { text: "NOW PLAYING"; color: #e6e6e6; font-size: 18px; font-weight: 700; font-family: Dy.mono; }
+1947|                    Rectangle { horizontal-stretch: 1; }
+1948|                    Pill { label: "CLOSE"; clicked => { root.collapse(); } }
+1949|                }
+1950|                Text { text: root.track-title; color: #e6e6e6; font-size: 32px; font-weight: 700; }
+1951|                Text { text: root.track-artist; color: #7a7a7a; font-size: 16px; }
+1952|                Bar { level: root.media-progress; fill: #e6e6e6; }
+1953|                HorizontalLayout {
+1954|                    spacing: 12px;
+1955|                    alignment: center;
+1956|                    IconBtn { glyph: "⟨"; clicked => { root.prev-track(); } }
+1957|                    IconBtn { glyph: root.playing ? "❚❚" : "▶"; primary: true; clicked => { root.toggle-play(); } }
+1958|                    IconBtn { glyph: "⟩"; clicked => { root.next-track(); } }
+1959|                }
+1960|                Text { text: "Volume " + root.volume + "%"; color: #7a7a7a; font-size: 13px; }
+1961|                Slider { minimum: 0; maximum: 100; value: root.volume; changed(v) => { root.volume-changed(round(v)); } }
+1962|            }
+1963|        }
+1964|    }
+1965|
+
+cards:156|in property <bool> expandable: false;
+cards:705|export component TileShell inherits Rectangle {

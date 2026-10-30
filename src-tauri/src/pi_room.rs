@@ -303,7 +303,7 @@ pub const SCREEN_OFF_OPTIONS: &[(&str, i32)] = &[
 ];
 
 /// Theme names as stored in layout.json; the index is `Dy.theme` in cards.slint.
-pub const THEMES: [&str; 4] = ["dusk", "amber", "pocket", "paper"];
+pub const THEMES: [&str; 4] = ["dusk", "mono", "ink", "paper"];
 
 /// Unknown or missing names fall back to Dusk, the default.
 pub fn theme_index(name: &str) -> i32 {
