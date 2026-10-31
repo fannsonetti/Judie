@@ -14,6 +14,8 @@ mod widget_preview;
 mod releases;
 #[path = "../philips.rs"]
 mod philips;
+#[path = "../assistant.rs"]
+mod assistant;
 #[path = "../arcade.rs"]
 mod arcade;
 
@@ -22,7 +24,7 @@ slint::include_modules!();
 use pi_room::{Expanded, Overlay};
 use slint::{Model, ModelRc, SharedString, TimerMode, VecModel};
 use std::io::Write;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -747,6 +749,10 @@ fn dispatch_terminal(ui: &MainWindow) {
 }
 
 static PURIFIER_IP: Mutex<Option<String>> = Mutex::new(None);
+/// chat_rev last put on screen; u32::MAX forces the first push.
+static CHAT_REV: AtomicU32 = AtomicU32::new(u32::MAX);
+/// Track index last put in the Up next list; u32::MAX forces the first push.
+static QUEUE_TRACK: AtomicU32 = AtomicU32::new(u32::MAX);
 
 /// Find the Philips purifier on the LAN and mirror its pushed state into the
 /// room; the 1s tick puts the room on screen. Rediscovers if it goes quiet.
@@ -889,6 +895,38 @@ fn push_ui(ui: &MainWindow) {
         ui.set_display_rate(display.rate.into());
         ui.set_palette_query(room.palette_query.clone().into());
         ui.set_palette_reply(room.palette_reply.clone().into());
+        if CHAT_REV.swap(room.chat_rev, Ordering::Relaxed) != room.chat_rev {
+            let rows: Vec<ChatRow> = room
+                .chat
+                .iter()
+                .map(|m| ChatRow {
+                    judie: m.judie,
+                    text: m.text.clone().into(),
+                    chips: ModelRc::new(VecModel::from(m.chips.iter().map(|c| SharedString::from(c.as_str())).collect::<Vec<_>>())),
+                })
+                .collect();
+            ui.set_chat(ModelRc::new(VecModel::from(rows)));
+        }
+        let total = room.current_track().duration;
+        let mmss = |s: u32| format!("{}:{:02}", s / 60, s % 60);
+        ui.set_media_elapsed(mmss((room.progress.clamp(0.0, 1.0) * total as f32) as u32).into());
+        ui.set_media_total(mmss(total).into());
+        if QUEUE_TRACK.swap(room.track as u32, Ordering::Relaxed) != room.track as u32 {
+            let rows: Vec<QueueRow> = room
+                .queue
+                .iter()
+                .enumerate()
+                .map(|(i, t)| QueueRow {
+                    title: t.title.clone().into(),
+                    artist: t.artist.clone().into(),
+                    length: mmss(t.duration).into(),
+                    current: i == room.track,
+                })
+                .collect();
+            ui.set_queue(ModelRc::new(VecModel::from(rows)));
+        }
+        ui.set_chat_busy(room.chat_busy);
+        ui.set_chat_can_retry(room.chat_retry.is_some());
         ui.set_terminal_input(room.terminal_input.clone().into());
         ui.set_terminal_cwd(room.terminal_cwd_label().into());
         let term_lines: Vec<TerminalLine> = room
@@ -1164,7 +1202,10 @@ fn apply_kb_field(ui: &MainWindow, field: &str, text: &str) {
             ui.set_longitude(text.into());
         }
         "assistant-url" => {
-            pi_room::with(|room| room.assistant_url = text.to_string());
+            pi_room::with(|room| {
+                room.assistant_url = text.trim().to_string();
+                room.save();
+            });
             ui.set_assistant_url(text.into());
         }
         "palette" => {
@@ -1532,7 +1573,68 @@ fn begin_power_action(ui: &MainWindow, action: &str) {
     });
 }
 
+/// Send one message to the AI service off the UI thread (ai/README.md). Without
+/// a token it falls back to the local command parser. `retry_id` resends an
+/// unanswered message under its original request ID so nothing runs twice.
+fn ask_judie(ui: &MainWindow, message: String, retry_id: Option<String>) {
+    if message.is_empty() || pi_room::with(|room| room.chat_busy) {
+        return;
+    }
+    let Some(token) = assistant::token() else {
+        pi_room::with(|room| {
+            room.chat_push(false, message.clone(), vec![]);
+            let reply = room.run_command(&message);
+            room.chat_push(true, reply, vec![]);
+            room.palette_query.clear();
+        });
+        push_ui(ui);
+        return;
+    };
+    let (base, session) = pi_room::with(|room| {
+        if retry_id.is_none() {
+            room.chat_push(false, message.clone(), vec![]);
+        }
+        room.palette_query.clear();
+        room.chat_busy = true;
+        room.chat_rev += 1;
+        (room.assistant_url.clone(), room.chat_session.clone())
+    });
+    push_ui(ui);
+    let id = retry_id.unwrap_or_else(assistant::request_id);
+    let weak = ui.as_weak();
+    std::thread::spawn(move || {
+        let result = match session {
+            Some(s) => Ok(s),
+            None => assistant::new_session(&base, &token),
+        }
+        .and_then(|s| {
+            pi_room::with(|room| room.chat_session = Some(s.clone()));
+            assistant::chat(&base, &token, &s, &id, &message)
+        });
+        pi_room::with(|room| {
+            room.chat_busy = false;
+            match result {
+                Ok(r) => room.chat_push(true, if r.text.is_empty() { "Done.".into() } else { r.text }, r.chips),
+                Err(assistant::Error::SessionGone) => {
+                    room.chat_session = None;
+                    room.chat_push(true, "That conversation expired, so I didn't resend it. Send it again to start a new one.", vec![]);
+                }
+                Err(assistant::Error::Failed(why)) => {
+                    room.chat_retry = Some((id, message));
+                    room.chat_push(true, format!("No answer yet: {why}. Retry is safe, it won't run anything twice."), vec![]);
+                }
+            }
+        });
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = weak.upgrade() {
+                push_ui(&ui);
+            }
+        });
+    });
+}
+
 fn bind(ui: &MainWindow) {
+    ui.set_assistant_live(assistant::token().is_some());
     let weak = ui.as_weak();
     let refresh = move || {
         if let Some(ui) = weak.upgrade() {
@@ -1573,6 +1675,11 @@ fn bind(ui: &MainWindow) {
     let r = refresh.clone();
     ui.on_next_track(move || {
         pi_room::with(|room| room.next_track());
+        r();
+    });
+    let r = refresh.clone();
+    ui.on_play_track(move |i| {
+        pi_room::with(|room| room.play_track(i.max(0) as usize));
         r();
     });
     let r = refresh.clone();
@@ -1799,7 +1906,11 @@ fn bind(ui: &MainWindow) {
         }
     });
     let r = refresh.clone();
+    let weak = ui.as_weak();
     ui.on_open_palette(move || {
+        if let Some(ui) = weak.upgrade() {
+            ui.set_assistant_live(assistant::token().is_some());
+        }
         pi_room::with(|room| room.overlay = Overlay::Palette);
         r();
     });
@@ -2073,13 +2184,36 @@ fn bind(ui: &MainWindow) {
         pi_room::with(|room| room.palette_query = t.to_string());
         r();
     });
-    let r = refresh.clone();
+    let weak = ui.as_weak();
     ui.on_submit_palette(move || {
-        pi_room::with(|room| {
-            let q = room.palette_query.clone();
-            room.palette_reply = room.run_command(&q);
+        let Some(ui) = weak.upgrade() else { return };
+        let q = pi_room::with(|room| room.palette_query.trim().to_string());
+        ask_judie(&ui, q, None);
+    });
+    let weak = ui.as_weak();
+    ui.on_ask_suggestion(move |q| {
+        let Some(ui) = weak.upgrade() else { return };
+        ask_judie(&ui, q.to_string(), None);
+    });
+    let weak = ui.as_weak();
+    ui.on_retry_chat(move || {
+        let Some(ui) = weak.upgrade() else { return };
+        if let Some((id, msg)) = pi_room::with(|room| room.chat_retry.take()) {
+            ask_judie(&ui, msg, Some(id));
+        }
+    });
+    let r2 = refresh.clone();
+    ui.on_new_chat(move || {
+        let (base, session) = pi_room::with(|room| {
+            room.chat.clear();
+            room.chat_retry = None;
+            room.chat_rev += 1;
+            (room.assistant_url.clone(), room.chat_session.take())
         });
-        r();
+        if let (Some(s), Some(token)) = (session, assistant::token()) {
+            std::thread::spawn(move || assistant::end_session(&base, &token, &s));
+        }
+        r2();
     });
     let weak = ui.as_weak();
     ui.on_submit_terminal(move || {
@@ -2134,7 +2268,10 @@ fn bind(ui: &MainWindow) {
         });
     });
     ui.on_set_assistant_url(move |t| {
-        pi_room::with(|room| room.assistant_url = t.to_string());
+        pi_room::with(|room| {
+            room.assistant_url = t.trim().to_string();
+            room.save();
+        });
     });
     let r = refresh.clone();
     ui.on_add_routine(move || {
@@ -2849,7 +2986,11 @@ fn main() {
     push_ui(&ui);
     load_link(&ui);
     poll_latest(ui.as_weak());
-    start_purifier();
+    // A desktop preview must not become a second observer of the real purifier;
+    // it only copes with one, and that one is the Pi.
+    if std::env::var_os("JUDIE_WINDOWED").is_none() {
+        start_purifier();
+    }
 
     // Low quality was removed in 0.3.15. A panel still set to it gets a
     // one-way switch back in Settings → Display.

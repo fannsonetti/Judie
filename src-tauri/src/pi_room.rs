@@ -197,6 +197,8 @@ struct Persist {
     theme: String,
     #[serde(default)]
     reduced_motion: Option<bool>,
+    #[serde(default)]
+    assistant_url: String,
 }
 
 pub const GRID_COLS: i32 = 6;
@@ -586,6 +588,7 @@ fn save_persist(room: &Room) {
         slots: room.slots.clone(),
         custom: room.custom.clone(),
         room_name: room.room_name.clone(),
+        assistant_url: room.assistant_url.clone(),
         weather_loc: room.weather_loc.clone(),
         latitude: room.latitude.clone(),
         longitude: room.longitude.clone(),
@@ -1050,6 +1053,14 @@ pub struct Room {
     pub settings_tab: i32,
     pub palette_query: String,
     pub palette_reply: String,
+    /// The assistant conversation, oldest first. chat_rev bumps on every change
+    /// so the UI only rebuilds the list when it changed.
+    pub chat: Vec<ChatMsg>,
+    pub chat_rev: u32,
+    pub chat_busy: bool,
+    pub chat_session: Option<String>,
+    /// (request ID, message) of a send that got no answer; retried with the same ID.
+    pub chat_retry: Option<(String, String)>,
     pub terminal_input: String,
     pub terminal_cwd: PathBuf,
     pub terminal_lines: Vec<TerminalLine>,
@@ -1205,7 +1216,8 @@ impl Default for Room {
             purifier_hours: 0,
             purifier_online: false,
             room_name: if persist.room_name.is_empty() { "Room".into() } else { persist.room_name.clone() },
-            assistant_url: "http://127.0.0.1:8742".into(),
+            // The AI service's LAN host (ai/UI-HANDOFF.md); Settings > Voice changes it.
+            assistant_url: if persist.assistant_url.is_empty() { "http://192.168.0.57:8742".into() } else { persist.assistant_url.clone() },
             latitude: if persist.latitude.is_empty() { "64.07".into() } else { persist.latitude.clone() },
             longitude: if persist.longitude.is_empty() { "-21.95".into() } else { persist.longitude.clone() },
             voice: persist.voice.unwrap_or(true),
@@ -1222,6 +1234,11 @@ impl Default for Room {
             settings_tab: 0,
             palette_query: String::new(),
             palette_reply: String::new(),
+            chat: Vec::new(),
+            chat_rev: 0,
+            chat_busy: false,
+            chat_session: None,
+            chat_retry: None,
             terminal_input: String::new(),
             terminal_cwd: default_shell_cwd(),
             terminal_lines: Vec::new(),
@@ -1293,7 +1310,22 @@ impl Default for Room {
     }
 }
 
+pub struct ChatMsg {
+    pub judie: bool,
+    pub text: String,
+    pub chips: Vec<String>,
+}
+
 impl Room {
+    pub fn chat_push(&mut self, judie: bool, text: impl Into<String>, chips: Vec<String>) {
+        self.chat.push(ChatMsg { judie, text: text.into(), chips });
+        // ponytail: keep the last 40 messages on screen; the service holds the real context.
+        if self.chat.len() > 40 {
+            self.chat.remove(0);
+        }
+        self.chat_rev += 1;
+    }
+
     fn persist(&self) {
         save_persist(self);
     }
@@ -1491,6 +1523,14 @@ impl Room {
         self.track = (self.track + 1) % self.queue.len();
         self.progress = 0.0;
         self.playing = true;
+    }
+
+    pub fn play_track(&mut self, i: usize) {
+        if i < self.queue.len() {
+            self.track = i;
+            self.progress = 0.0;
+            self.playing = true;
+        }
     }
 
     pub fn prev_track(&mut self) {

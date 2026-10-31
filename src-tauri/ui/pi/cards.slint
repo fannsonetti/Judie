@@ -66,6 +66,20 @@ export struct CalCell {
     today: bool,
 }
 
+export struct QueueRow {
+    title: string,
+    artist: string,
+    length: string,
+    current: bool,
+}
+
+// One assistant message; chips are the actions Judie took for it.
+export struct ChatRow {
+    judie: bool,
+    text: string,
+    chips: [string],
+}
+
 export struct PaletteHit {
     id: string,
     title: string,
@@ -571,14 +585,40 @@ export component RoutineCard inherits Rectangle {
     }
 }
 
+export struct Px { x: float, y: float }
+
+// 8x8 bitmap icon (spec rule 5). Scale by whole numbers only: 2 inline, 4 in tiles.
+export component PixIcon inherits Rectangle {
+    in property <string> name;
+    in property <int> scale: 2;
+    in property <color> fill: Dy.text;
+    width: 8px * root.scale;
+    height: 8px * root.scale;
+    background: transparent;
+    property <[Px]> sun: [{x:3,y:0},{x:0,y:1},{x:3,y:1},{x:6,y:1},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:0,y:3},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3},{x:7,y:3},{x:0,y:4},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:5,y:4},{x:6,y:4},{x:1,y:5},{x:2,y:5},{x:3,y:5},{x:4,y:5},{x:5,y:5},{x:0,y:6},{x:3,y:6},{x:6,y:6},{x:3,y:7}];
+    property <[Px]> bulb: [{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:5,y:0},{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:4,y:1},{x:5,y:1},{x:6,y:1},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:6,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3},{x:6,y:3},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:5,y:4},{x:2,y:5},{x:5,y:5},{x:2,y:6},{x:3,y:6},{x:4,y:6},{x:5,y:6},{x:3,y:7},{x:4,y:7}];
+    property <[Px]> vol: [{x:3,y:0},{x:2,y:1},{x:3,y:1},{x:6,y:1},{x:0,y:2},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:5,y:2},{x:0,y:3},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:5,y:3},{x:7,y:3},{x:0,y:4},{x:1,y:4},{x:2,y:4},{x:3,y:4},{x:5,y:4},{x:7,y:4},{x:2,y:5},{x:3,y:5},{x:5,y:5},{x:3,y:6},{x:6,y:6}];
+    property <[Px]> wifi: [{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:5,y:0},{x:6,y:0},{x:0,y:1},{x:7,y:1},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:1,y:3},{x:6,y:3},{x:3,y:4},{x:4,y:4},{x:3,y:6},{x:4,y:6},{x:3,y:7},{x:4,y:7}];
+    property <[Px]> berry: [{x:1,y:0},{x:2,y:0},{x:5,y:0},{x:6,y:0},{x:3,y:1},{x:4,y:1},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:1,y:3},{x:2,y:3},{x:4,y:3},{x:5,y:3},{x:6,y:3},{x:1,y:4},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:5,y:4},{x:6,y:4},{x:1,y:5},{x:2,y:5},{x:3,y:5},{x:5,y:5},{x:6,y:5},{x:2,y:6},{x:3,y:6},{x:4,y:6},{x:5,y:6},{x:3,y:7},{x:4,y:7}];
+    property <[Px]> note: [{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:5,y:0},{x:6,y:0},{x:7,y:0},{x:2,y:1},{x:3,y:1},{x:4,y:1},{x:5,y:1},{x:6,y:1},{x:7,y:1},{x:2,y:2},{x:7,y:2},{x:2,y:3},{x:7,y:3},{x:1,y:4},{x:2,y:4},{x:6,y:4},{x:7,y:4},{x:0,y:5},{x:1,y:5},{x:2,y:5},{x:5,y:5},{x:6,y:5},{x:7,y:5},{x:0,y:6},{x:1,y:6},{x:2,y:6},{x:5,y:6},{x:6,y:6},{x:7,y:6},{x:1,y:7},{x:6,y:7}];
+    property <[Px]> px: root.name == "note" ? root.note : root.name == "berry" ? root.berry : root.name == "sun" ? root.sun : root.name == "bulb" ? root.bulb : root.name == "wifi" ? root.wifi : root.vol;
+    for p in root.px: Rectangle {
+        x: p.x * root.scale * 1px;
+        y: p.y * root.scale * 1px;
+        width: root.scale * 1px;
+        height: root.scale * 1px;
+        background: root.fill;
+    }
+}
+
 export component KeyBtn inherits Rectangle {
     in property <string> glyph;
     in property <string> sub: "";
     in property <bool> wide: false;
     in property <float> u: 1;
     in property <bool> on: false;
-    in property <bool> has-icon: false;
-    in property <image> icon;
+    // PixIcon name drawn instead of the glyph.
+    in property <string> icon: "";
     callback clicked;
     min-width: 14px;
     min-height: Dy.hit-target;
@@ -589,15 +629,14 @@ export component KeyBtn inherits Rectangle {
     background: (root.on || ta.pressed) ? Dy.panel : Dy.bg;
     ta := TouchArea { clicked => { root.clicked(); } }
     out property <bool> down: ta.pressed;
-    if root.has-icon: Image {
-        source: root.icon;
-        width: 20px;
-        height: 20px;
+    if root.icon != "": PixIcon {
+        name: root.icon;
+        scale: 3;
+        fill: Dy.accent3;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
-        image-fit: contain;
     }
-    if !root.has-icon: Text {
+    if root.icon == "": Text {
         text: root.glyph;
         color: Dy.text;
         font-size: Dy.type-control + 2px;
@@ -911,29 +950,7 @@ export component TileShell inherits Rectangle {
     }
 }
 
-export struct Px { x: float, y: float }
 
-// 8x8 bitmap icon (spec rule 5). Scale by whole numbers only: 2 inline, 4 in tiles.
-export component PixIcon inherits Rectangle {
-    in property <string> name;
-    in property <int> scale: 2;
-    in property <color> fill: Dy.text;
-    width: 8px * root.scale;
-    height: 8px * root.scale;
-    background: transparent;
-    property <[Px]> sun: [{x:3,y:0},{x:0,y:1},{x:3,y:1},{x:6,y:1},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:0,y:3},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3},{x:7,y:3},{x:0,y:4},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:5,y:4},{x:6,y:4},{x:1,y:5},{x:2,y:5},{x:3,y:5},{x:4,y:5},{x:5,y:5},{x:0,y:6},{x:3,y:6},{x:6,y:6},{x:3,y:7}];
-    property <[Px]> bulb: [{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:5,y:0},{x:1,y:1},{x:2,y:1},{x:3,y:1},{x:4,y:1},{x:5,y:1},{x:6,y:1},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:6,y:2},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:4,y:3},{x:5,y:3},{x:6,y:3},{x:2,y:4},{x:3,y:4},{x:4,y:4},{x:5,y:4},{x:2,y:5},{x:5,y:5},{x:2,y:6},{x:3,y:6},{x:4,y:6},{x:5,y:6},{x:3,y:7},{x:4,y:7}];
-    property <[Px]> vol: [{x:3,y:0},{x:2,y:1},{x:3,y:1},{x:6,y:1},{x:0,y:2},{x:1,y:2},{x:2,y:2},{x:3,y:2},{x:5,y:2},{x:0,y:3},{x:1,y:3},{x:2,y:3},{x:3,y:3},{x:5,y:3},{x:7,y:3},{x:0,y:4},{x:1,y:4},{x:2,y:4},{x:3,y:4},{x:5,y:4},{x:7,y:4},{x:2,y:5},{x:3,y:5},{x:5,y:5},{x:3,y:6},{x:6,y:6}];
-    property <[Px]> wifi: [{x:1,y:0},{x:2,y:0},{x:3,y:0},{x:4,y:0},{x:5,y:0},{x:6,y:0},{x:0,y:1},{x:7,y:1},{x:2,y:2},{x:3,y:2},{x:4,y:2},{x:5,y:2},{x:1,y:3},{x:6,y:3},{x:3,y:4},{x:4,y:4},{x:3,y:6},{x:4,y:6},{x:3,y:7},{x:4,y:7}];
-    property <[Px]> px: root.name == "sun" ? root.sun : root.name == "bulb" ? root.bulb : root.name == "wifi" ? root.wifi : root.vol;
-    for p in root.px: Rectangle {
-        x: p.x * root.scale * 1px;
-        y: p.y * root.scale * 1px;
-        width: root.scale * 1px;
-        height: root.scale * 1px;
-        background: root.fill;
-    }
-}
 
 // Judie's mark. The five rectangles are fixed (160x120 design box); keep the
 // lopsided legs exactly. Set `width` only; height follows at 3:4.

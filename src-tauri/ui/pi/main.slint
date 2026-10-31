@@ -2,7 +2,7 @@ import "./fonts/PressStart2P.ttf";
 import "./fonts/Silkscreen-Regular.ttf";
 import "./fonts/Silkscreen-Bold.ttf";
 import "./fonts/PixelifySans-Variable.ttf";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, PixIcon, ScreenOffChoice, RailTab, Seg, SegBtn, SetRow, SetFact, ModeRow } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, PixIcon, ScreenOffChoice, RailTab, Seg, SegBtn, SetRow, SetFact, ModeRow, ChatRow, QueueRow } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 import { WidgetPreview } from "preview.slint";
@@ -93,6 +93,9 @@ export component MainWindow inherits Window {
     in-out property <string> pad-status: "No pad";
     in-out property <string> rail-active: "home";
     in-out property <float> media-progress: 0.2;
+    in-out property <string> media-elapsed: "0:00";
+    in-out property <string> media-total: "0:00";
+    in-out property <[QueueRow]> queue: [];
 
     in-out property <string> indoor: "";
     in-out property <string> outdoor: "";
@@ -146,6 +149,11 @@ export component MainWindow inherits Window {
     in-out property <string> terminal-cwd: "~";
     in-out property <[TerminalLine]> terminal-lines: [];
     in-out property <[PaletteHit]> palette-hits: [];
+    in-out property <[ChatRow]> chat: [];
+    in-out property <bool> chat-busy: false;
+    in-out property <bool> chat-can-retry: false;
+    // An assistant token is on disk, so messages go to the AI service.
+    in-out property <bool> assistant-live: false;
     in-out property <[RoutineRow]> routines: [];
     in-out property <string> expanded: "";
     in-out property <[Slot]> slots: [];
@@ -253,6 +261,7 @@ export component MainWindow inherits Window {
     callback next-track();
     callback prev-track();
     callback volume-changed(int);
+    callback play-track(int);
     callback open-vol-menu();
     callback close-vol-menu();
     callback note-input();
@@ -289,6 +298,9 @@ export component MainWindow inherits Window {
     callback submit-terminal();
     callback palette-text(string);
     callback run-palette-hit(string);
+    callback ask-suggestion(string);
+    callback retry-chat();
+    callback new-chat();
     callback set-tab(int);
     callback toggle-voice();
     callback toggle-speak();
@@ -1134,6 +1146,15 @@ export component MainWindow inherits Window {
                         SetRow { label: "Voice response"; hint: "Speak replies out loud"; Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } } }
                     }
                     if root.settings-tab == 1: Card {
+                        kicker: "Assistant";
+                        FieldTap { label: "Service address"; value: root.assistant-url; active: root.kb-field == "assistant-url"; label-size: Dy.type-label; value-size: Dy.type-title; tap-height: Dy.hit-target + 8px; tapped => { root.open-keyboard("assistant-url"); } }
+                        SetRow {
+                            label: "Token";
+                            hint: root.assistant-live ? "Found. Messages go to the AI service." : "Put it in assistant-token in Judie's data folder. Until then only room commands work.";
+                            Text { text: root.assistant-live ? "Found" : "Missing"; color: root.assistant-live ? Dy.accent2 : Dy.accent3; font-size: Dy.type-label; font-family: Dy.caps; }
+                        }
+                    }
+                    if root.settings-tab == 1: Card {
                         kicker: "Routines";
                         SetRow {
                             label: root.routines.length == 0 ? "No routines yet" : root.routines.length == 1 ? "1 routine" : root.routines.length + " routines";
@@ -1815,6 +1836,8 @@ export component MainWindow inherits Window {
 
     // Expanded pages: the same tiles as home (Card), laid out on a grid with
     // the screen padding and tile gap from the mockup.
+    // Weather: the current reading as the hero, the day's note beside it, and
+    // the next hours as a strip of small tiles (the first one is now).
     if root.expanded == "weather": Rectangle {
         x: root.rail-w;
         y: Dy.header-h;
@@ -1826,35 +1849,50 @@ export component MainWindow inherits Window {
             padding-top: 0px;
             spacing: Dy.gap;
             Card {
-                row: 0; col: 0; colspan: 2;
+                row: 0; col: 0;
                 kicker: "Weather · " + root.weather-loc;
-                HorizontalLayout {
-                    spacing: 16px;
-                    alignment: start;
-                    VerticalLayout { alignment: center; PixIcon { name: "sun"; scale: 6; fill: Dy.accent1; } }
-                    Text { text: root.weather-temp; color: Dy.text; font-size: Dy.type-clock; font-family: Dy.caps; vertical-alignment: center; }
-                }
-                Text { text: root.weather-cond + " · " + root.weather-range; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                Text { text: root.weather-feel; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
                 Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 24px;
+                    alignment: center;
+                    VerticalLayout { alignment: center; PixIcon { name: "sun"; scale: 10; fill: Dy.accent1; } }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        Text { text: root.weather-temp; color: Dy.text; font-size: Dy.type-clock * 2; font-family: Dy.caps; }
+                        Text { text: root.weather-cond; color: Dy.accent1; font-size: Dy.type-value; font-family: Dy.caps; }
+                    }
+                }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: Dy.gap;
+                    SetFact { horizontal-stretch: 1; key: "High · low"; value: root.weather-range; }
+                    SetFact { horizontal-stretch: 1; key: "Feels"; value: root.weather-feel; }
+                }
             }
             Card {
-                row: 0; col: 2; colspan: 2;
+                row: 0; col: 1;
                 kicker: "Today";
                 Text { text: root.weather-note; color: Dy.text; font-size: Dy.type-title; wrap: word-wrap; }
                 Rectangle { vertical-stretch: 1; }
             }
             Card {
-                row: 1; col: 0; colspan: 4;
+                row: 1; col: 0; colspan: 2;
+                vertical-stretch: 0;
                 kicker: "Next hours";
                 HorizontalLayout {
                     spacing: Dy.gap;
-                    for h in root.hours: VerticalLayout {
-                        spacing: 4px;
-                        alignment: center;
-                        Text { text: h.hour; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; horizontal-alignment: center; }
-                        Text { text: h.temp; color: Dy.text; font-size: Dy.type-value; horizontal-alignment: center; }
-                        Text { text: h.precip; color: Dy.accent2; font-size: Dy.type-label; font-family: Dy.caps; horizontal-alignment: center; }
+                    for h[i] in root.hours: Rectangle {
+                        horizontal-stretch: 1;
+                        border-width: Dy.stroke;
+                        border-color: i == 0 ? Dy.accent1 : Dy.line;
+                        VerticalLayout {
+                            padding: 8px;
+                            spacing: 4px;
+                            Text { text: i == 0 ? "Now" : h.hour; color: i == 0 ? Dy.accent1 : Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; horizontal-alignment: center; }
+                            Text { text: h.temp; color: Dy.text; font-size: Dy.type-hero; font-family: Dy.caps; horizontal-alignment: center; }
+                            Text { text: h.precip; color: Dy.accent2; font-size: Dy.type-label; font-family: Dy.caps; horizontal-alignment: center; }
+                        }
                     }
                 }
             }
@@ -1936,6 +1974,8 @@ export component MainWindow inherits Window {
         }
     }
 
+    // Media: the player on the left (cover, title, segmented progress with
+    // times, big transport), volume and the Up next queue on the right.
     if root.expanded == "media": Rectangle {
         x: root.rail-w;
         y: Dy.header-h;
@@ -1947,25 +1987,71 @@ export component MainWindow inherits Window {
             padding-top: 0px;
             spacing: Dy.gap;
             Card {
-                row: 0; col: 0; colspan: 2;
+                row: 0; col: 0; rowspan: 2;
                 kicker: root.playing ? "Now playing" : "Paused";
-                Text { text: root.track-title; color: Dy.text; font-size: Dy.type-hero; overflow: elide; }
-                Text { text: root.track-artist; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; overflow: elide; }
                 Rectangle { vertical-stretch: 1; }
-                Bar { level: root.media-progress; segments: 12; }
                 HorizontalLayout {
-                    spacing: 6px;
-                    alignment: start;
-                    IconBtn { glyph: "<<"; zoom: 1.5; clicked => { root.prev-track(); } }
-                    IconBtn { glyph: root.playing ? "||" : ">"; primary: true; zoom: 1.5; clicked => { root.toggle-play(); } }
-                    IconBtn { glyph: ">>"; zoom: 1.5; clicked => { root.next-track(); } }
+                    alignment: center;
+                    Rectangle {
+                        width: 160px;
+                        height: 160px;
+                        background: Dy.bg;
+                        border-width: Dy.stroke;
+                        border-color: root.playing ? Dy.accent1 : Dy.line;
+                        PixIcon { name: "note"; scale: 12; fill: root.playing ? Dy.accent1 : Dy.dim; x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; }
+                    }
+                }
+                Rectangle { height: 8px; }
+                Text { text: root.track-title; color: Dy.text; font-size: Dy.type-hero; font-family: Dy.caps; horizontal-alignment: center; overflow: elide; }
+                Text { text: root.track-artist; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; horizontal-alignment: center; overflow: elide; }
+                Rectangle { height: 8px; }
+                Bar { level: root.media-progress; segments: 24; zoom: 1.5; }
+                HorizontalLayout {
+                    Text { text: root.media-elapsed; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; horizontal-stretch: 1; }
+                    Text { text: root.media-total; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
+                }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 12px;
+                    alignment: center;
+                    IconBtn { glyph: "<<"; zoom: 2; clicked => { root.prev-track(); } }
+                    IconBtn { glyph: root.playing ? "||" : ">"; primary: true; zoom: 2; clicked => { root.toggle-play(); } }
+                    IconBtn { glyph: ">>"; zoom: 2; clicked => { root.next-track(); } }
                 }
             }
             Card {
-                row: 1; col: 0; colspan: 2;
+                row: 0; col: 1;
+                vertical-stretch: 0;
                 kicker: "Volume";
-                Text { text: root.volume + "%"; color: Dy.text; font-size: Dy.type-hero; }
-                Bar { level: root.volume / 100; interactive: true; changed(v) => { root.volume-changed(v); } }
+                HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout { alignment: center; PixIcon { name: "vol"; scale: 3; fill: root.volume == 0 ? Dy.dim : Dy.text; } }
+                    Text { text: root.volume + "%"; color: Dy.text; font-size: Dy.type-hero; font-family: Dy.caps; vertical-alignment: center; }
+                }
+                Bar { level: root.volume / 100; interactive: true; zoom: 2; changed(v) => { root.volume-changed(v); } }
+            }
+            Card {
+                row: 1; col: 1;
+                kicker: "Up next";
+                for t[i] in root.queue: TouchArea {
+                    height: Dy.hit-target + 8px;
+                    clicked => { root.play-track(i); }
+                    Rectangle {
+                        background: t.current ? Dy.accent1 : parent.pressed ? Dy.bg : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                alignment: center;
+                                horizontal-stretch: 1;
+                                Text { text: t.title; color: t.current ? Dy.bg : Dy.text; font-size: Dy.type-title; font-family: Dy.caps; overflow: elide; }
+                                Text { text: t.artist; color: t.current ? Dy.bg : Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; overflow: elide; }
+                            }
+                            Text { text: t.length; color: t.current ? Dy.bg : Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                        }
+                    }
+                }
                 Rectangle { vertical-stretch: 1; }
             }
         }
@@ -2505,20 +2591,20 @@ export component MainWindow inherits Window {
             }
             Flickable {
                 vertical-stretch: 1;
-                viewport-height: 10 * 36px;
+                viewport-height: 11 * 36px;
                 VerticalLayout {
                     alignment: start;
                     spacing: 4px;
                     for t in [
-                        { id: "", label: "Home" }, { id: "lights", label: "Lights" }, { id: "climate", label: "Climate" },
+                        { id: "", label: "Home" }, { id: "assistant", label: "Judie" }, { id: "lights", label: "Lights" }, { id: "climate", label: "Climate" },
                         { id: "calendar", label: "Calendar" }, { id: "weather", label: "Weather" }, { id: "media", label: "Media" },
                         { id: "purifier", label: "Purifier" }, { id: "terminal", label: "Terminal" }, { id: "pong", label: "Arcade" },
                         { id: "settings", label: "Settings" },
                     ]: rail-tab := TouchArea {
-                        property <bool> on: t.id == "settings" ? root.settings-page : (root.expanded == t.id && !root.settings-page);
+                        property <bool> on: t.id == "assistant" ? root.palette-open : t.id == "settings" ? root.settings-page : (root.expanded == t.id && !root.settings-page && !root.palette-open);
                         height: 32px;
                         clicked => {
-                            if t.id == "" { root.collapse(); root.close-overlay(); } else { root.expand(t.id); }
+                            if t.id == "" { root.collapse(); root.close-overlay(); } else if t.id == "assistant" { root.open-palette(); } else { root.expand(t.id); }
                         }
                         Rectangle {
                             background: rail-tab.on ? Dy.accent1 : rail-tab.pressed ? Dy.panel : transparent;
@@ -2644,84 +2730,119 @@ export component MainWindow inherits Window {
         }
     }
 
-    // Assistant (pixel-ui-mockup.html "Assistant"): your message on the right
-    // in a line-filled bubble, Judie's reply on the left in a tile with the PiMark.
+    // Assistant (pixel-ui-mockup.html "Assistant"): your messages on the right in
+    // line-filled bubbles, Judie's on the left in tiles with the PiMark and the
+    // actions she took as chips above the reply. Shrinks to sit above the keyboard.
     if root.palette-open: Rectangle {
         x: root.rail-w;
+        y: Dy.header-h;
         width: parent.width - root.rail-w;
-        height: 100%;
+        height: parent.height - Dy.header-h - (root.kb-open ? 288px + root.pad : 0px);
         background: Dy.bg;
         TouchArea { }
         VerticalLayout {
             padding: root.pad;
+            padding-top: 0px;
             spacing: Dy.gap;
             HorizontalLayout {
-                height: 30px;
-                TouchArea {
-                    width: 120px;
-                    clicked => { root.close-overlay(); }
-                    Text { x: 0px; text: "< Judie"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                height: Dy.hit-target;
+                spacing: 10px;
+                VerticalLayout { alignment: center; PiMark { width: 28px; } }
+                Text { text: "Judie"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.caps; vertical-alignment: center; }
+                Text {
+                    text: root.chat-busy ? "Thinking" : root.assistant-live ? "Online" : "Room commands only";
+                    color: root.chat-busy ? Dy.accent1 : root.assistant-live ? Dy.accent2 : Dy.dim;
+                    font-size: Dy.type-label;
+                    font-family: Dy.caps;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
                 }
-                Rectangle { horizontal-stretch: 1; }
-                Text { text: "Online"; color: Dy.accent2; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                if root.chat.length > 0: VerticalLayout { alignment: center; Pill { label: "New chat"; min-width: 96px; clicked => { root.new-chat(); } } }
             }
-            VerticalLayout {
+            if root.chat.length == 0: VerticalLayout {
                 vertical-stretch: 1;
-                alignment: end;
-                spacing: Dy.gap;
-                if root.palette-reply == "": Rectangle {
-                    clip: true;
-                    height: 30px;
-                    HorizontalLayout {
-                        spacing: 6px;
-                        alignment: start;
-                        for hit in root.palette-hits: TouchArea {
-                            clicked => { root.run-palette-hit(hit.id); }
+                alignment: center;
+                spacing: 16px;
+                HorizontalLayout { alignment: center; PiMark { width: 96px; } }
+                Text {
+                    text: root.assistant-live ? "Ask about the room, or anything else." : "No assistant token yet, so only room commands work.";
+                    color: Dy.dim;
+                    font-size: Dy.type-title;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: Dy.gap;
+                    for s in ["Is the air clean?", "Purifier to Sleep", "Filter cleaning due?"]: Pill {
+                        label: s;
+                        min-width: 180px;
+                        height: Dy.hit-target;
+                        clicked => { root.ask-suggestion(s); }
+                    }
+                }
+            }
+            if root.chat.length > 0: chat-flick := Flickable {
+                vertical-stretch: 1;
+                viewport-height: max(self.height, chat-list.preferred-height);
+                // Follow the newest message whenever the conversation grows.
+                changed viewport-height => { self.viewport-y = self.height - self.viewport-height; }
+                chat-list := VerticalLayout {
+                    width: chat-flick.width;
+                    height: max(chat-flick.height, self.preferred-height);
+                    alignment: end;
+                    spacing: Dy.gap;
+                    for m in root.chat: HorizontalLayout {
+                        alignment: m.judie ? start : end;
+                        spacing: 8px;
+                        if m.judie: VerticalLayout { alignment: start; PiMark { width: 28px; } }
+                        VerticalLayout {
+                            spacing: 4px;
+                            max-width: chat-flick.width * (m.judie ? 0.8 : 0.7);
+                            if m.chips.length > 0: HorizontalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                for c in m.chips: Rectangle {
+                                    background: Dy.accent1;
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        padding-top: 4px;
+                                        padding-bottom: 4px;
+                                        Text { text: c; color: Dy.bg; font-size: Dy.type-label; font-family: Dy.caps; }
+                                    }
+                                }
+                            }
                             Rectangle {
-                                border-width: Dy.stroke;
+                                background: m.judie ? Dy.panel : Dy.line;
+                                border-width: m.judie ? Dy.stroke : 0px;
                                 border-color: Dy.line;
                                 HorizontalLayout {
-                                    padding-left: 8px;
-                                    padding-right: 8px;
-                                    Text { text: hit.title; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                                    padding: 8px;
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    Text { text: m.text; color: Dy.text; font-size: Dy.type-title; wrap: word-wrap; }
                                 }
                             }
                         }
                     }
-                }
-                if root.palette-reply != "": HorizontalLayout {
-                    alignment: end;
-                    Rectangle {
-                        background: Dy.line;
-                        max-width: parent.width * 0.7;
-                        HorizontalLayout {
-                            padding: 8px;
-                            padding-left: 10px;
-                            padding-right: 10px;
-                            Text { text: root.palette-query; color: Dy.text; font-size: Dy.type-title; wrap: word-wrap; }
+                    if root.chat-busy: HorizontalLayout {
+                        alignment: start;
+                        spacing: 8px;
+                        VerticalLayout { alignment: start; PiMark { width: 28px; } }
+                        Rectangle {
+                            background: Dy.panel;
+                            border-width: Dy.stroke;
+                            border-color: Dy.line;
+                            width: 48px;
+                            height: Dy.type-title + 22px;
+                            Rectangle { x: 10px; width: 8px; height: Dy.type-title; background: Dy.accent2; visible: root.blink; }
                         }
                     }
-                }
-                if root.palette-reply != "": HorizontalLayout {
-                    spacing: 8px;
-                    alignment: start;
-                    VerticalLayout { alignment: end; PiMark { width: 36px; } }
-                    Rectangle {
-                        background: Dy.panel;
-                        border-width: Dy.stroke;
-                        border-color: Dy.line;
-                        max-width: parent.width * 0.8;
-                        HorizontalLayout {
-                            padding: 8px;
-                            padding-left: 10px;
-                            padding-right: 10px;
-                            spacing: 2px;
-                            Text { text: root.palette-reply; color: Dy.text; font-size: Dy.type-title; wrap: word-wrap; }
-                            VerticalLayout {
-                                alignment: end;
-                                Rectangle { width: 6px; height: Dy.type-title; background: Dy.accent2; opacity: root.blink ? 1 : 0; }
-                            }
-                        }
+                    if root.chat-can-retry && !root.chat-busy: HorizontalLayout {
+                        alignment: start;
+                        padding-left: 36px;
+                        Pill { label: "Retry"; on: true; min-width: 96px; clicked => { root.retry-chat(); } }
                     }
                 }
             }
@@ -2737,8 +2858,8 @@ export component MainWindow inherits Window {
                         Text {
                             x: 10px;
                             width: parent.width - 20px;
-                            text: root.palette-query == "" || root.palette-reply != "" ? "Type a message" : root.palette-query;
-                            color: root.palette-query == "" || root.palette-reply != "" ? Dy.dim : Dy.text;
+                            text: root.palette-query == "" ? "Type a message" : root.palette-query;
+                            color: root.palette-query == "" ? Dy.dim : Dy.text;
                             font-size: Dy.type-title;
                             vertical-alignment: center;
                             overflow: elide;
@@ -2747,9 +2868,10 @@ export component MainWindow inherits Window {
                 }
                 TouchArea {
                     width: 72px;
+                    enabled: !root.chat-busy;
                     clicked => { root.submit-palette(); }
                     Rectangle {
-                        background: parent.pressed ? Dy.accent1 : Dy.accent2;
+                        background: root.chat-busy ? Dy.line : parent.pressed ? Dy.accent1 : Dy.accent2;
                         Text { text: "Send"; color: Dy.bg; font-size: Dy.type-label; font-family: Dy.caps; horizontal-alignment: center; vertical-alignment: center; }
                     }
                 }
@@ -2757,12 +2879,12 @@ export component MainWindow inherits Window {
         }
     }
 
+    // The keyboard floats one screen pad clear of the edges instead of resting on the bezel.
     if root.kb-open: AnsiKeyboard {
-        x: root.rail-w;
-        y: parent.height - 300px;
-        width: parent.width - root.rail-w;
-        height: 300px;
-        field: root.kb-field;
+        x: root.rail-w + root.pad;
+        y: parent.height - self.height - root.pad;
+        width: parent.width - root.rail-w - root.pad * 2;
+        height: 288px;
         preview: root.kb-field == "wifi-pass" ? (root.kb-text == "" ? "" : "••••••••") : root.kb-text;
         typed(ch) => { root.keyboard-key(ch); }
         command(cmd) => { root.keyboard-command(cmd); }

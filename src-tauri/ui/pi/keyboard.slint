@@ -2,13 +2,12 @@ import { Dy, KeyBtn } from "cards.slint";
 
 export component AnsiKeyboard inherits Rectangle {
     in-out property <bool> caps: false;
-    in property <string> field: "";
     in property <string> preview: "";
     callback typed(string);
     callback command(string);
     callback close();
 
-    background: Dy.bg;
+    background: Dy.panel;
     border-width: Dy.stroke;
     border-color: Dy.line;
 
@@ -26,13 +25,6 @@ export component AnsiKeyboard inherits Rectangle {
             spacing: 5px;
             height: Dy.hit-target;
             Text {
-                text: root.field;
-                color: Dy.dim;
-                font-size: Dy.type-status;
-                font-family: Dy.mono;
-                vertical-alignment: center;
-            }
-            Text {
                 text: root.preview;
                 color: Dy.text;
                 font-size: Dy.type-control;
@@ -46,13 +38,13 @@ export component AnsiKeyboard inherits Rectangle {
                 width: max(44px, Dy.hit-target * 1.4);
                 Rectangle {
                     border-width: Dy.stroke;
-                    border-color: Dy.dim;
+                    border-color: Dy.line;
+                    background: parent.pressed ? Dy.bg : transparent;
                     Text {
                         text: "Hide";
                         color: Dy.text;
                         font-size: Dy.type-control;
-                        font-family: Dy.mono;
-                        font-weight: 700;
+                        font-family: Dy.caps;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -113,7 +105,7 @@ export component AnsiKeyboard inherits Rectangle {
                 clicked => { if root.fn-layer { root.command("f12"); } else { root.typed(root.shift ? "+" : "="); } }
             }
             KeyBtn {
-                u: 2; glyph: root.fn-layer ? "Del" : "⌫";
+                u: 2; glyph: root.fn-layer ? "Del" : "Back";
                 clicked => { root.command(root.fn-layer ? "delete" : (root.ctrl ? "word-back" : "back")); }
             }
         }
@@ -179,8 +171,7 @@ export component AnsiKeyboard inherits Rectangle {
             KeyBtn {
                 u: 1.25;
                 glyph: "";
-                has-icon: true;
-                icon: @image-url("raspberry.png");
+                icon: "berry";
                 clicked => { root.command("pi"); }
             }
             alt-l := KeyBtn { u: 1.25; glyph: "Alt"; on: root.alt; }
