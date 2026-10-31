@@ -1,6 +1,6 @@
 [package]
 name = "judie"
-version = "0.3.15"
+version = "0.3.16"
 description = "Judie room control"
 authors = ["Judie"]
 edition = "2021"

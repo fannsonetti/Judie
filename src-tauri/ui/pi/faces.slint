@@ -46,6 +46,7 @@ export component WidgetFace inherits Rectangle {
     in property <string> purifier-mode: "Auto";
     in property <string> purifier-aq: "Good";
     in property <int> purifier-filter: 38;
+    in property <int> purifier-iai: 2;
 
     in property <float> cpu: 0;
     in property <float> memory: 0;
@@ -161,6 +162,7 @@ export component WidgetFace inherits Rectangle {
     property <string> t-aq: root.sample ? "Good" : root.purifier-aq;
     property <string> t-pmode: root.sample ? "Auto" : root.purifier-mode;
     property <int> t-filter: root.sample ? 38 : root.purifier-filter;
+    property <int> t-iai: root.sample ? 2 : root.purifier-iai;
     property <float> t-cpu: root.sample ? 24 : root.cpu;
     property <float> t-mem: root.sample ? 51 : root.memory;
     property <string> t-memd: root.sample ? "4.1 / 8.0 GB" : root.mem-detail;
@@ -275,10 +277,10 @@ export component WidgetFace inherits Rectangle {
             spacing: root.sp;
             alignment: start;
             Text { text: root.t-aq; color: Dy.text; font-size: root.f-hero; }
-            Text { text: "PM2.5 7 · Allergens 4/12"; color: Dy.dim; font-size: root.f-label; font-family: Dy.caps; overflow: elide; }
+            Text { text: "Allergen index " + root.t-iai + "/12"; color: Dy.dim; font-size: root.f-label; font-family: Dy.caps; overflow: elide; }
             Text { text: "Filter " + root.t-filter + "%"; color: Dy.dim; font-size: root.f-label; font-family: Dy.caps; }
             Bar { level: root.t-filter / 100; zoom: root.s; }
-            if root.size == "2x2": Text { text: "Clean the filter soon for the best air."; color: Dy.dim; font-size: root.f-body; wrap: word-wrap; }
+            if root.size == "2x2" && root.t-filter < 15: Text { text: "Clean the filter soon"; color: Dy.accent3; font-size: root.f-label; font-family: Dy.caps; wrap: word-wrap; }
             if root.size != "1x1": HorizontalLayout {
                 spacing: root.sp;
                 Pill { label: "Auto"; zoom: root.s; horizontal-stretch: 1; on: root.t-pmode == "Auto"; clicked => { if !root.sample { root.set-purifier-mode("Auto"); } } }

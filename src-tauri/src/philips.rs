@@ -19,6 +19,9 @@ pub struct Status {
     pub mode: &'static str,
     pub aq: &'static str,
     pub filter: u8,
+    /// Allergen index, 1 (clean) to 12.
+    pub iai: u8,
+    pub filter_hours: u16,
 }
 
 fn hex(b: &[u8]) -> String {
@@ -146,6 +149,8 @@ fn parse_status(raw: &str) -> Option<Status> {
             _ => "Very poor",
         },
         filter: (num(r, "D0540E") * 100 / total).clamp(0, 100) as u8,
+        iai: num(r, "D03120").clamp(0, 12) as u8,
+        filter_hours: num(r, "D0540E").clamp(0, 65535) as u16,
     })
 }
 

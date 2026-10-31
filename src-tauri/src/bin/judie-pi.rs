@@ -760,9 +760,13 @@ fn start_purifier() {
                     room.purifier_mode = s.mode.into();
                     room.purifier_aq = s.aq.into();
                     room.purifier_filter = s.filter;
+                    room.purifier_iai = s.iai;
+                    room.purifier_hours = s.filter_hours;
+                    room.purifier_online = true;
                 });
             });
             *PURIFIER_IP.lock().unwrap() = None;
+            pi_room::with(|room| room.purifier_online = false);
         }
         std::thread::sleep(Duration::from_secs(30));
     });
@@ -867,6 +871,10 @@ fn push_ui(ui: &MainWindow) {
         ui.set_purifier_mode(room.purifier_mode.clone().into());
         ui.set_purifier_aq(room.purifier_aq.clone().into());
         ui.set_purifier_filter(i32::from(room.purifier_filter));
+        ui.set_purifier_iai(i32::from(room.purifier_iai));
+        ui.set_purifier_hours(i32::from(room.purifier_hours));
+        ui.set_purifier_online(room.purifier_online);
+        ui.set_humidity_pct(i32::from(room.humidity));
         ui.set_room_name(room.room_name.clone().into());
         ui.set_voice_enabled(room.voice);
         ui.set_speak_replies(room.speak);

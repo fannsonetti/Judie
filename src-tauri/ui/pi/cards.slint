@@ -279,6 +279,26 @@ export component SetFact inherits VerticalLayout {
     Text { text: root.value == "" ? "–" : root.value; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
 }
 
+// A full-width choice row (purifier modes): label and dim hint, framed in accent1 when picked.
+export component ModeRow inherits Rectangle {
+    in property <string> label;
+    in property <string> hint;
+    in property <bool> on: false;
+    callback clicked;
+    min-height: Dy.hit-target + 20px;
+    border-width: Dy.stroke;
+    border-color: root.on ? Dy.accent1 : Dy.line;
+    background: root.on ? Dy.accent1 : ta.pressed ? Dy.bg : transparent;
+    ta := TouchArea { clicked => { root.clicked(); } }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        Text { text: root.label; color: root.on ? Dy.bg : Dy.text; font-size: Dy.type-title; font-family: Dy.caps; vertical-alignment: center; }
+        Text { text: root.hint; color: root.on ? Dy.bg : Dy.dim; font-size: Dy.type-label; font-family: Dy.mono; vertical-alignment: center; horizontal-alignment: right; horizontal-stretch: 1; overflow: elide; }
+    }
+}
+
 export component Toggle inherits Rectangle {
     in-out property <bool> on;
     in property <float> zoom: 1.0;

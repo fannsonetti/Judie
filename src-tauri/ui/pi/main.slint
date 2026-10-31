@@ -2,7 +2,7 @@ import "./fonts/PressStart2P.ttf";
 import "./fonts/Silkscreen-Regular.ttf";
 import "./fonts/Silkscreen-Bold.ttf";
 import "./fonts/PixelifySans-Variable.ttf";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, PixIcon, ScreenOffChoice, RailTab, Seg, SegBtn, SetRow, SetFact } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, PixIcon, ScreenOffChoice, RailTab, Seg, SegBtn, SetRow, SetFact, ModeRow } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 import { WidgetPreview } from "preview.slint";
@@ -105,6 +105,10 @@ export component MainWindow inherits Window {
     in-out property <string> purifier-mode: "Auto";
     in-out property <string> purifier-aq: "Good";
     in-out property <int> purifier-filter: 38;
+    in-out property <int> purifier-iai: 2;
+    in-out property <int> purifier-hours: 0;
+    in-out property <bool> purifier-online: false;
+    in-out property <int> humidity-pct: 42;
 
     in-out property <float> cpu: 0;
     in-out property <float> memory: 0;
@@ -869,6 +873,7 @@ export component MainWindow inherits Window {
                         purifier-mode: root.purifier-mode;
                         purifier-aq: root.purifier-aq;
                         purifier-filter: root.purifier-filter;
+                        purifier-iai: root.purifier-iai;
                         cpu: root.cpu;
                         memory: root.memory;
                         mem-detail: root.mem-detail;
@@ -2016,45 +2021,73 @@ export component MainWindow inherits Window {
         }
     }
 
+    // Purifier: the air reading on the left, modes on the right, filter along
+    // the bottom. Allergen colour: 1-3 accent2, 4-6 accent1, 7+ accent3.
     if root.expanded == "purifier": Rectangle {
         x: root.rail-w;
         y: Dy.header-h;
         width: parent.width - root.rail-w;
         height: parent.height - Dy.header-h;
         background: Dy.bg;
+        property <color> aq-color: root.purifier-iai <= 3 ? Dy.accent2 : root.purifier-iai <= 6 ? Dy.accent1 : Dy.accent3;
         GridLayout {
             padding: root.pad;
             padding-top: 0px;
             spacing: Dy.gap;
             Card {
                 row: 0; col: 0;
-                kicker: "Air quality";
-                HorizontalLayout {
-                    Text { text: root.purifier-aq; color: Dy.text; font-size: Dy.type-clock; font-family: Dy.caps; horizontal-stretch: 1; }
-                    VerticalLayout { alignment: start; Toggle { on: root.purifier-on; toggled => { root.toggle-purifier(); } } }
-                }
-                Text { text: "PM2.5 7 · Allergens 4/12"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
+                kicker: root.purifier-online ? "Air quality · live" : "Air quality · looking for the purifier";
                 Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 12px;
+                    Text {
+                        text: root.purifier-online ? root.purifier-aq : "No signal";
+                        color: root.purifier-online && root.purifier-on ? aq-color : Dy.dim;
+                        font-size: self.text.character-count <= 4 ? Dy.type-clock * 2 : Dy.type-clock;
+                        font-family: Dy.caps;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 4px;
+                        Toggle { zoom: 1.5; on: root.purifier-on; toggled => { root.toggle-purifier(); } }
+                        Text { text: root.purifier-on ? "On" : "Off"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; horizontal-alignment: center; }
+                    }
+                }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    Text { text: "Allergen index"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; horizontal-stretch: 1; }
+                    Text { text: root.purifier-online ? root.purifier-iai + " / 12" : "–"; color: Dy.text; font-size: Dy.type-value; font-family: Dy.caps; }
+                }
+                Bar { level: root.purifier-online ? root.purifier-iai / 12 : 0; segments: 12; zoom: 2; fill: aq-color; }
+                Text { text: "1–3 good · 4–6 fair · 7–9 poor · 10+ very poor"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; wrap: word-wrap; }
             }
             Card {
                 row: 0; col: 1;
                 kicker: "Mode";
-                HorizontalLayout {
-                    spacing: 4px;
-                    Pill { label: "Auto"; horizontal-stretch: 1; on: root.purifier-mode == "Auto"; clicked => { root.set-purifier-mode("Auto"); } }
-                    Pill { label: "Sleep"; horizontal-stretch: 1; on: root.purifier-mode == "Sleep"; clicked => { root.set-purifier-mode("Sleep"); } }
-                    Pill { label: "Medium"; horizontal-stretch: 1; on: root.purifier-mode == "Medium"; clicked => { root.set-purifier-mode("Medium"); } }
-                    Pill { label: "Turbo"; horizontal-stretch: 1; on: root.purifier-mode == "Turbo"; clicked => { root.set-purifier-mode("Turbo"); } }
-                }
+                ModeRow { label: "Auto"; hint: "Follows the air"; on: root.purifier-mode == "Auto"; clicked => { root.set-purifier-mode("Auto"); } }
+                ModeRow { label: "Sleep"; hint: "Quietest, display off"; on: root.purifier-mode == "Sleep"; clicked => { root.set-purifier-mode("Sleep"); } }
+                ModeRow { label: "Medium"; hint: "Steady fan"; on: root.purifier-mode == "Medium"; clicked => { root.set-purifier-mode("Medium"); } }
+                ModeRow { label: "Turbo"; hint: "Full speed"; on: root.purifier-mode == "Turbo"; clicked => { root.set-purifier-mode("Turbo"); } }
                 Rectangle { vertical-stretch: 1; }
             }
             Card {
                 row: 1; col: 0; colspan: 2;
+                vertical-stretch: 0;
                 kicker: "Filter";
-                Text { text: root.purifier-filter + "%"; color: Dy.text; font-size: Dy.type-hero; }
-                Bar { level: root.purifier-filter / 100; }
-                Text { text: "Clean the filter soon for the best air."; color: Dy.dim; font-size: Dy.type-title; }
-                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    spacing: 16px;
+                    Text { text: root.purifier-online ? root.purifier-filter + "%" : "–"; color: Dy.text; font-size: Dy.type-hero; font-family: Dy.caps; vertical-alignment: center; }
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Bar { level: root.purifier-online ? root.purifier-filter / 100 : 0; zoom: 2; fill: root.purifier-filter < 15 ? Dy.accent3 : Dy.accent1; }
+                    }
+                    if root.purifier-hours > 0: Text { text: root.purifier-hours + " h left"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                }
+                if root.purifier-online: Text { text: root.purifier-filter < 15 ? "Time to clean or replace the filter" : "Filter is in good shape"; color: root.purifier-filter < 15 ? Dy.accent3 : Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
             }
         }
     }
@@ -2109,6 +2142,8 @@ export component MainWindow inherits Window {
         }
     }
 
+    // Climate: indoor temperature as the hero, humidity and outdoor beside it,
+    // and a purifier strip along the bottom since both are about the room's air.
     if root.expanded == "climate": Rectangle {
         x: root.rail-w;
         y: Dy.header-h;
@@ -2120,23 +2155,39 @@ export component MainWindow inherits Window {
             padding-top: 0px;
             spacing: Dy.gap;
             Card {
-                row: 0; col: 0; colspan: 2;
-                kicker: "Indoor now";
-                Text { text: root.indoor; color: Dy.text; font-size: Dy.type-clock; font-family: Dy.caps; }
-                Text { text: root.comfort; color: Dy.accent2; font-size: Dy.type-label; font-family: Dy.caps; }
+                row: 0; col: 0; rowspan: 2;
+                kicker: "Indoor";
+                Rectangle { vertical-stretch: 1; }
+                Text { text: root.indoor; color: Dy.text; font-size: Dy.type-clock * 2; font-family: Dy.caps; horizontal-alignment: center; }
+                Text { text: root.comfort; color: Dy.accent2; font-size: Dy.type-value; font-family: Dy.caps; horizontal-alignment: center; }
                 Rectangle { vertical-stretch: 1; }
             }
             Card {
-                row: 1; col: 0;
+                row: 0; col: 1;
                 kicker: "Humidity";
-                Text { text: root.humidity; color: Dy.text; font-size: Dy.type-hero; }
+                Rectangle { vertical-stretch: 1; }
+                Text { text: root.humidity; color: Dy.text; font-size: Dy.type-clock; font-family: Dy.caps; }
+                Bar { level: root.humidity-pct / 100; zoom: 2; fill: root.humidity-pct < 30 || root.humidity-pct > 60 ? Dy.accent3 : Dy.accent2; }
+                Text { text: "30–60% is comfortable"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
                 Rectangle { vertical-stretch: 1; }
             }
             Card {
                 row: 1; col: 1;
-                kicker: "Outdoor";
-                Text { text: root.outdoor; color: Dy.text; font-size: Dy.type-hero; }
+                kicker: "Outdoor · " + root.weather-loc;
                 Rectangle { vertical-stretch: 1; }
+                Text { text: root.outdoor; color: Dy.text; font-size: Dy.type-clock; font-family: Dy.caps; }
+                Text { text: root.weather-cond; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; overflow: elide; }
+                Rectangle { vertical-stretch: 1; }
+            }
+            Card {
+                row: 2; col: 0; colspan: 2;
+                vertical-stretch: 0;
+                kicker: "Air purifier";
+                tapped => { root.expand("purifier"); }
+                HorizontalLayout {
+                    Text { text: !root.purifier-online ? "Not connected" : root.purifier-on ? root.purifier-aq + " · " + root.purifier-mode : "Off"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.caps; horizontal-stretch: 1; vertical-alignment: center; }
+                    Text { text: "Open >"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                }
             }
         }
     }
