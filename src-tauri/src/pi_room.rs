@@ -192,8 +192,6 @@ struct Persist {
     #[serde(default)]
     hit_target: Option<i32>,
     #[serde(default)]
-    display_scale: Option<i32>,
-    #[serde(default)]
     display_native: String,
     #[serde(default)]
     theme: String,
@@ -613,7 +611,6 @@ fn save_persist(room: &Room) {
         ui_scale: Some(room.ui_scale),
         header_h: Some(room.header_h),
         hit_target: Some(room.hit_target),
-        display_scale: Some(room.display_scale),
         display_native: room.display_native.clone(),
         theme: room.theme.clone(),
         reduced_motion: room.reduced_motion,
@@ -1084,7 +1081,6 @@ pub struct Room {
     pub header_h: i32,
     pub hit_target: i32,
     pub gallery_border: bool,
-    pub display_scale: i32,
     pub display_native: String,
     pub theme: String,
     /// None until the user picks; startup then follows JUDIE_REDUCED_MOTION.
@@ -1275,10 +1271,6 @@ impl Default for Room {
             header_h: persist.header_h.unwrap_or(108).clamp(88, 140),
             hit_target: persist.hit_target.unwrap_or(72).clamp(48, 96),
             gallery_border: true,
-            display_scale: match persist.display_scale.unwrap_or(100) {
-                50 => 50,
-                _ => 100,
-            },
             display_native: persist.display_native,
             theme: THEMES[theme_index(&persist.theme) as usize].to_string(),
             reduced_motion: persist.reduced_motion,
@@ -1361,11 +1353,6 @@ impl Room {
     pub fn set_screen_off(&mut self, secs: i32) {
         let ok = SCREEN_OFF_OPTIONS.iter().any(|(_, s)| *s == secs);
         self.screen_off_secs = if ok { secs.max(0) } else { 0 };
-        self.persist();
-    }
-
-    pub fn set_display_scale(&mut self, scale: i32) {
-        self.display_scale = if scale == 50 { 50 } else { 100 };
         self.persist();
     }
 

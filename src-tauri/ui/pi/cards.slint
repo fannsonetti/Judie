@@ -249,6 +249,36 @@ export component Seg inherits Rectangle {
     }
 }
 
+// Settings: label (plus an optional dim hint) on the left, the control on the right.
+export component SetRow inherits Rectangle {
+    in property <string> label;
+    in property <string> hint;
+    min-height: Dy.hit-target;
+    HorizontalLayout {
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text { text: root.label; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
+            if root.hint != "": Text { text: root.hint; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.mono; wrap: word-wrap; }
+        }
+        VerticalLayout {
+            alignment: center;
+            @children
+        }
+    }
+}
+
+// Settings: a dim caps key over its value, for read-only facts.
+export component SetFact inherits VerticalLayout {
+    in property <string> key;
+    in property <string> value;
+    spacing: 2px;
+    Text { text: root.key; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
+    Text { text: root.value == "" ? "–" : root.value; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
+}
+
 export component Toggle inherits Rectangle {
     in-out property <bool> on;
     in property <float> zoom: 1.0;
@@ -313,15 +343,16 @@ export component PowerAction inherits Rectangle {
     in property <string> label;
     in property <string> glyph;
     in property <bool> enabled: true;
+    in property <bool> danger: false;
     callback clicked;
     border-radius: 0px;
     border-width: Dy.stroke;
-    border-color: Dy.dim;
-    background: Dy.bg;
-    height: 28px;
+    border-color: root.danger ? Dy.accent3 : Dy.dim;
+    background: ta.pressed ? Dy.panel : Dy.bg;
+    height: Dy.hit-target;
     horizontal-stretch: 1;
     opacity: root.enabled ? 1 : 0.35;
-    TouchArea {
+    ta := TouchArea {
         enabled: root.enabled;
         clicked => { root.clicked(); }
     }
@@ -331,7 +362,7 @@ export component PowerAction inherits Rectangle {
         alignment: center;
         Text {
             text: root.glyph;
-            color: Dy.text;
+            color: root.danger ? Dy.accent3 : Dy.text;
             font-size: Dy.type-control;
             font-weight: 700;
             font-family: Dy.mono;
@@ -339,7 +370,7 @@ export component PowerAction inherits Rectangle {
         }
         Text {
             text: root.label;
-            color: Dy.text;
+            color: root.danger ? Dy.accent3 : Dy.text;
             font-size: Dy.type-title;
             font-weight: 700;
             font-family: Dy.mono;
@@ -447,11 +478,11 @@ export component RoutineCard inherits Rectangle {
     border-color: Dy.line;
     background: Dy.bg;
     VerticalLayout {
-        padding: 5px;
-        spacing: 4px;
+        padding: 8px;
+        spacing: 6px;
         HorizontalLayout {
             spacing: 4px;
-            height: 22px;
+            height: 28px;
             Text {
                 text: root.item.status;
                 color: Dy.dim;
@@ -474,9 +505,9 @@ export component RoutineCard inherits Rectangle {
             error: root.item.name-error;
             active: root.kb-field == "routine-name:" + root.item.id;
             locked: root.item.builtin;
-            label-size: 7px;
-            value-size: 9px;
-            tap-height: 28px;
+            label-size: Dy.type-label;
+            value-size: Dy.type-title;
+            tap-height: Dy.hit-target;
             tapped => { root.edit-name(); }
         }
         FieldTap {
@@ -485,9 +516,9 @@ export component RoutineCard inherits Rectangle {
             error: root.item.phrase-error;
             active: root.kb-field == "routine-phrase:" + root.item.id;
             locked: root.item.builtin;
-            label-size: 7px;
-            value-size: 9px;
-            tap-height: 28px;
+            label-size: Dy.type-label;
+            value-size: Dy.type-title;
+            tap-height: Dy.hit-target;
             tapped => { root.edit-phrase(); }
         }
         FieldTap {
@@ -496,14 +527,15 @@ export component RoutineCard inherits Rectangle {
             error: root.item.command-error;
             active: root.kb-field == "routine-command:" + root.item.id;
             locked: root.item.builtin;
-            label-size: 7px;
-            value-size: 9px;
-            tap-height: 28px;
+            label-size: Dy.type-label;
+            value-size: Dy.type-title;
+            tap-height: Dy.hit-target;
             tapped => { root.edit-command(); }
         }
-        HorizontalLayout {
+        // Save and Cancel only mean something once there is an edit to keep or drop.
+        if root.item.dirty || root.item.is-new: HorizontalLayout {
             spacing: 4px;
-            height: 22px;
+            height: 28px;
             Pill {
                 label: "Save";
                 on: true;
@@ -512,7 +544,6 @@ export component RoutineCard inherits Rectangle {
             }
             Pill {
                 label: "Cancel";
-                opacity: (root.item.dirty || root.item.is-new) ? 1 : 0.35;
                 clicked => { root.cancel(); }
             }
             Rectangle { horizontal-stretch: 1; }

@@ -2,7 +2,7 @@ import "./fonts/PressStart2P.ttf";
 import "./fonts/Silkscreen-Regular.ttf";
 import "./fonts/Silkscreen-Bold.ttf";
 import "./fonts/PixelifySans-Variable.ttf";
-import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, PixIcon, ScreenOffChoice, RailTab, Seg, SegBtn } from "cards.slint";
+import { Dy, LightRow, HourRow, EventRow, ServiceRow, ActivityRow, TimerRow, Slot, GalleryItem, CalCell, PaletteHit, RoutineRow, PartKind, SlopNode, ReleaseRow, WifiNet, DiagRow, TerminalLine, Card, Pill, Toggle, Swatch, IconBtn, HitBtn, FieldTap, RoutineCard, KeyBtn, Bar, TileShell, WidgetRemoveBtn, QuickTask, NetGlyph, ConfirmSheet, PowerAction, PiMark, PixIcon, ScreenOffChoice, RailTab, Seg, SegBtn, SetRow, SetFact } from "cards.slint";
 import { AnsiKeyboard } from "keyboard.slint";
 import { WidgetFace } from "faces.slint";
 import { WidgetPreview } from "preview.slint";
@@ -59,7 +59,6 @@ export component MainWindow inherits Window {
     in-out property <bool> header-line: false;
     in-out property <int> screen-off-secs: 0;
     in-out property <string> screen-off-label: "Never";
-    in-out property <bool> screen-off-open: false;
     in-out property <int> text-scale: 100;
     in-out property <int> ui-scale: 100;
     in-out property <int> header-h-px: 108;
@@ -206,7 +205,6 @@ export component MainWindow inherits Window {
     in-out property <string> display-output: "—";
     in-out property <string> display-mode: "—";
     in-out property <string> display-rate: "—";
-    in-out property <int> display-scale: 100;
     in-out property <bool> display-lowres: false;
     in-out property <string> wifi-detail: "";
     in-out property <string> net-iface: "—";
@@ -260,7 +258,6 @@ export component MainWindow inherits Window {
     callback toggle-header-line();
     callback set-screen-off(int);
     callback set-display-rate(string);
-    callback set-display-scale(int);
     callback set-theme(int);
     callback toggle-reduced-motion();
     callback set-gallery-border(bool);
@@ -421,7 +418,6 @@ export component MainWindow inherits Window {
 
     property <duration> gallery-ease: 0ms;
     property <string> gallery-size-caption: root.gallery-index == 0 ? "Small 1x1" : ((root.gallery-index == 1 && root.gallery-kind != "clock" && root.gallery-kind != "pong") ? "Medium 2x1" : "Large 2x2");
-    property <length> general-col: min(380px, root.width - 40px);
 
     animate drag-dx { duration: drag-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
     animate drag-dy { duration: drag-ease; easing: cubic-bezier(0.22, 1, 0.36, 1); }
@@ -1042,13 +1038,13 @@ export component MainWindow inherits Window {
         }
     }
 
-    // Stepped, never eased (pixel-ui.md rule 6): about 12 fps at Performance,
-    // 30 fps at Quality. Reduced motion cuts straight to the end.
+    // Stepped, never eased (pixel-ui.md rule 6): 30 fps.
+    // Reduced motion cuts straight to the end.
     Timer {
-        interval: root.display-scale == 50 ? 83ms : 33ms;
+        interval: 33ms;
         running: root.settings-animating;
         triggered => {
-            root.settings-anim-t = root.reduced-motion ? 1.0 : min(1.0, root.settings-anim-t + (root.display-scale == 50 ? 83.0 : 33.0) / root.settings-anim-ms);
+            root.settings-anim-t = root.reduced-motion ? 1.0 : min(1.0, root.settings-anim-t + 33.0 / root.settings-anim-ms);
             root.settings-eased = root.settings-anim-t;
             root.settings-pull = root.settings-from + (root.settings-goal - root.settings-from) * root.settings-eased;
             if root.settings-anim-t >= 1 {
@@ -1068,474 +1064,347 @@ export component MainWindow inherits Window {
             width: 100%;
             height: 100%;
         }
+        // Settings: category tabs on top, panels of rows below, one centred column.
         VerticalLayout {
-            padding-left: 10px;
-            padding-right: 10px;
-            padding-top: 6px;
-            padding-bottom: 10px;
-            spacing: 5px;
-            Seg {
-                SegBtn { label: "General"; on: root.settings-tab == 0; clicked => { root.set-tab(0); } }
-                SegBtn { label: "Network"; on: root.settings-tab == 1; clicked => { root.set-tab(1); } }
-                SegBtn { label: "Power"; on: root.settings-tab == 2; clicked => { root.set-tab(2); } }
-                SegBtn { label: "Device"; on: root.settings-tab == 3; clicked => { root.set-tab(3); } }
-                SegBtn { label: "Display"; on: root.settings-tab == 4; clicked => { root.set-tab(4); } }
+            padding-left: 8px;
+            padding-right: 8px;
+            padding-top: 8px;
+            padding-bottom: 16px;
+            spacing: 12px;
+            HorizontalLayout {
+                alignment: center;
+                Seg {
+                    width: min(720px, settings-flick.width);
+                    height: Dy.hit-target;
+                    SegBtn { label: "General"; on: root.settings-tab == 0; clicked => { root.set-tab(0); } }
+                    SegBtn { label: "Voice"; on: root.settings-tab == 1; clicked => { root.set-tab(1); } }
+                    SegBtn { label: "Network"; on: root.settings-tab == 2; clicked => { root.set-tab(2); } }
+                    SegBtn { label: "Display"; on: root.settings-tab == 3; clicked => { root.set-tab(3); } }
+                    SegBtn { label: "Layout"; on: root.settings-tab == 4; clicked => { root.set-tab(4); } }
+                    SegBtn { label: "System"; on: root.settings-tab == 5; clicked => { root.set-tab(5); } }
+                }
             }
-            Flickable {
+            settings-flick := Flickable {
                 vertical-stretch: 1;
+                viewport-width: self.width;
                 viewport-height: settings-scroll.preferred-height;
                 interactive: !root.settings-tracking;
                 settings-scroll := VerticalLayout {
+                    x: (settings-flick.width - self.width) / 2;
+                    width: min(720px, settings-flick.width);
                     alignment: start;
-                    spacing: 7px;
-                    if root.settings-tab == 0: HorizontalLayout {
-                        alignment: center;
-                        VerticalLayout {
-                            alignment: start;
-                            width: root.general-col;
-                            spacing: 9px;
-                            padding-bottom: 40px;
-                            FieldTap { label: "Username"; value: root.room-name; active: root.kb-field == "room-name"; label-size: 8px; value-size: 11px; tap-height: 39px; tapped => { root.open-keyboard("room-name"); } }
-                            Text { text: "Location"; color: Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; }
-                            FieldTap { label: "Location name"; value: root.weather-loc; active: root.kb-field == "location"; label-size: 8px; value-size: 11px; tap-height: 39px; tapped => { root.open-keyboard("location"); } }
-                            HorizontalLayout {
-                                spacing: 10px;
-                                FieldTap { label: "Latitude"; value: root.latitude; active: root.kb-field == "latitude"; label-size: 8px; value-size: 11px; tap-height: 39px; tapped => { root.open-keyboard("latitude"); } }
-                                FieldTap { label: "Longitude"; value: root.longitude; active: root.kb-field == "longitude"; label-size: 8px; value-size: 11px; tap-height: 39px; tapped => { root.open-keyboard("longitude"); } }
+                    spacing: 12px;
+                    padding-bottom: 40px;
+
+                    if root.settings-tab == 0: Card {
+                        kicker: "Profile";
+                        FieldTap { label: "Username"; value: root.room-name; active: root.kb-field == "room-name"; label-size: Dy.type-label; value-size: Dy.type-title; tap-height: Dy.hit-target + 8px; tapped => { root.open-keyboard("room-name"); } }
+                    }
+                    if root.settings-tab == 0: Card {
+                        kicker: "Location";
+                        FieldTap { label: "Location name"; value: root.weather-loc; active: root.kb-field == "location"; label-size: Dy.type-label; value-size: Dy.type-title; tap-height: Dy.hit-target + 8px; tapped => { root.open-keyboard("location"); } }
+                        HorizontalLayout {
+                            spacing: 12px;
+                            FieldTap { label: "Latitude"; value: root.latitude; active: root.kb-field == "latitude"; label-size: Dy.type-label; value-size: Dy.type-title; tap-height: Dy.hit-target + 8px; tapped => { root.open-keyboard("latitude"); } }
+                            FieldTap { label: "Longitude"; value: root.longitude; active: root.kb-field == "longitude"; label-size: Dy.type-label; value-size: Dy.type-title; tap-height: Dy.hit-target + 8px; tapped => { root.open-keyboard("longitude"); } }
+                        }
+                    }
+                    if root.settings-tab == 0: Card {
+                        kicker: "Units";
+                        SetRow {
+                            label: "Temperature and distance";
+                            hint: root.temp-unit == "f" ? "Fahrenheit and miles" : root.temp-unit == "k" ? "Kelvin and furlongs" : "Celsius and kilometres";
+                            Seg {
+                                width: 264px;
+                                SegBtn { label: "C · km"; on: root.temp-unit == "c"; clicked => { root.set-units-preset("c-km"); } }
+                                SegBtn { label: "F · mi"; on: root.temp-unit == "f"; clicked => { root.set-units-preset("f-mi"); } }
+                                SegBtn { label: "K · fur"; on: root.temp-unit == "k"; clicked => { root.set-units-preset("k-fur"); } }
                             }
-                            Text { text: "Units"; color: Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; }
-                            VerticalLayout {
-                                spacing: 5px;
-                                Rectangle {
-                                    height: 29px;
-                                    border-width: Dy.stroke;
-                                    border-color: root.temp-unit == "c" ? Dy.text : Dy.line;
-                                    TouchArea { clicked => { root.set-units-preset("c-km"); } }
-                                    Text {
-                                        x: 8px;
-                                        height: 100%;
-                                        text: "Celsius and kilometres";
-                                        color: root.temp-unit == "c" ? Dy.text : Dy.dim;
-                                        font-size: Dy.type-title;
-                                        font-family: Dy.mono;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                                Rectangle {
-                                    height: 29px;
-                                    border-width: Dy.stroke;
-                                    border-color: root.temp-unit == "f" ? Dy.text : Dy.line;
-                                    TouchArea { clicked => { root.set-units-preset("f-mi"); } }
-                                    Text {
-                                        x: 8px;
-                                        height: 100%;
-                                        text: "Fahrenheit and miles";
-                                        color: root.temp-unit == "f" ? Dy.text : Dy.dim;
-                                        font-size: Dy.type-title;
-                                        font-family: Dy.mono;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                                Rectangle {
-                                    height: 29px;
-                                    border-width: Dy.stroke;
-                                    border-color: root.temp-unit == "k" ? Dy.text : Dy.line;
-                                    TouchArea { clicked => { root.set-units-preset("k-fur"); } }
-                                    Text {
-                                        x: 8px;
-                                        height: 100%;
-                                        text: "Kelvin and furlongs";
-                                        color: root.temp-unit == "k" ? Dy.text : Dy.dim;
-                                        font-size: Dy.type-title;
-                                        font-family: Dy.mono;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-                            Text { text: "Voice"; color: Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; }
-                            HorizontalLayout {
-                                spacing: 10px;
-                                height: 28px;
-                                Text { text: "Microphone"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
-                                Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } }
-                                Rectangle { horizontal-stretch: 1; }
-                            }
-                            HorizontalLayout {
-                                spacing: 10px;
-                                height: 28px;
-                                Text { text: "Voice Response"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
-                                Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } }
-                                Rectangle { horizontal-stretch: 1; }
-                            }
-                            Text { text: "Routines"; color: Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; }
+                        }
+                    }
+
+                    if root.settings-tab == 1: Card {
+                        kicker: "Voice";
+                        SetRow { label: "Microphone"; hint: "Listen for spoken commands"; Toggle { on: root.voice-enabled; toggled => { root.toggle-voice(); } } }
+                        SetRow { label: "Voice response"; hint: "Speak replies out loud"; Toggle { on: root.speak-replies; toggled => { root.toggle-speak(); } } }
+                    }
+                    if root.settings-tab == 1: Card {
+                        kicker: "Routines";
+                        SetRow {
+                            label: root.routines.length == 0 ? "No routines yet" : root.routines.length == 1 ? "1 routine" : root.routines.length + " routines";
+                            hint: "A phrase that runs a command";
                             Pill { label: "Add"; on: true; clicked => { root.add-routine(); } }
-                            for r in root.routines: RoutineCard {
-                                item: r;
-                                kb-field: root.kb-field;
-                                edit-name => { root.open-keyboard("routine-name:" + r.id); }
-                                edit-phrase => { root.open-keyboard("routine-phrase:" + r.id); }
-                                edit-command => { root.open-keyboard("routine-command:" + r.id); }
-                                save => { root.save-routine(r.id); }
-                                cancel => { root.cancel-routine(r.id); }
-                                duplicate => { root.duplicate-routine(r.id); }
-                                toggle-enabled => { root.toggle-routine(r.id); }
-                                delete => { root.delete-routine(r.id); }
-                            }
+                        }
+                        for r in root.routines: RoutineCard {
+                            item: r;
+                            kb-field: root.kb-field;
+                            edit-name => { root.open-keyboard("routine-name:" + r.id); }
+                            edit-phrase => { root.open-keyboard("routine-phrase:" + r.id); }
+                            edit-command => { root.open-keyboard("routine-command:" + r.id); }
+                            save => { root.save-routine(r.id); }
+                            cancel => { root.cancel-routine(r.id); }
+                            duplicate => { root.duplicate-routine(r.id); }
+                            toggle-enabled => { root.toggle-routine(r.id); }
+                            delete => { root.delete-routine(r.id); }
                         }
                     }
-                    if root.settings-tab == 1: HorizontalLayout {
-                        alignment: center;
-                        VerticalLayout {
-                            alignment: start;
-                            width: root.general-col;
-                            spacing: 5px;
-                            padding-bottom: 40px;
-                            Text { text: root.net-headline; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "Type"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-kind; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "Interface"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-iface; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "SSID"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.wifi-ssid; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; overflow: elide; }
-                            Text { text: "State"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.wifi-state; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "Signal"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-signal; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "Security"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-security; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "IPv4"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.wifi-ip; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "IPv6"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-ipv6; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; wrap: word-wrap; }
-                            Text { text: "Gateway"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-gateway; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "DNS"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-dns; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; wrap: word-wrap; }
-                            Text { text: "MAC"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-mac; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "Link speed"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            Text { text: root.net-speed; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                            Text { text: "Preferred interface"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                            HorizontalLayout {
-                                spacing: 4px;
-                                Pill { label: "Ethernet"; on: root.preferred-net == "ethernet"; clicked => { root.set-preferred-net("ethernet"); } }
-                                Pill { label: "Wi-Fi"; on: root.preferred-net == "wifi"; clicked => { root.set-preferred-net("wifi"); } }
-                            }
-                            HorizontalLayout {
-                                Text { text: "DHCP"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; vertical-alignment: center; }
-                                Rectangle { horizontal-stretch: 1; }
-                                Toggle { on: root.dhcp-on; toggled => { root.toggle-dhcp(); } }
-                            }
-                            HorizontalLayout {
-                                spacing: 4px;
-                                Pill { label: "Reconnect"; on: true; clicked => { root.reconnect-net(); } }
-                                if root.net-kind == "wifi": Pill { label: "Disconnect Wi-Fi"; clicked => { root.disconnect-wifi(); } }
-                            }
-                            HorizontalLayout {
-                                spacing: 4px;
-                                Text { text: "Nearby Wi-Fi"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
-                                Rectangle { horizontal-stretch: 1; }
-                                Pill { label: root.wifi-busy ? "Scanning…" : "Refresh"; on: true; clicked => { if !root.wifi-busy { root.scan-wifi(); } } }
-                            }
-                            Text {
-                                text: root.wifi-scan-state == "" ? root.wifi-status : root.wifi-scan-state;
-                                color: Dy.dim;
-                                font-size: Dy.type-label;
-                                font-family: Dy.mono;
-                                wrap: word-wrap;
-                            }
-                            for net in root.wifi-nets: Rectangle {
-                                height: 26px;
-                                border-width: Dy.stroke;
-                                border-color: net.connected ? Dy.text : Dy.line;
-                                HorizontalLayout {
-                                    padding-left: 5px;
-                                    padding-right: 5px;
-                                    spacing: 5px;
-                                    NetGlyph { kind: "wifi"; bars: net.bars; }
-                                    VerticalLayout {
-                                        alignment: center;
-                                        horizontal-stretch: 1;
-                                        Text { text: net.ssid + (net.connected ? "  · connected" : ""); color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; overflow: elide; }
-                                        Text { text: net.security + (net.saved ? "  · saved" : ""); color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; overflow: elide; }
-                                    }
-                                    if !net.connected: Pill {
-                                        label: "Join";
-                                        on: true;
-                                        clicked => { root.pick-wifi(net.ssid); root.connect-wifi(); }
-                                    }
-                                    if net.saved: Pill {
-                                        label: "Forget";
-                                        clicked => { root.ask-forget-wifi(net.ssid); }
-                                    }
-                                }
-                            }
-                            Pill { label: root.hidden-open ? "Hide hidden network" : "Join hidden network"; clicked => { root.hidden-open = !root.hidden-open; } }
-                            if root.hidden-open: VerticalLayout {
-                                spacing: 4px;
-                                FieldTap { label: "Network name"; value: root.hidden-ssid; active: root.kb-field == "hidden-ssid"; label-size: 7px; value-size: 8px; tap-height: 28px; tapped => { root.open-keyboard("hidden-ssid"); } }
-                                FieldTap { label: "Password"; value: root.wifi-pass == "" ? "" : "••••••••"; active: root.kb-field == "wifi-pass"; label-size: 7px; value-size: 8px; tap-height: 28px; tapped => { root.open-keyboard("wifi-pass"); } }
-                                Pill { label: "Connect hidden"; on: true; clicked => { root.connect-hidden(); } }
-                            }
-                            HorizontalLayout {
-                                spacing: 4px;
-                                Text { text: "Diagnostics"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
-                                Rectangle { horizontal-stretch: 1; }
-                                Pill { label: "Run checks"; on: true; clicked => { root.run-diag(); } }
-                            }
-                            for d in root.diags: HorizontalLayout {
-                                height: 14px;
-                                Text { text: d.label; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; vertical-alignment: center; }
-                                Rectangle { horizontal-stretch: 1; }
-                                Text { text: d.state + (d.detail == "" ? "" : "  " + d.detail); color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+
+                    if root.settings-tab == 2: Card {
+                        kicker: "Connection";
+                        Text { text: root.net-headline; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
+                        GridLayout {
+                            spacing-horizontal: 16px;
+                            spacing-vertical: 8px;
+                            padding-top: 4px;
+                            padding-bottom: 4px;
+                            Row { SetFact { key: "Type"; value: root.net-kind; } SetFact { key: "Interface"; value: root.net-iface; } }
+                            Row { SetFact { key: "SSID"; value: root.wifi-ssid; } SetFact { key: "State"; value: root.wifi-state; } }
+                            Row { SetFact { key: "Signal"; value: root.net-signal; } SetFact { key: "Security"; value: root.net-security; } }
+                            Row { SetFact { key: "IPv4"; value: root.wifi-ip; } SetFact { key: "Gateway"; value: root.net-gateway; } }
+                            Row { SetFact { key: "IPv6"; value: root.net-ipv6; } SetFact { key: "DNS"; value: root.net-dns; } }
+                            Row { SetFact { key: "MAC"; value: root.net-mac; } SetFact { key: "Link speed"; value: root.net-speed; } }
+                        }
+                        SetRow {
+                            label: "Preferred interface";
+                            Seg {
+                                width: 220px;
+                                SegBtn { label: "Ethernet"; on: root.preferred-net == "ethernet"; clicked => { root.set-preferred-net("ethernet"); } }
+                                SegBtn { label: "Wi-Fi"; on: root.preferred-net == "wifi"; clicked => { root.set-preferred-net("wifi"); } }
                             }
                         }
-                    }
-                    if root.settings-tab == 2: VerticalLayout {
-                        alignment: start;
-                        spacing: 3px;
+                        SetRow { label: "DHCP"; hint: "Get an address from the router"; Toggle { on: root.dhcp-on; toggled => { root.toggle-dhcp(); } } }
                         HorizontalLayout {
-                            spacing: 4px;
-                            PowerAction {
-                                label: "Restart";
-                                glyph: "↻";
-                                enabled: !root.updating && !root.power-busy;
-                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("restart"); } }
-                            }
-                            PowerAction {
-                                label: "Sleep";
-                                glyph: "z";
-                                enabled: !root.updating && !root.power-busy;
-                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("sleep"); } }
-                            }
-                            PowerAction {
-                                label: "Shut Down";
-                                glyph: "○";
-                                enabled: !root.updating && !root.power-busy;
-                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("shutdown"); } }
-                            }
-                            PowerAction {
-                                label: "Uninstall";
-                                glyph: "×";
-                                enabled: !root.updating && !root.power-busy;
-                                clicked => { if !root.updating && !root.power-busy { root.begin-confirm("uninstall1"); } }
-                            }
-                        }
-                        if root.power-status != "": Text {
-                            text: root.power-status;
-                            color: Dy.text;
-                            font-size: Dy.type-label;
-                            font-family: Dy.mono;
-                            wrap: word-wrap;
-                        }
-                        Rectangle { height: 1px; background: Dy.line; }
-                        Text { text: "Software"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        HorizontalLayout {
-                            Text { text: "Installed version"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                            spacing: 8px;
+                            Pill { label: "Reconnect"; on: true; clicked => { root.reconnect-net(); } }
+                            if root.net-kind == "wifi": Pill { label: "Disconnect Wi-Fi"; clicked => { root.disconnect-wifi(); } }
                             Rectangle { horizontal-stretch: 1; }
-                            Text { text: "v" + root.version-text; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; vertical-alignment: center; }
                         }
-                        if root.update-label != "": Text {
-                            text: root.update-label;
-                            color: Dy.text;
-                            font-size: Dy.type-label;
-                            font-family: Dy.mono;
-                            wrap: word-wrap;
+                    }
+                    if root.settings-tab == 2: Card {
+                        kicker: "Nearby Wi-Fi";
+                        SetRow {
+                            label: root.wifi-scan-state == "" ? root.wifi-status : root.wifi-scan-state;
+                            Pill { label: root.wifi-busy ? "Scanning…" : "Refresh"; on: !root.wifi-busy; clicked => { if !root.wifi-busy { root.scan-wifi(); } } }
                         }
-                        if root.refresh-status != "": Text {
-                            text: root.refresh-status;
-                            color: Dy.dim;
-                            font-size: Dy.type-label;
-                            font-family: Dy.mono;
-                            wrap: word-wrap;
-                        }
-                        Text { text: "Switch version"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; }
-                        Rectangle {
-                            height: 28px;
+                        for net in root.wifi-nets: Rectangle {
+                            height: Dy.hit-target + 8px;
                             border-width: Dy.stroke;
-                            border-color: (root.updating || root.power-busy) ? Dy.line : Dy.text;
+                            border-color: net.connected ? Dy.accent1 : Dy.line;
                             background: Dy.bg;
-                            TouchArea {
-                                clicked => {
-                                    if !root.updating && !root.power-busy {
-                                        root.version-menu-open = !root.version-menu-open;
-                                    }
-                                }
-                            }
                             HorizontalLayout {
                                 padding-left: 8px;
-                                padding-right: 8px;
-                                Text {
-                                    text: (root.selected-release == "" ? ("v" + root.version-text) : root.selected-release) + "  ▼";
-                                    color: (root.updating || root.power-busy) ? Dy.dim : Dy.text;
-                                    font-size: Dy.type-label;
-                                    font-family: Dy.mono;
-                                    vertical-alignment: center;
+                                padding-right: 6px;
+                                spacing: 8px;
+                                NetGlyph { kind: "wifi"; bars: net.bars; }
+                                VerticalLayout {
+                                    alignment: center;
+                                    horizontal-stretch: 1;
+                                    Text { text: net.ssid + (net.connected ? "  · connected" : ""); color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; overflow: elide; }
+                                    Text { text: net.security + (net.saved ? "  · saved" : ""); color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; overflow: elide; }
                                 }
+                                VerticalLayout {
+                                    alignment: center;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        if !net.connected: Pill { label: "Join"; on: true; clicked => { root.pick-wifi(net.ssid); root.connect-wifi(); } }
+                                        if net.saved: Pill { label: "Forget"; clicked => { root.ask-forget-wifi(net.ssid); } }
+                                    }
+                                }
+                            }
+                        }
+                        SetRow {
+                            label: "Hidden network";
+                            hint: "Join a network that doesn't broadcast its name";
+                            Pill { label: root.hidden-open ? "Close" : "Join"; clicked => { root.hidden-open = !root.hidden-open; } }
+                        }
+                        if root.hidden-open: VerticalLayout {
+                            spacing: 8px;
+                            FieldTap { label: "Network name"; value: root.hidden-ssid; active: root.kb-field == "hidden-ssid"; label-size: Dy.type-label; value-size: Dy.type-title; tap-height: Dy.hit-target + 8px; tapped => { root.open-keyboard("hidden-ssid"); } }
+                            FieldTap { label: "Password"; value: root.wifi-pass == "" ? "" : "••••••••"; active: root.kb-field == "wifi-pass"; label-size: Dy.type-label; value-size: Dy.type-title; tap-height: Dy.hit-target + 8px; tapped => { root.open-keyboard("wifi-pass"); } }
+                            HorizontalLayout {
+                                Pill { label: "Connect hidden"; on: true; clicked => { root.connect-hidden(); } }
                                 Rectangle { horizontal-stretch: 1; }
+                            }
+                        }
+                    }
+                    if root.settings-tab == 2: Card {
+                        kicker: "Diagnostics";
+                        SetRow {
+                            label: "Connection checks";
+                            Pill { label: "Run checks"; on: true; clicked => { root.run-diag(); } }
+                        }
+                        for d in root.diags: HorizontalLayout {
+                            height: 20px;
+                            Text { text: d.label; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; vertical-alignment: center; }
+                            Rectangle { horizontal-stretch: 1; }
+                            Text { text: d.state + (d.detail == "" ? "" : "  " + d.detail); color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                        }
+                    }
+
+                    if root.settings-tab == 3: Card {
+                        kicker: "Look";
+                        SetRow {
+                            label: "Theme";
+                            Seg {
+                                width: 320px;
+                                SegBtn { label: "Dusk"; on: root.theme == 0; clicked => { root.set-theme(0); } }
+                                SegBtn { label: "Mono"; on: root.theme == 1; clicked => { root.set-theme(1); } }
+                                SegBtn { label: "Ink"; on: root.theme == 2; clicked => { root.set-theme(2); } }
+                                SegBtn { label: "Paper"; on: root.theme == 3; clicked => { root.set-theme(3); } }
+                            }
+                        }
+                        SetRow { label: "Reduced motion"; hint: "Cuts all animation except touch feedback"; Toggle { on: root.reduced-motion; toggled => { root.toggle-reduced-motion(); } } }
+                    }
+                    if root.settings-tab == 3: Card {
+                        kicker: "Panel";
+                        SetRow {
+                            label: "Refresh rate";
+                            hint: root.display-output + "  " + root.display-mode + " @ " + root.display-rate + " Hz";
+                            Seg {
+                                width: 180px;
+                                SegBtn { label: "60 Hz"; on: root.display-rate == "60.00" || root.display-rate == "60"; clicked => { root.set-display-rate("60"); } }
+                                SegBtn { label: "30 Hz"; on: root.display-rate == "30.00" || root.display-rate == "30"; clicked => { root.set-display-rate("30"); } }
+                            }
+                        }
+                        // Low quality is gone; this only shows on a panel still set to it.
+                        if root.display-lowres: SetRow {
+                            label: "Running at 960x600";
+                            hint: "Low quality was removed · restarts to change";
+                            Pill { label: "Full resolution"; on: true; clicked => { root.begin-confirm("fullres"); } }
+                        }
+                    }
+                    if root.settings-tab == 3: Card {
+                        kicker: "Screen";
+                        SetRow { label: "Turn the screen off after"; hint: root.screen-off-label; }
+                        Seg {
+                            for c in [
+                                { label: "1 min", secs: 60 }, { label: "2 min", secs: 120 }, { label: "3 min", secs: 180 }, { label: "5 min", secs: 300 },
+                                { label: "10 min", secs: 600 }, { label: "15 min", secs: 900 }, { label: "20 min", secs: 1200 }, { label: "25 min", secs: 1500 },
+                            ]: SegBtn { label: c.label; on: root.screen-off-secs == c.secs; clicked => { root.set-screen-off(c.secs); } }
+                        }
+                        Seg {
+                            for c in [
+                                { label: "30 min", secs: 1800 }, { label: "45 min", secs: 2700 }, { label: "1 hr", secs: 3600 }, { label: "2 hr", secs: 7200 },
+                                { label: "3 hr", secs: 10800 }, { label: "4 hr", secs: 14400 }, { label: "5 hr", secs: 18000 }, { label: "Never", secs: 0 },
+                            ]: SegBtn { label: c.label; on: root.screen-off-secs == c.secs; clicked => { root.set-screen-off(c.secs); } }
+                        }
+                    }
+
+                    if root.settings-tab == 4: Card {
+                        kicker: "Chrome";
+                        SetRow { label: "Sidebar"; hint: "Keep the page list on the left"; Toggle { on: root.sidebar; toggled => { root.toggle-sidebar(); } } }
+                        SetRow { label: "Blocky font"; hint: "Press Start 2P for body text"; Toggle { on: root.blocky-font; toggled => { root.toggle-blocky-font(); } } }
+                        SetRow { label: "Header clock"; Toggle { on: !root.hide-header-clock; toggled => { root.toggle-hide-header-clock(); } } }
+                        SetRow { label: "Header separator"; Toggle { on: root.header-line; toggled => { root.toggle-header-line(); } } }
+                    }
+                    if root.settings-tab == 4: Card {
+                        kicker: "Sizes";
+                        SetRow {
+                            label: "Text scale";
+                            hint: "80–200 %";
+                            HorizontalLayout {
+                                width: 280px;
+                                spacing: 8px;
+                                Bar { horizontal-stretch: 1; interactive: true; level: (root.text-scale - 80) / 120; changed(p) => { root.set-text-scale(round(80 + p * 120 / 100)); } }
+                                FieldTap { width: 52px; tap-height: Dy.hit-target; label: "%"; label-size: Dy.type-label; value-size: Dy.type-title; value: "\{root.text-scale}"; active: root.kb-field == "text-scale"; tapped => { root.open-keyboard("text-scale"); } }
+                            }
+                        }
+                        SetRow {
+                            label: "UI / padding scale";
+                            hint: "75–150 %";
+                            HorizontalLayout {
+                                width: 280px;
+                                spacing: 8px;
+                                Bar { horizontal-stretch: 1; interactive: true; level: (root.ui-scale - 75) / 75; changed(p) => { root.set-ui-scale(round(75 + p * 75 / 100)); } }
+                                FieldTap { width: 52px; tap-height: Dy.hit-target; label: "%"; label-size: Dy.type-label; value-size: Dy.type-title; value: "\{root.ui-scale}"; active: root.kb-field == "ui-scale"; tapped => { root.open-keyboard("ui-scale"); } }
+                            }
+                        }
+                        SetRow {
+                            label: "Header height";
+                            hint: "88–140 px";
+                            HorizontalLayout {
+                                width: 280px;
+                                spacing: 8px;
+                                Bar { horizontal-stretch: 1; interactive: true; level: (root.header-h-px - 88) / 52; changed(p) => { root.set-header-h(round(88 + p * 52 / 100)); } }
+                                FieldTap { width: 52px; tap-height: Dy.hit-target; label: "px"; label-size: Dy.type-label; value-size: Dy.type-title; value: "\{root.header-h-px}"; active: root.kb-field == "header-h"; tapped => { root.open-keyboard("header-h"); } }
+                            }
+                        }
+                        SetRow {
+                            label: "Hit-target size";
+                            hint: "48–96 px";
+                            HorizontalLayout {
+                                width: 280px;
+                                spacing: 8px;
+                                Bar { horizontal-stretch: 1; interactive: true; level: (root.hit-target-px - 48) / 48; changed(p) => { root.set-hit-target(round(48 + p * 48 / 100)); } }
+                                FieldTap { width: 52px; tap-height: Dy.hit-target; label: "px"; label-size: Dy.type-label; value-size: Dy.type-title; value: "\{root.hit-target-px}"; active: root.kb-field == "hit-target"; tapped => { root.open-keyboard("hit-target"); } }
+                            }
+                        }
+                    }
+
+                    if root.settings-tab == 5: Card {
+                        kicker: "Software";
+                        SetRow {
+                            label: "Installed version";
+                            hint: root.update-label;
+                            Text { text: "v" + root.version-text; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; }
+                        }
+                        if root.refresh-status != "": Text { text: root.refresh-status; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.mono; wrap: word-wrap; }
+                        SetRow {
+                            label: "Switch version";
+                            Rectangle {
+                                width: 220px;
+                                height: Dy.hit-target;
+                                border-width: Dy.stroke;
+                                border-color: (root.updating || root.power-busy) ? Dy.line : Dy.text;
+                                background: Dy.bg;
+                                TouchArea { clicked => { if !root.updating && !root.power-busy { root.version-menu-open = !root.version-menu-open; } } }
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    Text { text: root.selected-release == "" ? ("v" + root.version-text) : root.selected-release; color: (root.updating || root.power-busy) ? Dy.dim : Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; horizontal-stretch: 1; overflow: elide; }
+                                    Text { text: root.version-menu-open ? "▲" : "▼"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.mono; vertical-alignment: center; }
+                                }
                             }
                         }
                         if root.version-menu-open && !root.updating && !root.power-busy: Flickable {
-                            height: 90px;
-                            viewport-height: 24 * 20px;
+                            height: min(5, root.releases.length) * 32px;
+                            viewport-height: root.releases.length * 32px;
                             VerticalLayout {
-                                spacing: 1px;
-                                for rel in root.releases: TouchArea {
-                                    clicked => { if !rel.current && !root.updating && !root.power-busy { root.pick-version(rel.tag); } }
-                                    height: 20px;
+                                for rel in root.releases: Rectangle {
+                                    height: 32px;
+                                    background: rel-ta.pressed ? Dy.bg : transparent;
+                                    rel-ta := TouchArea { clicked => { if !rel.current && !root.updating && !root.power-busy { root.pick-version(rel.tag); } } }
                                     HorizontalLayout {
-                                        Text { text: rel.tag; color: rel.current ? Dy.text : Dy.dim; font-size: Dy.type-label; font-family: Dy.mono; vertical-alignment: center; }
-                                        Rectangle { horizontal-stretch: 1; }
-                                        if rel.current: Text { text: "current"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        Text { text: rel.tag; color: rel.current ? Dy.accent1 : Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; horizontal-stretch: 1; }
+                                        if rel.current: Text { text: "Installed"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; vertical-alignment: center; }
                                     }
                                 }
                             }
                         }
-                        Rectangle {
-                            height: 28px;
-                            border-width: Dy.stroke;
-                            border-color: (root.updating || root.power-busy) ? Dy.line : Dy.text;
-                            background: Dy.bg;
-                            TouchArea {
-                                clicked => { if !root.updating && !root.power-busy { root.check-updates(); } }
-                            }
-                            Text {
-                                text: "Check for updates";
-                                color: (root.updating || root.power-busy) ? Dy.dim : Dy.text;
-                                font-size: Dy.type-label;
-                                font-weight: 700;
-                                font-family: Dy.mono;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-                        }
-                        Text {
-                            text: root.release-status;
-                            color: Dy.dim;
-                            font-size: Dy.type-label;
-                            font-family: Dy.mono;
-                            wrap: word-wrap;
+                        SetRow {
+                            label: "Updates";
+                            hint: root.release-status;
+                            Pill { label: "Check now"; on: !root.updating && !root.power-busy; clicked => { if !root.updating && !root.power-busy { root.check-updates(); } } }
                         }
                     }
-                    if root.settings-tab == 3: VerticalLayout {
-                        alignment: start;
-                        spacing: 5px;
-                        padding-bottom: 40px;
-                        Text { text: "Screen"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        Text { text: "Turn my screen off after"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; }
-                        TouchArea {
-                            clicked => { root.screen-off-open = !root.screen-off-open; }
-                            height: 24px;
-                            Rectangle {
-                                border-width: Dy.stroke;
-                                border-color: Dy.text;
-                                HorizontalLayout {
-                                    padding-left: 6px;
-                                    padding-right: 6px;
-                                    Text { text: root.screen-off-label + "  ▼"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; vertical-alignment: center; }
-                                }
-                            }
+                    if root.settings-tab == 5: Card {
+                        kicker: "Power";
+                        HorizontalLayout {
+                            spacing: 8px;
+                            PowerAction { label: "Restart"; glyph: "↻"; enabled: !root.updating && !root.power-busy; clicked => { if !root.updating && !root.power-busy { root.begin-confirm("restart"); } } }
+                            PowerAction { label: "Sleep"; glyph: "z"; enabled: !root.updating && !root.power-busy; clicked => { if !root.updating && !root.power-busy { root.begin-confirm("sleep"); } } }
+                            PowerAction { label: "Shut Down"; glyph: "○"; enabled: !root.updating && !root.power-busy; clicked => { if !root.updating && !root.power-busy { root.begin-confirm("shutdown"); } } }
                         }
-                        if root.screen-off-open: VerticalLayout {
-                            spacing: 1px;
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(60); } Text { text: "1 minute"; color: root.screen-off-secs == 60 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(120); } Text { text: "2 minutes"; color: root.screen-off-secs == 120 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(180); } Text { text: "3 minutes"; color: root.screen-off-secs == 180 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(300); } Text { text: "5 minutes"; color: root.screen-off-secs == 300 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(600); } Text { text: "10 minutes"; color: root.screen-off-secs == 600 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(900); } Text { text: "15 minutes"; color: root.screen-off-secs == 900 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(1200); } Text { text: "20 minutes"; color: root.screen-off-secs == 1200 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(1500); } Text { text: "25 minutes"; color: root.screen-off-secs == 1500 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(1800); } Text { text: "30 minutes"; color: root.screen-off-secs == 1800 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(2700); } Text { text: "45 minutes"; color: root.screen-off-secs == 2700 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(3600); } Text { text: "1 hour"; color: root.screen-off-secs == 3600 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(7200); } Text { text: "2 hours"; color: root.screen-off-secs == 7200 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(10800); } Text { text: "3 hours"; color: root.screen-off-secs == 10800 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(14400); } Text { text: "4 hours"; color: root.screen-off-secs == 14400 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(18000); } Text { text: "5 hours"; color: root.screen-off-secs == 18000 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                            TouchArea { height: 18px; clicked => { root.set-screen-off(0); } Text { text: "Never"; color: root.screen-off-secs == 0 ? Dy.text : Dy.dim; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; } }
-                        }
-                        Text { text: "Display"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        Text { text: root.display-output + "  " + root.display-mode + "  @  " + root.display-rate + " Hz"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; wrap: word-wrap; }
-                        Text { text: "Refresh rate"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; }
-                        Seg {
-                            SegBtn { label: "60"; on: root.display-rate == "60.00" || root.display-rate == "60"; clicked => { root.set-display-rate("60"); } }
-                            SegBtn { label: "50"; on: root.display-rate == "50.00" || root.display-rate == "50"; clicked => { root.set-display-rate("50"); } }
-                            SegBtn { label: "30"; on: root.display-rate == "30.00" || root.display-rate == "30"; clicked => { root.set-display-rate("30"); } }
-                        }
-                        Text { text: "Quality"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        Seg {
-                            SegBtn { label: "Performance"; on: root.display-scale == 50; clicked => { root.set-display-scale(50); } }
-                            SegBtn { label: "Quality"; on: root.display-scale == 100; clicked => { root.set-display-scale(100); } }
-                        }
-                        Text { text: root.display-scale == 50 ? "12 fps stepped motion · no transitions" : "30 fps transitions · cross-fades between screens"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.caps; wrap: word-wrap; }
-                        Text { text: "Resolution"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        Seg {
-                            SegBtn { label: "Full"; on: !root.display-lowres; clicked => { if root.display-lowres { root.begin-confirm("fullres"); } } }
-                            SegBtn { label: "Low quality"; on: root.display-lowres; clicked => { if !root.display-lowres { root.begin-confirm("lowres"); } } }
-                        }
-                        Text { text: root.display-lowres ? "Panel runs at 960x600 · restarts to change" : "Panel runs at its native resolution · restarts to change"; color: Dy.text; font-size: Dy.type-label; font-family: Dy.caps; wrap: word-wrap; }
-                        Text { text: "Theme"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        Seg {
-                            SegBtn { label: "Dusk"; on: root.theme == 0; clicked => { root.set-theme(0); } }
-                            SegBtn { label: "Mono"; on: root.theme == 1; clicked => { root.set-theme(1); } }
-                            SegBtn { label: "Ink"; on: root.theme == 2; clicked => { root.set-theme(2); } }
-                            SegBtn { label: "Paper"; on: root.theme == 3; clicked => { root.set-theme(3); } }
-                        }
-                        Text { text: "Reduced motion"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        Seg {
-                            SegBtn { label: "On"; on: root.reduced-motion; clicked => { if !root.reduced-motion { root.toggle-reduced-motion(); } } }
-                            SegBtn { label: "Off"; on: !root.reduced-motion; clicked => { if root.reduced-motion { root.toggle-reduced-motion(); } } }
-                        }
+                        if root.power-status != "": Text { text: root.power-status; color: Dy.text; font-size: Dy.type-label; font-family: Dy.mono; wrap: word-wrap; }
                     }
-                    if root.settings-tab == 4: VerticalLayout {
-                        alignment: start;
-                        spacing: 5px;
-                        padding-bottom: 40px;
-                        Text { text: "Display"; color: Dy.dim; font-size: Dy.type-label; font-family: Dy.caps; }
-                        HorizontalLayout {
-                            Text { text: "Sidebar"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.sidebar; toggled => { root.toggle-sidebar(); } }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Blocky font"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.blocky-font; toggled => { root.toggle-blocky-font(); } }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Hide header clock"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.hide-header-clock; toggled => { root.toggle-hide-header-clock(); } }
-                        }
-                        HorizontalLayout {
-                            Text { text: "Header separator"; color: Dy.text; font-size: Dy.type-title; font-family: Dy.mono; vertical-alignment: center; }
-                            Rectangle { horizontal-stretch: 1; }
-                            Toggle { on: root.header-line; toggled => { root.toggle-header-line(); } }
-                        }
-                        Text { text: "Text scale"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            spacing: 5px;
-                            Bar { horizontal-stretch: 1; interactive: true; level: (root.text-scale - 80) / 120; changed(p) => { root.set-text-scale(round(80 + p * 120 / 100)); } }
-                            FieldTap { width: 44px; tap-height: 26px; label: "80–200"; value: "\{root.text-scale}"; active: root.kb-field == "text-scale"; tapped => { root.open-keyboard("text-scale"); } }
-                        }
-                        Text { text: "UI / padding scale"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            spacing: 5px;
-                            Bar { horizontal-stretch: 1; interactive: true; level: (root.ui-scale - 75) / 75; changed(p) => { root.set-ui-scale(round(75 + p * 75 / 100)); } }
-                            FieldTap { width: 44px; tap-height: 26px; label: "75–150"; value: "\{root.ui-scale}"; active: root.kb-field == "ui-scale"; tapped => { root.open-keyboard("ui-scale"); } }
-                        }
-                        Text { text: "Header height"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            spacing: 5px;
-                            Bar { horizontal-stretch: 1; interactive: true; level: (root.header-h-px - 88) / 52; changed(p) => { root.set-header-h(round(88 + p * 52 / 100)); } }
-                            FieldTap { width: 44px; tap-height: 26px; label: "88–140"; value: "\{root.header-h-px}"; active: root.kb-field == "header-h"; tapped => { root.open-keyboard("header-h"); } }
-                        }
-                        Text { text: "Hit-target size"; color: Dy.text; font-size: Dy.type-control; font-family: Dy.mono; }
-                        HorizontalLayout {
-                            spacing: 5px;
-                            Bar { horizontal-stretch: 1; interactive: true; level: (root.hit-target-px - 48) / 48; changed(p) => { root.set-hit-target(round(48 + p * 48 / 100)); } }
-                            FieldTap { width: 44px; tap-height: 26px; label: "48–96"; value: "\{root.hit-target-px}"; active: root.kb-field == "hit-target"; tapped => { root.open-keyboard("hit-target"); } }
+                    if root.settings-tab == 5: Card {
+                        kicker: "Danger zone";
+                        SetRow {
+                            label: "Uninstall Judie";
+                            hint: "Removes the app from this device. Asks three times.";
+                            PowerAction { width: 160px; label: "Uninstall"; glyph: "×"; danger: true; enabled: !root.updating && !root.power-busy; clicked => { if !root.updating && !root.power-busy { root.begin-confirm("uninstall1"); } } }
                         }
                     }
                 }
@@ -1574,13 +1443,13 @@ export component MainWindow inherits Window {
         }
     }
 
-    if root.confirm-kind == "restart" || root.confirm-kind == "sleep" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi" || root.confirm-kind == "lowres" || root.confirm-kind == "fullres" || root.confirm-kind == "keep-lowres": ConfirmSheet {
+    if root.confirm-kind == "restart" || root.confirm-kind == "sleep" || root.confirm-kind == "shutdown" || root.confirm-kind == "uninstall1" || root.confirm-kind == "downgrade" || root.confirm-kind == "upgrade" || root.confirm-kind == "forget-wifi" || root.confirm-kind == "fullres": ConfirmSheet {
         x: root.rail-w;
         width: parent.width - root.rail-w;
         title: root.confirm-title;
         body: root.confirm-body;
-        primary: root.confirm-kind == "forget-wifi" ? "Forget" : root.confirm-kind == "keep-lowres" ? "Keep" : "Continue";
-        secondary: root.confirm-kind == "keep-lowres" ? "Revert" : "Cancel";
+        primary: root.confirm-kind == "forget-wifi" ? "Forget" : "Continue";
+        secondary: "Cancel";
         accept => { root.accept-confirm(); }
         dismiss => { root.cancel-confirm(); }
     }

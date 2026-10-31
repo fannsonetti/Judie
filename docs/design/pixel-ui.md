@@ -8,7 +8,7 @@ The Pi 3B renders on the CPU (Slint `renderer-software`) at 1920×1200. A pixel 
 
 ## Rules
 
-1. **Grid.** Everything sits on a 4px base unit (2 art-pixels at Quality, 1 at Performance). No fractional offsets.
+1. **Grid.** Everything sits on a 4px base unit (2 panel pixels per canvas pixel). No fractional offsets.
 2. **Shapes.** Rectangles only. `border-radius: 0` everywhere. Borders are 3px solid, with no shadows, gradients, blur or transparency stacks.
 3. **Colour.** Eight tokens per theme, no other colours on screen (except the selected theme's own values):
 
@@ -65,19 +65,13 @@ Keep these numbers exactly. The asymmetry is the point. Fill it with the `text` 
   - timers tile.
 - **Assistant.** User messages on the right (`line` fill). Judie's replies on the left in `panel` tiles, with the PiMark avatar, streaming character by character with a block cursor. Actions Judie took appear as chips above the reply (for example "Lights 30% · done", "Reminder 20:00 · set", plus "Undo"). The input bar has "Type or hold to talk" and a Send button.
 - **Settings → Display.**
-  - Quality: Performance / Quality.
-  - Theme: Dusk / Amber CRT / Pocket / Paper.
+  - Theme: Dusk / Mono / Ink / Paper.
   - Reduced motion: on / off.
+  - Refresh rate: 60 / 30 Hz.
 
-## Quality settings
+## Motion and resolution
 
-Keep it to two tiers plus Reduced motion. More tiers multiply design and test work.
-
-| | Performance (default on Pi 3B) | Quality |
-|---|---|---|
-| Canvas | 960 wide, drawn at 2x | same |
-| Motion | stepped, about 12 fps, no screen transitions | 30 fps transitions, cross-fades between screens |
-| Reduced motion | cuts all animation except touch feedback | same |
+One mode only. The Performance/Quality tiers and the 960x600 Low quality mode were removed in 0.3.15. Motion is stepped at 30 fps; Reduced motion cuts all animation except touch feedback.
 
 The UI is always laid out on a 960-wide canvas (960×600 on the 1920×1200 panel). `judie-pi` sets `SLINT_SCALE_FACTOR` to the whole number `panel width / 960`, so every canvas pixel is an exact 2×2 block. Sizes in the `.slint` files are canvas pixels, the same numbers as the mockup. For a desktop preview, run `judie-pi` with `JUDIE_WINDOWED=1 SLINT_SCALE_FACTOR=1` (on Windows also `DISPLAY=:0`) to get a 960×600 window.
 

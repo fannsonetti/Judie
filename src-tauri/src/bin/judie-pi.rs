@@ -529,44 +529,6 @@ fn apply_xrandr_mode(output: &str, mode: &str, rate: Option<&str>) -> bool {
     cmd.status().map(|s| s.success()).unwrap_or(false)
 }
 
-fn ensure_mode(output: &str, w: u32, h: u32, hz: u32) -> Option<String> {
-    let name = format!("{w}x{h}");
-    if apply_xrandr_mode(output, &name, Some(&hz.to_string())) {
-        return Some(name);
-    }
-    let cvt = std::process::Command::new("cvt")
-        .args([w.to_string(), h.to_string(), hz.to_string()])
-        .output()
-        .ok()?;
-    let line = String::from_utf8_lossy(&cvt.stdout)
-        .lines()
-        .find(|l| l.contains("Modeline"))?
-        .to_string();
-    let rest = line.splitn(2, "Modeline").nth(1)?.trim();
-    let mut parts = rest.split_whitespace();
-    let modeline = parts.next()?.trim_matches('"').to_string();
-    let timing: Vec<String> = parts.map(|s| s.to_string()).collect();
-    if timing.is_empty() {
-        return None;
-    }
-    let mut newmode = vec!["--newmode".into(), modeline.clone()];
-    newmode.extend(timing);
-    let _ = std::process::Command::new("xrandr").args(&newmode).status();
-    let _ = std::process::Command::new("xrandr")
-        .args(["--addmode", output, &modeline])
-        .status();
-    if apply_xrandr_mode(output, &modeline, None) {
-        Some(modeline)
-    } else {
-        None
-    }
-}
-
-/// Present while a switch to 960x600 waits for the user to tap Keep.
-fn lowres_trial_path() -> std::path::PathBuf {
-    pi_room::data_dir().join("lowres-trial")
-}
-
 /// Low quality lives on the kernel command line (see linux/power), not in layout.json.
 fn display_lowres() -> bool {
     ["/boot/firmware/cmdline.txt", "/boot/cmdline.txt"]
@@ -576,7 +538,7 @@ fn display_lowres() -> bool {
 }
 
 fn apply_persisted_display() {
-    let (scale, native) = pi_room::with(|room| (room.display_scale, room.display_native.clone()));
+    let native = pi_room::with(|room| room.display_native.clone());
     let info = parse_xrandr();
     if native.is_empty() {
         if info.mode != "—" {
@@ -585,12 +547,6 @@ fn apply_persisted_display() {
                 room.save();
             });
         }
-    }
-    if scale == 50 {
-        let parts: Vec<&str> = info.mode.split('x').collect();
-        let w = parts.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1920) / 2;
-        let h = parts.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1200) / 2;
-        let _ = ensure_mode(&info.output, w.max(320), h.max(240), 60);
     }
     // The UI is laid out on a 960-wide canvas. Scale by a whole number so each
     // canvas pixel is an exact block (2x2 on a 1920 panel). SLINT_SCALE_FACTOR
@@ -604,12 +560,6 @@ fn apply_persisted_display() {
     }
 }
 
-fn restart_kiosk() {
-    std::thread::spawn(|| {
-        std::thread::sleep(std::time::Duration::from_millis(250));
-        std::process::exit(0);
-    });
-}
 
 fn pong_step() {
     let mut g = PONG.lock().unwrap();
@@ -923,9 +873,8 @@ fn push_ui(ui: &MainWindow) {
         ui.set_units_metric(room.units_metric);
         ui.set_temp_unit(room.temp_unit.clone().into());
         ui.set_distance_unit(room.distance_unit.clone().into());
-        ui.set_settings_tab(room.settings_tab.clamp(0, 4));
+        ui.set_settings_tab(room.settings_tab.clamp(0, 5));
         ui.set_gallery_border(room.gallery_border);
-        ui.set_display_scale(room.display_scale);
         let display = parse_xrandr();
         ui.set_display_output(display.output.into());
         ui.set_display_mode(display.mode.into());
@@ -1682,29 +1631,6 @@ fn bind(ui: &MainWindow) {
         }
         r();
     });
-    let r = refresh.clone();
-    ui.on_set_display_scale(move |scale| {
-        let info = parse_xrandr();
-        pi_room::with(|room| {
-            if room.display_native.is_empty() && info.mode != "—" {
-                room.display_native = info.mode.clone();
-            }
-            room.set_display_scale(scale);
-        });
-        if scale == 50 {
-            let parts: Vec<&str> = info.mode.split('x').collect();
-            let w = parts.first().and_then(|s| s.parse::<u32>().ok()).unwrap_or(1920) / 2;
-            let h = parts.get(1).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1200) / 2;
-            let _ = ensure_mode(&info.output, w.max(320), h.max(240), 60);
-        } else {
-            let native = pi_room::with(|room| room.display_native.clone());
-            if !native.is_empty() {
-                let _ = apply_xrandr_mode(&info.output, &native, Some("60"));
-            }
-        }
-        restart_kiosk();
-        r();
-    });
     // Theme and reduced motion are set here and at startup, never in push_ui.
     let weak = ui.as_weak();
     ui.on_set_theme(move |index| {
@@ -1880,7 +1806,7 @@ fn bind(ui: &MainWindow) {
     });
     let r = refresh.clone();
     ui.on_set_tab(move |t| {
-        pi_room::with(|room| room.settings_tab = t.clamp(0, 4));
+        pi_room::with(|room| room.settings_tab = t.clamp(0, 5));
         r();
     });
     let r = refresh.clone();
@@ -2713,11 +2639,6 @@ fn bind(ui: &MainWindow) {
                 ui.set_confirm_body("The panel will power off. Judie stays on screen until the computer shuts down.".into());
                 ui.set_confirm_kind("shutdown".into());
             }
-            "lowres" => {
-                ui.set_confirm_title("Switch to low quality?".into());
-                ui.set_confirm_body("The panel restarts at 960x600. If the screen stays black, it switches back on its own after 20 seconds.".into());
-                ui.set_confirm_kind("lowres".into());
-            }
             "fullres" => {
                 ui.set_confirm_title("Switch to full resolution?".into());
                 ui.set_confirm_body("The panel restarts at its native resolution.".into());
@@ -2734,11 +2655,6 @@ fn bind(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_cancel_confirm(move || {
         if let Some(ui) = weak.upgrade() {
-            if ui.get_confirm_kind() == "keep-lowres" {
-                ui.set_confirm_kind("".into());
-                begin_power_action(&ui, "fullres");
-                return;
-            }
             ui.set_confirm_kind("".into());
             ui.set_pending_routine_id("".into());
             ui.set_forget_ssid("".into());
@@ -2769,15 +2685,6 @@ fn bind(ui: &MainWindow) {
             return;
         }
         match ui.get_confirm_kind().as_str() {
-            "keep-lowres" => {
-                ui.set_confirm_kind("".into());
-                let _ = std::fs::remove_file(lowres_trial_path());
-            }
-            "lowres" => {
-                ui.set_confirm_kind("".into());
-                let _ = std::fs::write(lowres_trial_path(), "");
-                begin_power_action(&ui, "lowres");
-            }
             "fullres" => {
                 ui.set_confirm_kind("".into());
                 begin_power_action(&ui, "fullres");
@@ -2936,28 +2843,9 @@ fn main() {
     poll_latest(ui.as_weak());
     start_purifier();
 
+    // Low quality was removed in 0.3.15. A panel still set to it gets a
+    // one-way switch back in Settings → Display.
     ui.set_display_lowres(display_lowres());
-    // After a switch to 960x600, revert unless Keep is tapped: the panel may
-    // not take that mode, and then nobody can see the setting to undo it.
-    let lowres_timer = slint::Timer::default();
-    if lowres_trial_path().exists() {
-        if framebuffer_size().map(|s| s.width) == Some(960) {
-            ui.set_confirm_title("Keep low quality?".into());
-            ui.set_confirm_body("The panel is at 960x600. It switches back in 20 seconds unless you tap Keep.".into());
-            ui.set_confirm_kind("keep-lowres".into());
-            let weak = ui.as_weak();
-            lowres_timer.start(TimerMode::SingleShot, Duration::from_secs(20), move || {
-                if let Some(ui) = weak.upgrade() {
-                    if ui.get_confirm_kind() == "keep-lowres" {
-                        ui.set_confirm_kind("".into());
-                        begin_power_action(&ui, "fullres");
-                    }
-                }
-            });
-        } else {
-            let _ = std::fs::remove_file(lowres_trial_path());
-        }
-    }
 
     note_input();
     let weak = ui.as_weak();
